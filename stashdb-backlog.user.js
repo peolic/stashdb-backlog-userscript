@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.0.3
+// @version   1.1.0
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -161,7 +161,9 @@ async function inject() {
     if (!index) index = await getDataIndex();
     if (!index) throw new Error("[backlog] failed to get index");
 
-    if (index[`${object}s`].indexOf(uuid) === -1) {
+    const haystack = index[`${object}s`];
+    const notFound = Array.isArray(haystack) ? haystack.indexOf(uuid) === -1 : haystack[uuid] === undefined;
+    if (notFound) {
       return null;
     }
 
@@ -355,8 +357,7 @@ async function inject() {
         }
         if (toUpdate) {
           performer.classList.add('bg-primary', 'p-1');
-          performer.style.textDecoration = 'line-through';
-          performer.title = `<pending>\nupdate ${toUpdate.name}${!toUpdate.appearance ? '' : ' (as ' + toUpdate.appearance + ')'}`;
+          performer.title = `<pending>\nupdate to\n${toUpdate.name}${!toUpdate.appearance ? '' : ' (as ' + toUpdate.appearance + ')'}`;
           removeFrom(toUpdate, update);
         }
       });
@@ -440,19 +441,24 @@ async function inject() {
       return;
     }
 
-    const index = (await getDataIndex()) || {};
+    const index = await getDataIndex();
+    if (!index) return;
+
     cards.forEach((card) => {
       const markerDataset = card.parentElement.dataset;
       if (markerDataset.backlogInjected) return;
       else markerDataset.backlogInjected = true;
 
       const sceneId = card.querySelector('a').href.replace(/.+\//, '');
-      const found = index.scenes.indexOf(sceneId) !== -1;
+      const found = Array.isArray(index.scenes) ? index.scenes.indexOf(sceneId) !== -1 : index.scenes[sceneId];
       if (!found) return;
-      // const sceneData = await getDataFor('scene', sceneId, index);
+      const changes = (typeof found === 'string') ? found.split(/,/g) : null;
       card.style.outline = '0.4rem solid var(--yellow)';
-      // card.style.borderRadius = 'unset';
-      // card.parentElement.title = `<pending>\n${JSON.stringify(sceneData, null, 2)}`;
+      if (changes) {
+        card.parentElement.title = `<pending>\nchanges to:\n- ${changes.join('\n- ')}\n(click scene to view changes)`;
+      } else {
+        card.parentElement.title = `<pending>\n(click scene to view backlogged changes)`;
+      }
     });
   }
 }
