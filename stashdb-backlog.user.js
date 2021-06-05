@@ -2,7 +2,7 @@
 // @name      StashDB Backlog
 // @author    peolic
 // @version   1.0.0
-// @namespace	https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
+// @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
 // @grant     GM.getValue
 // @grant     GM.deleteValue
