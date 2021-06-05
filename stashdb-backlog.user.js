@@ -61,9 +61,9 @@ async function inject() {
     if (!loc) {
       throw new Error('[backlog] Failed to parse location!');
     }
-    
+
     await Promise.race([
-    	elementReady('.StashDBContent > .LoadingIndicator'),
+      elementReady('.StashDBContent > .LoadingIndicator'),
       wait(100),
     ]);
 
@@ -96,13 +96,13 @@ async function inject() {
     }
   });
 
- 	setTimeout(dispatcher, 0);
-  
+  setTimeout(dispatcher, 0);
+
   // =====
 
   const DATA_INDEX_KEY = 'stashdb_backlog_index';
   async function getDataIndex() {
-		const storedDataIndex = JSON.parse(await GM.getValue(DATA_INDEX_KEY, '{}'));
+    const storedDataIndex = JSON.parse(await GM.getValue(DATA_INDEX_KEY, '{}'));
     if (!storedDataIndex) {
       throw new Error("[backlog] invalid stored data");
     }
@@ -114,7 +114,7 @@ async function inject() {
         const data = await response.json();
         data.lastUpdated = new Date().toISOString();
         await GM.setValue(DATA_INDEX_KEY, JSON.stringify(data));
-      	console.debug(`[backlog] index ${lastUpdated ? 'updated' : 'fetched'}`);
+        console.debug(`[backlog] index ${lastUpdated ? 'updated' : 'fetched'}`);
         return data;
       } catch (error) {
         console.error('[backlog] index error', error);
@@ -122,23 +122,23 @@ async function inject() {
       }
     } else {
       console.debug('[backlog] index stored');
-			return storedDataIndex;
+      return storedDataIndex;
     }
   }
-  
+
   const makeDataPath = (object, uuid) => `${object}s/${uuid.slice(0, 2)}/${uuid}.json`;
   const DATA_KEY = 'stashdb_backlog';
 
   async function getDataFor(object, uuid, index = undefined) {
     if (!index) {
-    	index = (await getDataIndex()) || {};
+      index = (await getDataIndex()) || {};
     }
-    
+
     if (index[`${object}s`].indexOf(uuid) === -1) {
       return null;
     }
-    
-		const storedData = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
+
+    const storedData = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
     if (!storedData) {
       throw new Error("[backlog] invalid stored data");
     }
@@ -152,7 +152,7 @@ async function inject() {
         data.lastUpdated = new Date().toISOString();
         storedData[key] = data;
         await GM.setValue(DATA_KEY, JSON.stringify(storedData));
-      	console.debug(`[backlog] <${object} ${uuid}> data ${lastUpdated ? 'updated' : 'fetched'}`);
+        console.debug(`[backlog] <${object} ${uuid}> data ${lastUpdated ? 'updated' : 'fetched'}`);
         return data;
       } catch (error) {
         console.error(`[backlog] <${object} ${uuid}> data error`, error);
@@ -160,10 +160,10 @@ async function inject() {
       }
     } else {
       console.debug(`[backlog] <${object} ${uuid}> data stored`);
-			return storedData[key];
+      return storedData[key];
     }
   }
-  
+
   async function backlogClearCache() {
     await GM.deleteValue(DATA_INDEX_KEY);
     await GM.deleteValue(DATA_KEY);
@@ -178,22 +178,22 @@ async function inject() {
     unsafeWindow.console.info('data', data);
   }
   unsafeWindow.backlogCacheReport = exportFunction(backlogCacheReport, unsafeWindow);
-  
+
   async function getImage(url) {
-		const response = await fetch(url, {
+    const response = await fetch(url, {
       credentials: 'same-origin',
       referrerPolicy: 'same-origin',
-		});
+    });
     const data = await response.blob();
     return URL.createObjectURL(data);
   }
-  
+
   // =====
-  
+
   // SVG is rendered huge if FontAwesome was tree-shaken in compilation?
   const svgStyleFix = [
     'overflow: visible', // svg:not(:root).svg-inline--fa
-		'width: 1.125em', // .svg-inline--fa.fa-w-18
+    'width: 1.125em', // .svg-inline--fa.fa-w-18
     'display: inline-block', // .svg-inline--fa
     'font-size: inherit', // .svg-inline--fa
     'height: 1em', // .svg-inline--fa
@@ -242,7 +242,7 @@ async function inject() {
       return;
     }
     console.debug('[backlog] found', found);
-    
+
     if (found.comments && found.comments.length > 0) {
       const header = document.querySelector('.scene-info > .card-header');
       const comments = document.createElement('div');
@@ -251,11 +251,11 @@ async function inject() {
       found.comments.forEach((comment, index) => {
         if (index > 0) comments.appendChild(document.createElement('br'));
         let commentElement;
-      	if (/https?:/.test(comment)) {
-        	commentElement = document.createElement('a');
-        	commentElement.href = comment;
-        	commentElement.target = '_blank';
-        	commentElement.rel = 'nofollow noopener noreferrer';
+        if (/https?:/.test(comment)) {
+          commentElement = document.createElement('a');
+          commentElement.href = comment;
+          commentElement.target = '_blank';
+          commentElement.rel = 'nofollow noopener noreferrer';
         } else {
           commentElement = document.createElement('span');
         }
@@ -270,19 +270,19 @@ async function inject() {
       let title = document.querySelector('.scene-info h3');
       if (!title.innerText.trim()) {
         title.innerText = `<MISSING> ${found.title}`;
-      	title.classList.add('bg-danger', 'p-1');
+        title.classList.add('bg-danger', 'p-1');
       } else {
-      	title.classList.add('bg-warning', 'p-1');
-      	title.title = `<pending>\n${found.title}`;
+        title.classList.add('bg-warning', 'p-1');
+        title.title = `<pending>\n${found.title}`;
       }
     }
-    
+
     if (found.date || found.studio) {
       let studio_date = document.querySelector('.scene-info > .card-header > h6');
       studio_date.classList.add('bg-warning', 'p-1');
       studio_date.title = `<pending>${found.studio ? '\nStudio: ' + found.studio : ''}${found.date ? '\nDate: ' + found.date : ''}`;
     }
-    
+
     if (found.image) {
       let img = document.querySelector('.scene-photo > img');
 
@@ -291,13 +291,13 @@ async function inject() {
       img.addEventListener('click', () => GM.openInTab(found.image, false));
 
       if (img.getAttribute('src')) {
-      	img.classList.add('bg-warning', 'p-2');
-     		img.title = `<pending>\n${found.image}`;
+        img.classList.add('bg-warning', 'p-2');
+        img.title = `<pending>\n${found.image}`;
       } else {
-      	img.classList.add('bg-danger', 'p-2');
-      	// img.src = found.image;
-				img.src = await getImage(found.image);
-      	img.title = `<MISSING>\n${found.image}`;
+        img.classList.add('bg-danger', 'p-2');
+        // img.src = found.image;
+        img.src = await getImage(found.image);
+        img.title = `<MISSING>\n${found.image}`;
       }
     }
 
@@ -308,30 +308,30 @@ async function inject() {
         if (index === -1) console.error('[backlog] entry not found', entry, 'in', from);
         from.splice(index, 1);
       };
-      
+
       const scenePerformers = document.querySelector('.scene-info .scene-performers');
-			const existingPerformers = Array.from(scenePerformers.querySelectorAll(':scope > a.scene-performer'));
-      
+      const existingPerformers = Array.from(scenePerformers.querySelectorAll(':scope > a.scene-performer'));
+
       existingPerformers.forEach((performer) => {
         const { uuid } = parsePath(performer.href);
         const toRemove = remove.find((e) => e.id === uuid) || null;
         const toAppend = append.find((e) => e.id === uuid) || null;
         const toUpdate = !update ? null : update.find((e) => e.id === uuid) || null;
         if (toRemove) {
-      		performer.classList.add('bg-danger', 'p-1');
+          performer.classList.add('bg-danger', 'p-1');
           performer.style.textDecoration = 'line-through';
-      		performer.title = `<pending>\nremoval`;
+          performer.title = `<pending>\nremoval`;
           removeFrom(toRemove, remove);
         }
         if (toAppend) {
-      		performer.classList.add('bg-danger', 'p-1');
-      		performer.title = `<already added>`;
+          performer.classList.add('bg-danger', 'p-1');
+          performer.title = `<already added>`;
           removeFrom(toAppend, append);
         }
         if (toUpdate) {
-      		performer.classList.add('bg-primary', 'p-1');
+          performer.classList.add('bg-primary', 'p-1');
           performer.style.textDecoration = 'line-through';
-      		performer.title = `<pending>\nupdate ${toUpdate.name}${!toUpdate.appearance ? '' : ' (as ' + toUpdate.appearance + ')'}`;
+          performer.title = `<pending>\nupdate ${toUpdate.name}${!toUpdate.appearance ? '' : ' (as ' + toUpdate.appearance + ')'}`;
           removeFrom(toUpdate, update);
         }
       });
@@ -341,14 +341,14 @@ async function inject() {
         p.classList.add('scene-performer', 'bg-success', 'p-1');
         p.title = `<pending>\naddition`;
         if (entry.id) {
-        	p.href = `/performers/${entry.id}`;
+          p.href = `/performers/${entry.id}`;
         } else {
           p.title = `${p.title} (performer needs to be created)`;
         }
         const formattedName = (
-        	!entry.appearance
-        		? `<span>${entry.name}</span>`
-        		: `<span>${entry.appearance}</span><small class="ml-1 text-small text-muted">(${entry.name})</small>`
+          !entry.appearance
+            ? `<span>${entry.name}</span>`
+            : `<span>${entry.appearance}</span><small class="ml-1 text-small text-muted">(${entry.name})</small>`
         );
         const dsmbg = !entry.disambiguation ? '' : `<small class="ml-1 text-small text-muted">(${entry.disambiguation})</small>`;
         p.innerHTML = (
@@ -357,11 +357,11 @@ async function inject() {
           + formattedName
           + dsmbg
         );
-      	scenePerformers.appendChild(p);
+        scenePerformers.appendChild(p);
       });
 
       remove.forEach((entry) => {
-      	console.warning('[backlog] entry to remove not found. already removed?', entry);
+        console.warning('[backlog] entry to remove not found. already removed?', entry);
       });
       if (update) {
         update.forEach((entry) => {
@@ -375,11 +375,11 @@ async function inject() {
       if (!duration) {
         duration = document.createElement('div');
         duration.innerHTML = `&lt;MISSING&gt; Duration: <b>${found.duration}</b>`;
-      	duration.classList.add('bg-danger', 'p-1');
+        duration.classList.add('bg-danger', 'p-1');
         document.querySelector('.scene-info > .card-footer > *:first-child').insertAdjacentElement('afterend', duration);
       } else {
-      	duration.classList.add('bg-warning', 'p-1');
-      	duration.innerHTML = duration.innerHTML + ` => &lt;pending&gt; ${found.duration}`;
+        duration.classList.add('bg-warning', 'p-1');
+        duration.innerHTML = duration.innerHTML + ` => &lt;pending&gt; ${found.duration}`;
       }
     }
 
@@ -387,10 +387,10 @@ async function inject() {
       let desc = document.querySelector('.scene-description > h4 + div');
       if (!desc.innerText.trim()) {
         desc.innerText = `<MISSING> ${found.details}`;
-      	desc.classList.add('bg-danger');
+        desc.classList.add('bg-danger');
       } else {
-      	desc.classList.add('bg-warning');
-      	desc.title = `<pending>\n${found.details}`;
+        desc.classList.add('bg-warning');
+        desc.title = `<pending>\n${found.details}`;
       }
     }
 
@@ -400,9 +400,9 @@ async function inject() {
       studio_url.title = `<pending>\n${found.url}`;
     }
   } // iScenePage
-  
+
   // =====
-  
+
   async function highlightSceneCards() {
     await Promise.race([
       elementReady('.SceneCard > .card'),
@@ -424,9 +424,9 @@ async function inject() {
       const sceneId = card.querySelector('a').href.replace(/.+\//, '');
       const found = index.scenes.indexOf(sceneId) !== -1;
       if (!found) return;
-    	// const sceneData = await getDataFor('scene', sceneId, index);
+      // const sceneData = await getDataFor('scene', sceneId, index);
       card.style.outline = '0.3rem solid var(--warning)';
-			card.style.borderRadius = 'unset';
+      card.style.borderRadius = 'unset';
       // card.parentElement.title = `<pending>\n${JSON.stringify(sceneData, null, 2)}`;
     });
   }
