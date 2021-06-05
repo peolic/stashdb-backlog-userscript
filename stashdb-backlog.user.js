@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.1.0
+// @version   1.1.1
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -351,7 +351,7 @@ async function inject() {
           removeFrom(toRemove, remove);
         }
         if (toAppend) {
-          performer.classList.add('bg-danger', 'p-1');
+          performer.classList.add('bg-warning', 'p-1');
           performer.title = `<already added>`;
           removeFrom(toAppend, append);
         }
@@ -405,7 +405,11 @@ async function inject() {
         document.querySelector('.scene-info > .card-footer > *:first-child').insertAdjacentElement('afterend', duration);
       } else {
         duration.classList.add('bg-warning', 'p-1');
-        duration.innerHTML = duration.innerHTML + ` => &lt;pending&gt; ${found.duration}`;
+        if (found.duration == duration.title.match(/(\d+)/)[1]) {
+          duration.innerHTML = duration.innerHTML + ` &lt;already correct&gt;`;
+        } else {
+        	duration.innerHTML = duration.innerHTML + ` => &lt;pending&gt; ${found.duration}`;
+        }
       }
     }
 
