@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.1.1
+// @version   1.1.2
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -98,6 +98,46 @@ async function inject() {
   setTimeout(dispatcher, 0);
 
   // =====
+
+  /**
+   * @param {string} unsafe
+   * @returns {string}
+   */
+  function escapeHTML(unsafe) {
+    return unsafe
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  /**
+   * Format seconds as duration, adapted from stash-box
+   * @param {number | null} [dur] seconds
+   * @returns {string}
+   */
+  function formatDuration(dur) {
+    if (!dur) return "";
+    let value = dur;
+    let hour = 0;
+    let minute = 0;
+    let seconds = 0;
+    if (value >= 3600) {
+      hour = Math.floor(value / 3600);
+      value -= hour * 3600;
+    }
+    minute = Math.floor(value / 60);
+    value -= minute * 60;
+    seconds = value;
+
+    const res = [
+      minute.toString().padStart(2, "0"),
+      seconds.toString().padStart(2, "0"),
+    ];
+    if (hour) res.unshift(hour.toString());
+    return res.join(":");
+  }
 
   /**
    * @param {string} url
@@ -304,10 +344,35 @@ async function inject() {
       }
     }
 
-    if (found.date || found.studio) {
+    if (found.date || found.studio_id) {
       let studio_date = document.querySelector('.scene-info > .card-header > h6');
-      studio_date.classList.add('bg-warning', 'p-1');
-      studio_date.title = `<pending>${found.studio ? '\nStudio: ' + found.studio : ''}${found.date ? '\nDate: ' + found.date : ''}`;
+      let title = `<pending>`;
+      let alreadyCorrectStudioId = false;
+      if (found.studio_id) {
+        alreadyCorrectStudioId = found.studio_id === parsePath(studio_date.querySelector('a').href).uuid;
+        title += `\nStudio ID: ${found.studio_id}`;
+      }
+      let alreadyCorrectDate = false;
+      if (found.date) {
+        alreadyCorrectDate = found.date === Array.from(studio_date.childNodes).slice(-1)[0].nodeValue.trim();
+        title += `\nDate: ${found.date}`;
+      }
+      if (alreadyCorrectStudioId || alreadyCorrectDate) {
+        studio_date.classList.add('bg-warning', 'p-1');
+        if (alreadyCorrectDate) {
+          studio_date.innerHTML = studio_date.innerHTML + escapeHTML(' \u{1F878} <already correct>');
+        } else {
+          studio_date.innerHTML = escapeHTML('<already correct> \u{1F87A} ') + duration.innerHTML;
+        }
+        studio_date.title = (
+          [alreadyCorrectStudioId ? 'Studio ID' : null, alreadyCorrectDate ? 'Date' : null]
+            .filter(Boolean).join(' and ')
+          + ' already correct, should mark the entry on the backlog sheet as completed'
+        );
+      } else {
+        studio_date.classList.add('bg-primary', 'p-1');
+      }
+      studio_date.title = title;
     }
 
     if (found.image) {
@@ -352,7 +417,7 @@ async function inject() {
         }
         if (toAppend) {
           performer.classList.add('bg-warning', 'p-1');
-          performer.title = `<already added>`;
+          performer.title = `<already added>\nshould mark the entry on the backlog sheet as completed`;
           removeFrom(toAppend, append);
         }
         if (toUpdate) {
@@ -373,13 +438,13 @@ async function inject() {
         }
         const formattedName = (
           !entry.appearance
-            ? `<span>${entry.name}</span>`
-            : `<span>${entry.appearance}</span><small class="ml-1 text-small text-muted">(${entry.name})</small>`
+            ? `<span>${escapeHTML(entry.name)}</span>`
+            : `<span>${escapeHTML(entry.appearance)}</span><small class="ml-1 text-small text-muted">(${escapeHTML(entry.name)})</small>`
         );
-        const dsmbg = !entry.disambiguation ? '' : `<small class="ml-1 text-small text-muted">(${entry.disambiguation})</small>`;
+        const dsmbg = !entry.disambiguation ? '' : `<small class="ml-1 text-small text-muted">(${escapeHTML(entry.disambiguation)})</small>`;
         p.innerHTML = (
           genderIcon(existingPerformers.length === 0)
-          + (entry.id ? '' : `[${entry.status}] `)
+          + (entry.id ? '' : `[${escapeHTML(entry.status)}] `)
           + formattedName
           + dsmbg
         );
@@ -398,17 +463,28 @@ async function inject() {
 
     if (found.duration) {
       let duration = document.querySelector('.scene-info > .card-footer > div[title $= " seconds"]');
+      const foundDuration = Number(found.duration);
       if (!duration) {
         duration = document.createElement('div');
-        duration.innerHTML = `&lt;MISSING&gt; Duration: <b>${found.duration}</b>`;
+        duration.innerHTML = (
+          escapeHTML('<MISSING>')
+          + ` Duration: <b>${formatDuration(foundDuration)} (${found.duration})</b>`
+        );
         duration.classList.add('bg-danger', 'p-1');
+        duration.title = 'Duration is missing';
         document.querySelector('.scene-info > .card-footer > *:first-child').insertAdjacentElement('afterend', duration);
       } else {
-        duration.classList.add('bg-warning', 'p-1');
         if (found.duration == duration.title.match(/(\d+)/)[1]) {
-          duration.innerHTML = duration.innerHTML + ` &lt;already correct&gt;`;
+        	duration.classList.add('bg-warning', 'p-1');
+          duration.innerHTML = escapeHTML('<already correct> ') + duration.innerHTML;
+          duration.title = 'Duration already correct, should mark the entry on the backlog sheet as completed';
         } else {
-        	duration.innerHTML = duration.innerHTML + ` => &lt;pending&gt; ${found.duration}`;
+        	duration.classList.add('bg-primary', 'p-1');
+        	duration.innerHTML = (
+            escapeHTML('<pending> ')
+            + duration.innerHTML
+            + ` => ${formatDuration(foundDuration)} (${found.duration})`
+          );
         }
       }
     }
