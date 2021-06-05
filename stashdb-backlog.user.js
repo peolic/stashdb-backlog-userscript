@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.1.2
+// @version   1.1.3
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -70,14 +70,14 @@ async function inject() {
       await iScenePage(loc.uuid);
 
     } else if (loc.object === 'scenes' && !loc.uuid && !loc.action) {
-      await highlightSceneCards();
+      await highlightSceneCards(loc.object);
 
     } else if (['performers', 'studios', 'tags'].includes(loc.object) && loc.uuid && !loc.action) {
-      await highlightSceneCards();
+      await highlightSceneCards(loc.object);
 
     // Home page
     } else if (!loc.object && !loc.uuid && !loc.action) {
-      await highlightSceneCards();
+      await highlightSceneCards(loc.object);
 
     } else {
       console.debug(`[backlog] nothing to do for ${loc.object}/${loc.uuid}/${loc.action}.`);
@@ -149,6 +149,11 @@ async function inject() {
         credentials: 'same-origin',
         referrerPolicy: 'same-origin',
       });
+      if (!response.ok) {
+        const body = await response.text();
+        console.error('[backlog] fetch bad response', response.status, body);
+        return { error: true, status: response.status, body };
+      }
       const data = await response.json();
       return data;
 
@@ -179,8 +184,8 @@ async function inject() {
     }
     if (shouldFetch(storedDataIndex, 1)) {
       const data = await fetchJSON('https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main/index.json');
-      if (data === null) {
-        console.error('[backlog] index error');
+      if (data === null || data.error) {
+        console.error('[backlog] index error', data);
         return null;
       }
       const action = !!data.lastUpdated ? 'updated' : 'fetched';
@@ -194,16 +199,72 @@ async function inject() {
     }
   }
 
+  const makeObjectKey = (object, uuid) => `${object}/${uuid}`;
   const makeDataPath = (object, uuid) => `${object}s/${uuid.slice(0, 2)}/${uuid}.json`;
   const DATA_KEY = 'stashdb_backlog';
+
+  /**
+   * @param {'scene' | 'performer'} object
+   * @param {string} uuid
+   * @param {*} storedData
+   * @param {*} index
+   * @returns {Promise<{ [key: string]: any } | null>}
+   */
+  const _fetchObject = async (object, uuid, storedData, index) => {
+    const data = await fetchJSON(
+      `https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main/${makeDataPath(object, uuid)}`
+    );
+
+    const haystack = index[`${object}s`];
+    const key = makeObjectKey(object, uuid);
+
+    if (data && data.error && data.status === 404) {
+      // remove from data index
+      if (Array.isArray(haystack)) {
+        const index = haystack.indexOf(uuid);
+        if (index !== -1) {
+          haystack.splice(index, 1);
+        }
+      } else if (haystack[uuid] !== undefined) {
+        delete haystack[uuid];
+      }
+      await GM.setValue(DATA_INDEX_KEY, JSON.stringify(index));
+
+      // remove from data
+      delete storedData[key];
+      await GM.setValue(DATA_KEY, JSON.stringify(storedData));
+
+      console.debug(`[backlog] <${object} ${uuid}> removed, no longer valid`);
+      return null;
+    } else if (data === null || data.error) {
+      console.error(`[backlog] <${object} ${uuid}> data error`, data);
+      return null;
+    }
+
+    const action = !!data.lastUpdated ? 'updated' : 'fetched';
+    data.lastUpdated = new Date().toISOString();
+    storedData[key] = data;
+    await GM.setValue(DATA_KEY, JSON.stringify(storedData));
+
+    // add to data index if not present
+    if (Array.isArray(haystack) && !haystack.includes(uuid)) {
+      haystack.splice(haystack.length - 1, 0, uuid);
+    } else if (haystack[uuid] === undefined) {
+      haystack[uuid] = Object.keys(data).filter((k) => ['lastUpdated', 'comments'].includes(k)).join(',');
+    }
+    await GM.setValue(DATA_INDEX_KEY, JSON.stringify(index));
+
+    console.debug(`[backlog] <${object} ${uuid}> data ${action}`);
+    return data;
+  };
 
   async function getDataFor(object, uuid, index = undefined) {
     if (!index) index = await getDataIndex();
     if (!index) throw new Error("[backlog] failed to get index");
 
     const haystack = index[`${object}s`];
-    const notFound = Array.isArray(haystack) ? haystack.indexOf(uuid) === -1 : haystack[uuid] === undefined;
-    if (notFound) {
+    const found = Array.isArray(haystack) ? haystack.includes(uuid) : haystack[uuid] !== undefined;
+    if (!found) {
       return null;
     }
 
@@ -212,24 +273,16 @@ async function inject() {
       throw new Error("[backlog] invalid stored data");
     }
 
-    const key = `${object}/${uuid}`;
+    const key = makeObjectKey(object, uuid);
     if (shouldFetch(storedData[key], 24)) {
-      const data = await fetchJSON(`https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main/${makeDataPath(object, uuid)}`);
-      if (!data) {
-        console.error(`[backlog] <${object} ${uuid}> data error`);
-        return null;
-      }
-      const action = !!data.lastUpdated ? 'updated' : 'fetched';
-      data.lastUpdated = new Date().toISOString();
-      storedData[key] = data;
-      await GM.setValue(DATA_KEY, JSON.stringify(storedData));
-      console.debug(`[backlog] <${object} ${uuid}> data ${action}`);
-      return data;
-    } else {
-      console.debug(`[backlog] <${object} ${uuid}> data stored`);
-      return storedData[key];
+      return await _fetchObject(object, uuid, storedData, index);
     }
+
+    console.debug(`[backlog] <${object} ${uuid}> data stored`);
+    return storedData[key];
   }
+
+  // ===
 
   async function backlogClearCache() {
     await GM.deleteValue(DATA_INDEX_KEY);
@@ -237,6 +290,33 @@ async function inject() {
     unsafeWindow.console.info('[backlog] stored data cleared');
   }
   unsafeWindow.backlogClearCache = exportFunction(backlogClearCache, unsafeWindow);
+
+  // ===
+
+  async function backlogRefetch() {
+    const { object: pluralObject, uuid } = parsePath();
+    if (!pluralObject || !['scenes'].includes(pluralObject) || !uuid) {
+      unsafeWindow.console.warning(`[backlog] invalid request: <${object} ${uuid}>`);
+      return;
+    }
+    const object = pluralObject.slice(0, -1);
+
+    const storedData = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
+    if (!storedData) {
+      throw new Error("[backlog] invalid stored data");
+    }
+
+    const index = await getDataIndex();
+    if (!index) throw new Error("[backlog] failed to get index");
+
+    const data = await _fetchObject(object, uuid, storedData, index);
+    if (data === null) {
+      unsafeWindow.console.warning(`[backlog] <${object} ${uuid}> failed to refetch`);
+    }
+  }
+  unsafeWindow.backlogRefetch = exportFunction(backlogRefetch, unsafeWindow);
+
+  // ===
 
   async function backlogCacheReport() {
     const index = JSON.parse(await GM.getValue(DATA_INDEX_KEY, '{}'));
@@ -246,6 +326,8 @@ async function inject() {
   }
   unsafeWindow.backlogCacheReport = exportFunction(backlogCacheReport, unsafeWindow);
 
+  // =====
+
   async function getImage(url) {
     const response = await fetch(url, {
       credentials: 'same-origin',
@@ -254,8 +336,6 @@ async function inject() {
     const data = await response.blob();
     return URL.createObjectURL(data);
   }
-
-  // =====
 
   // SVG is rendered huge if FontAwesome was tree-shaken in compilation?
   const svgStyleFix = [
@@ -401,35 +481,68 @@ async function inject() {
         from.splice(index, 1);
       };
 
+      const parsePerformerAppearance = (/** @type {HTMLAnchorElement} */ pa) => {
+        const { uuid } = parsePath(pa.href);
+        const fullName = Array.from(pa.childNodes).slice(1).map((n) => n.textContent).join(' ');
+        return { uuid, fullName };
+      };
+
+      const formatName = (entry) => {
+        const disambiguation = entry.disambiguation ? ` (${entry.disambiguation})` : '';
+        if (!entry.appearance) return entry.name + disambiguation;
+        return entry.appearance + ` (${entry.name})` + disambiguation;
+      };
+
+      const highlight = (/** @type {HTMLElement} */ e, /** @type {string} */ v) => {
+        // e.classList.add(`bg-${v}`, 'p-1');
+
+        e.style.border = `6px solid var(--${v})`;
+        e.style.borderRadius = '6px';
+        e.style.padding = '.25rem';
+      };
+
       const scenePerformers = document.querySelector('.scene-info .scene-performers');
       const existingPerformers = Array.from(scenePerformers.querySelectorAll(':scope > a.scene-performer'));
 
       existingPerformers.forEach((performer) => {
-        const { uuid } = parsePath(performer.href);
+        const { uuid, fullName } = parsePerformerAppearance(performer);
         const toRemove = remove.find((e) => e.id === uuid) || null;
         const toAppend = append.find((e) => e.id === uuid) || null;
         const toUpdate = !update ? null : update.find((e) => e.id === uuid) || null;
         if (toRemove) {
-          performer.classList.add('bg-danger', 'p-1');
+          highlight(performer, 'danger');
           performer.style.textDecoration = 'line-through';
           performer.title = `<pending>\nremoval`;
           removeFrom(toRemove, remove);
         }
         if (toAppend) {
-          performer.classList.add('bg-warning', 'p-1');
-          performer.title = `<already added>\nshould mark the entry on the backlog sheet as completed`;
+          const entryFullName = formatName(toAppend);
+          if (fullName === entryFullName) {
+            highlight(performer, 'warning');
+            performer.title = `<already added>\nshould mark the entry on the backlog sheet as completed`;
+          } else {
+            highlight(performer, 'primary');
+            performer.title = `<already added>\nbut needs an update to\n${entryFullName}`;
+          }
           removeFrom(toAppend, append);
         }
         if (toUpdate) {
-          performer.classList.add('bg-primary', 'p-1');
-          performer.title = `<pending>\nupdate to\n${toUpdate.name}${!toUpdate.appearance ? '' : ' (as ' + toUpdate.appearance + ')'}`;
+          const entryFullName = formatName(toUpdate);
+          if (fullName === entryFullName) {
+            highlight(performer, 'warning');
+            performer.title = `<already updated>\nshould mark the entry on the backlog sheet as completed`;
+          } else {
+            highlight(performer, 'primary');
+            performer.title = `<pending>\nupdate to\n${entryFullName}`;
+          }
           removeFrom(toUpdate, update);
         }
       });
 
       append.forEach((entry) => {
         const p = document.createElement('a');
-        p.classList.add('scene-performer', 'bg-success', 'p-1');
+        p.classList.add('scene-performer');
+        highlight(p, 'success');
         p.title = `<pending>\naddition`;
         if (entry.id) {
           p.href = `/performers/${entry.id}`;
@@ -509,14 +622,13 @@ async function inject() {
 
   // =====
 
-  async function highlightSceneCards() {
+  async function highlightSceneCards(pluralObject) {
     await Promise.race([
       elementReady('.SceneCard > .card'),
       wait(2000),
     ]);
 
-    const cards = Array.from(document.querySelectorAll('.SceneCard > .card'));
-    if (cards.length === 0) {
+    if (document.querySelectorAll('.SceneCard > .card').length === 0) {
       console.debug('[backlog] no scene cards found, skipping');
       return;
     }
@@ -524,22 +636,40 @@ async function inject() {
     const index = await getDataIndex();
     if (!index) return;
 
-    cards.forEach((card) => {
-      const markerDataset = card.parentElement.dataset;
-      if (markerDataset.backlogInjected) return;
-      else markerDataset.backlogInjected = true;
+    const highlight = async () => {
+      Array.from(document.querySelectorAll('.SceneCard > .card')).forEach((card) => {
+        const markerDataset = card.parentElement.dataset;
+        if (markerDataset.backlogInjected) return;
+        else markerDataset.backlogInjected = true;
 
-      const sceneId = card.querySelector('a').href.replace(/.+\//, '');
-      const found = Array.isArray(index.scenes) ? index.scenes.indexOf(sceneId) !== -1 : index.scenes[sceneId];
-      if (!found) return;
-      const changes = (typeof found === 'string') ? found.split(/,/g) : null;
-      card.style.outline = '0.4rem solid var(--yellow)';
-      if (changes) {
-        card.parentElement.title = `<pending>\nchanges to:\n- ${changes.join('\n- ')}\n(click scene to view changes)`;
-      } else {
-        card.parentElement.title = `<pending>\n(click scene to view backlogged changes)`;
-      }
-    });
+        const sceneId = card.querySelector('a').href.replace(/.+\//, '');
+        const found = Array.isArray(index.scenes) ? index.scenes.includes(sceneId) : index.scenes[sceneId];
+        if (!found) return;
+        const changes = (typeof found === 'string') ? found.split(/,/g) : null;
+        card.style.outline = '0.4rem solid var(--yellow)';
+        if (changes) {
+          card.parentElement.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
+        } else {
+          card.parentElement.title = `<pending>\n(click scene to view backlogged changes)`;
+        }
+      });
+    };
+
+    highlight();
+
+    if (pluralObject === 'performers') {
+      const studioSelectorValue = document.querySelector(
+        '.PerformerScenes > .CheckboxSelect > .react-select__control > .react-select__value-container'
+      );
+      const observer = new MutationObserver(async (mutations, observer) => {
+        console.debug('[backlog] detected change in performers studios selector, re-highlighting scene cards');
+        await Promise.race([
+          elementReady('.SceneCard > .card'),
+          wait(2000),
+        ]);
+        await highlight();
+      }).observe(studioSelectorValue, { childList: true, subtree: true });
+    }
   }
 }
 
