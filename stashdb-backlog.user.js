@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.0.1
+// @version   1.0.2
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
 // @grant     GM.getValue
@@ -425,8 +425,8 @@ async function inject() {
       const found = index.scenes.indexOf(sceneId) !== -1;
       if (!found) return;
       // const sceneData = await getDataFor('scene', sceneId, index);
-      card.style.outline = '0.3rem solid var(--warning)';
-      card.style.borderRadius = 'unset';
+      card.style.outline = '0.4rem solid var(--yellow)';
+      // card.style.borderRadius = 'unset';
       // card.parentElement.title = `<pending>\n${JSON.stringify(sceneData, null, 2)}`;
     });
   }
