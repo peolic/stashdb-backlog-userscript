@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.0.2
+// @version   1.0.3
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
+// @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
 // @grant     GM.getValue
 // @grant     GM.deleteValue
@@ -40,12 +41,10 @@ async function inject() {
       action: null,
     };
 
-    if (!pathname)
-      return result;
+    if (!pathname) return result;
 
     const match = urlRegex.exec(pathname);
-    if (!match || match.length === 0)
-      return null;
+    if (!match || match.length === 0) return null;
 
     result.object = match[1] || null;
     result.uuid = match[2] || null;
@@ -100,26 +99,55 @@ async function inject() {
 
   // =====
 
+  /**
+   * @param {string} url
+   * @returns {Promise<{ [key: string]: any } | null>}
+   */
+  async function fetchJSON(url) {
+    try {
+      const response = await fetch(url, {
+        credentials: 'same-origin',
+        referrerPolicy: 'same-origin',
+      });
+      const data = await response.json();
+      return data;
+
+    } catch (error) {
+      console.error('[backlog] fetch error', error);
+      return null;
+    }
+  }
+
+  /**
+   * @param {{ lastUpdated?: string }} storedObject
+   * @param {number} maxTime in hours
+   * @returns {boolean}
+   */
+  function shouldFetch(storedObject, maxTime) {
+    if (!storedObject) return true;
+    const { lastUpdated } = storedObject;
+    if (!lastUpdated) return true;
+    const cacheInvalidation = (new Date(lastUpdated).getTime()) + 1000 * 60 * 60 * maxTime;
+    return new Date().getTime() >= cacheInvalidation;
+  }
+
   const DATA_INDEX_KEY = 'stashdb_backlog_index';
   async function getDataIndex() {
     const storedDataIndex = JSON.parse(await GM.getValue(DATA_INDEX_KEY, '{}'));
     if (!storedDataIndex) {
       throw new Error("[backlog] invalid stored data");
     }
-    const { lastUpdated } = storedDataIndex;
-    const cacheInvalidation = (new Date(lastUpdated).getTime()) + 1000 * 60 * 60 * 1;
-    if (!lastUpdated || new Date().getTime() >= cacheInvalidation) {
-      try {
-        const response = await fetch('https://github.com/peolic/stashdb_backlog_data/raw/main/index.json');
-        const data = await response.json();
-        data.lastUpdated = new Date().toISOString();
-        await GM.setValue(DATA_INDEX_KEY, JSON.stringify(data));
-        console.debug(`[backlog] index ${lastUpdated ? 'updated' : 'fetched'}`);
-        return data;
-      } catch (error) {
-        console.error('[backlog] index error', error);
+    if (shouldFetch(storedDataIndex, 1)) {
+      const data = await fetchJSON('https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main/index.json');
+      if (data === null) {
+        console.error('[backlog] index error');
         return null;
       }
+      const action = !!data.lastUpdated ? 'updated' : 'fetched';
+      data.lastUpdated = new Date().toISOString();
+      await GM.setValue(DATA_INDEX_KEY, JSON.stringify(data));
+      console.debug(`[backlog] index ${action}`);
+      return data;
     } else {
       console.debug('[backlog] index stored');
       return storedDataIndex;
@@ -130,9 +158,8 @@ async function inject() {
   const DATA_KEY = 'stashdb_backlog';
 
   async function getDataFor(object, uuid, index = undefined) {
-    if (!index) {
-      index = (await getDataIndex()) || {};
-    }
+    if (!index) index = await getDataIndex();
+    if (!index) throw new Error("[backlog] failed to get index");
 
     if (index[`${object}s`].indexOf(uuid) === -1) {
       return null;
@@ -142,22 +169,20 @@ async function inject() {
     if (!storedData) {
       throw new Error("[backlog] invalid stored data");
     }
+
     const key = `${object}/${uuid}`;
-    const { lastUpdated } = storedData[key] || {};
-    const cacheInvalidation = (new Date(lastUpdated).getTime()) + 1000 * 60 * 60 * 24;
-    if (!lastUpdated || new Date().getTime() >= cacheInvalidation) {
-      try {
-        const response = await fetch(`https://github.com/peolic/stashdb_backlog_data/raw/main/${makeDataPath(object, uuid)}`);
-        const data = await response.json();
-        data.lastUpdated = new Date().toISOString();
-        storedData[key] = data;
-        await GM.setValue(DATA_KEY, JSON.stringify(storedData));
-        console.debug(`[backlog] <${object} ${uuid}> data ${lastUpdated ? 'updated' : 'fetched'}`);
-        return data;
-      } catch (error) {
-        console.error(`[backlog] <${object} ${uuid}> data error`, error);
+    if (shouldFetch(storedData[key], 24)) {
+      const data = await fetchJSON(`https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main/${makeDataPath(object, uuid)}`);
+      if (!data) {
+        console.error(`[backlog] <${object} ${uuid}> data error`);
         return null;
       }
+      const action = !!data.lastUpdated ? 'updated' : 'fetched';
+      data.lastUpdated = new Date().toISOString();
+      storedData[key] = data;
+      await GM.setValue(DATA_KEY, JSON.stringify(storedData));
+      console.debug(`[backlog] <${object} ${uuid}> data ${action}`);
+      return data;
     } else {
       console.debug(`[backlog] <${object} ${uuid}> data stored`);
       return storedData[key];
