@@ -11,6 +11,7 @@
 // @include   https://stashdb.org/*
 // ==/UserScript==
 
+//@ts-check
 
 async function inject() {
   const urlRegex = new RegExp(
@@ -185,6 +186,7 @@ async function inject() {
 
   const DATA_INDEX_KEY = 'stashdb_backlog_index';
   async function getDataIndex() {
+    //@ts-expect-error
     const storedDataIndex = JSON.parse(await GM.getValue(DATA_INDEX_KEY, '{}'));
     if (!storedDataIndex) {
       throw new Error("[backlog] invalid stored data");
@@ -197,6 +199,7 @@ async function inject() {
       }
       const action = !!data.lastUpdated ? 'updated' : 'fetched';
       data.lastUpdated = new Date().toISOString();
+      //@ts-expect-error
       await GM.setValue(DATA_INDEX_KEY, JSON.stringify(data));
       console.debug(`[backlog] index ${action}`);
       return data;
@@ -235,10 +238,12 @@ async function inject() {
       } else if (haystack[uuid] !== undefined) {
         delete haystack[uuid];
       }
+      //@ts-expect-error
       await GM.setValue(DATA_INDEX_KEY, JSON.stringify(index));
 
       // remove from data
       delete storedData[key];
+      //@ts-expect-error
       await GM.setValue(DATA_KEY, JSON.stringify(storedData));
 
       console.debug(`[backlog] <${object} ${uuid}> removed, no longer valid`);
@@ -251,6 +256,7 @@ async function inject() {
     const action = !!data.lastUpdated ? 'updated' : 'fetched';
     data.lastUpdated = new Date().toISOString();
     storedData[key] = data;
+    //@ts-expect-error
     await GM.setValue(DATA_KEY, JSON.stringify(storedData));
 
     // add to data index if not present
@@ -259,6 +265,7 @@ async function inject() {
     } else if (haystack[uuid] === undefined) {
       haystack[uuid] = Object.keys(data).filter((k) => ['lastUpdated', 'comments'].includes(k)).join(',');
     }
+    //@ts-expect-error
     await GM.setValue(DATA_INDEX_KEY, JSON.stringify(index));
 
     console.debug(`[backlog] <${object} ${uuid}> data ${action}`);
@@ -275,6 +282,7 @@ async function inject() {
       return null;
     }
 
+    //@ts-expect-error
     const storedData = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
     if (!storedData) {
       throw new Error("[backlog] invalid stored data");
@@ -292,10 +300,14 @@ async function inject() {
   // ===
 
   async function backlogClearCache() {
+    //@ts-expect-error
     await GM.deleteValue(DATA_INDEX_KEY);
+    //@ts-expect-error
     await GM.deleteValue(DATA_KEY);
+    //@ts-expect-error
     unsafeWindow.console.info('[backlog] stored data cleared');
   }
+  //@ts-expect-error
   unsafeWindow.backlogClearCache = exportFunction(backlogClearCache, unsafeWindow);
 
   // ===
@@ -303,11 +315,14 @@ async function inject() {
   async function backlogRefetch() {
     const { object: pluralObject, uuid } = parsePath();
     if (!pluralObject || !['scenes'].includes(pluralObject) || !uuid) {
-      unsafeWindow.console.warning(`[backlog] invalid request: <${object} ${uuid}>`);
+      //@ts-expect-error
+      unsafeWindow.console.warning(`[backlog] invalid request: <${pluralObject} ${uuid}>`);
       return;
     }
-    const object = pluralObject.slice(0, -1);
+    /** @type {'scene' | 'performer'} */
+    const object = (pluralObject.slice(0, -1));
 
+    //@ts-expect-error
     const storedData = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
     if (!storedData) {
       throw new Error("[backlog] invalid stored data");
@@ -318,23 +333,33 @@ async function inject() {
 
     const data = await _fetchObject(object, uuid, storedData, index);
     if (data === null) {
+      //@ts-expect-error
       unsafeWindow.console.warning(`[backlog] <${object} ${uuid}> failed to refetch`);
     }
   }
+  //@ts-expect-error
   unsafeWindow.backlogRefetch = exportFunction(backlogRefetch, unsafeWindow);
 
   // ===
 
   async function backlogCacheReport() {
+    //@ts-expect-error
     const index = JSON.parse(await GM.getValue(DATA_INDEX_KEY, '{}'));
+    //@ts-expect-error
     unsafeWindow.console.info('index', index);
+    //@ts-expect-error
     const data = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
+    //@ts-expect-error
     unsafeWindow.console.info('data', data);
   }
+  //@ts-expect-error
   unsafeWindow.backlogCacheReport = exportFunction(backlogCacheReport, unsafeWindow);
 
   // =====
 
+  /**
+   * @param {string} url Image URL
+   */
   async function getImage(url) {
     const response = await fetch(url, {
       credentials: 'same-origin',
@@ -376,7 +401,7 @@ async function inject() {
       wait(2000),
     ]);
 
-    const sceneInfo = document.querySelector('.scene-info');
+    const sceneInfo = /** @type {HTMLDivElement | null} */ (document.querySelector('.scene-info'));
     if (!sceneInfo) {
       console.error('[backlog] scene info not found');
       return;
@@ -387,7 +412,7 @@ async function inject() {
       console.debug('[backlog] already injected, skipping');
       return;
     } else {
-      markerDataset.backlogInjected = true;
+      markerDataset.backlogInjected = 'true';
     }
 
     const found = await getDataFor('scene', sceneId);
@@ -397,7 +422,7 @@ async function inject() {
     }
     console.debug('[backlog] found', found);
 
-    const sceneHeader = sceneInfo.querySelector(':scope > .card-header');
+    const sceneHeader = /** @type {HTMLDivElement} */ (sceneInfo.querySelector(':scope > .card-header'));
     sceneHeader.style.borderTop = '1rem solid var(--warning)';
     sceneHeader.title = 'pending changes (backlog)';
 
@@ -405,7 +430,8 @@ async function inject() {
       const comments = document.createElement('div');
       comments.classList.add('bg-info');
 
-      found.comments.forEach((comment, index) => {
+      /** @type {string[]} */
+      (found.comments).forEach((comment, index) => {
         if (index > 0) comments.appendChild(document.createElement('br'));
         let commentElement;
         if (/https?:/.test(comment)) {
@@ -424,7 +450,7 @@ async function inject() {
     }
 
     if (found.title) {
-      let title = document.querySelector('.scene-info h3');
+      let title = /** @type {HTMLHeadingElement | null} */ (document.querySelector('.scene-info h3'));
       if (!title.innerText.trim()) {
         title.innerText = `<MISSING> ${found.title}`;
         title.classList.add('bg-danger', 'p-1');
@@ -435,7 +461,7 @@ async function inject() {
     }
 
     if (found.date || found.studio_id) {
-      let studio_date = sceneHeader.querySelector(':scope > h6');
+      let studio_date = /** @type {HTMLHeadingElement | null} */ (sceneHeader.querySelector(':scope > h6'));
       let title = `<pending>`;
       let alreadyCorrectStudioId = false;
       if (found.studio_id) {
@@ -452,7 +478,7 @@ async function inject() {
         if (alreadyCorrectDate) {
           studio_date.innerHTML = studio_date.innerHTML + escapeHTML(' \u{1F878} <already correct>');
         } else {
-          studio_date.innerHTML = escapeHTML('<already correct> \u{1F87A} ') + duration.innerHTML;
+          studio_date.innerHTML = escapeHTML('<already correct> \u{1F87A} ') + studio_date.innerHTML;
         }
         studio_date.title = (
           [alreadyCorrectStudioId ? 'Studio ID' : null, alreadyCorrectDate ? 'Date' : null]
@@ -466,10 +492,11 @@ async function inject() {
     }
 
     if (found.image) {
-      let img = document.querySelector('.scene-photo > img');
+      let img = /** @type {HTMLImageElement} */ (document.querySelector('.scene-photo > img'));
 
       img.addEventListener('mouseover', () => img.style.cursor = 'pointer');
       img.addEventListener('mouseout', () => img.removeAttribute('style'));
+      //@ts-expect-error
       img.addEventListener('click', () => GM.openInTab(found.image, false));
 
       if (img.getAttribute('src')) {
@@ -479,7 +506,9 @@ async function inject() {
         img.classList.add('bg-danger', 'p-2');
         img.title = `<MISSING>\n${found.image}`;
         // img.src = found.image;
-        setTimeout(async () => img.src = await getImage(found.image), 0);
+        getImage(found.image).then((blobURL) => {
+          img.src = blobURL;
+        });
       }
     }
 
@@ -512,7 +541,10 @@ async function inject() {
       };
 
       const scenePerformers = document.querySelector('.scene-info .scene-performers');
-      const existingPerformers = Array.from(scenePerformers.querySelectorAll(':scope > a.scene-performer'));
+      const existingPerformers = (
+        /** @type {HTMLAnchorElement[]} */
+        (Array.from(scenePerformers.querySelectorAll(':scope > a.scene-performer')))
+      );
 
       existingPerformers.forEach((performer) => {
         const { uuid, fullName } = parsePerformerAppearance(performer);
@@ -575,17 +607,20 @@ async function inject() {
       });
 
       remove.forEach((entry) => {
-        console.warning('[backlog] entry to remove not found. already removed?', entry);
+        // FIXME: Make it a visible warning
+        console.warn('[backlog] entry to remove not found. already removed?', entry);
       });
       if (update) {
         update.forEach((entry) => {
-          console.warning('[backlog] entry to update not found.', entry);
+          // FIXME: Make it a visible warning
+          console.warn('[backlog] entry to update not found.', entry);
         });
       }
     }
 
     if (found.duration) {
-      let duration = document.querySelector('.scene-info > .card-footer > div[title $= " seconds"]');
+      /** @type {HTMLDivElement | null} */
+      let duration = (document.querySelector('.scene-info > .card-footer > div[title $= " seconds"]'));
       const foundDuration = Number(found.duration);
       if (!duration) {
         duration = document.createElement('div');
@@ -613,7 +648,8 @@ async function inject() {
     }
 
     if (found.details) {
-      let desc = document.querySelector('.scene-description > h4 + div');
+      /** @type {HTMLDivElement} */
+      let desc = (document.querySelector('.scene-description > h4 + div'));
       if (!desc.innerText.trim()) {
         desc.innerText = `<MISSING> ${found.details}`;
         desc.classList.add('bg-danger');
@@ -624,7 +660,8 @@ async function inject() {
     }
 
     if (found.url) {
-      let studio_url = document.querySelector('.scene-description > div:last-of-type > a');
+      /** @type {HTMLAnchorElement} */
+      let studio_url = (document.querySelector('.scene-description > div:last-of-type > a'));
       studio_url.classList.add('bg-warning');
       studio_url.title = `<pending>\n${found.url}`;
     }
@@ -633,14 +670,14 @@ async function inject() {
   // =====
 
   async function iSceneEditPage(sceneId) {
-    const pageTitle = await elementReady('h3');
+    const pageTitle = /** @type {HTMLHeadingElement} */ (await elementReady('h3'));
 
     const markerDataset = pageTitle.dataset;
     if (markerDataset.backlogInjected) {
       console.debug('[backlog] already injected, skipping');
       return;
     } else {
-      markerDataset.backlogInjected = true;
+      markerDataset.backlogInjected = 'true';
     }
 
     const found = await getDataFor('scene', sceneId);
@@ -737,10 +774,11 @@ async function inject() {
     if (!index) return;
 
     const highlight = async () => {
-      Array.from(document.querySelectorAll('.SceneCard > .card')).forEach((card) => {
+      /** @type {HTMLDivElement[]} */
+      (Array.from(document.querySelectorAll('.SceneCard > .card'))).forEach((card) => {
         const markerDataset = card.parentElement.dataset;
         if (markerDataset.backlogInjected) return;
-        else markerDataset.backlogInjected = true;
+        else markerDataset.backlogInjected = 'true';
 
         const sceneId = card.querySelector('a').href.replace(/.+\//, '');
         const found = Array.isArray(index.scenes) ? index.scenes.includes(sceneId) : index.scenes[sceneId];
