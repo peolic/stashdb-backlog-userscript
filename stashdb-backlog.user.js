@@ -374,9 +374,9 @@ async function inject() {
     const reader = new FileReader();
     reader.readAsDataURL(data);
     return new Promise((resolve) => {
-      reader.onloadend = () => {
+      reader.addEventListener('loadend', () => {
         resolve(reader.result);
-      };
+      });
     });
   }
 
@@ -527,37 +527,55 @@ async function inject() {
       let img = /** @type {HTMLImageElement} */ (document.querySelector('.scene-photo > img'));
       const imgContainer = img.parentElement;
 
-      imgContainer.addEventListener('mouseover', () => imgContainer.style.cursor = 'pointer');
-      imgContainer.addEventListener('mouseout', () => imgContainer.removeAttribute('style'));
-      //@ts-expect-error
-      imgContainer.addEventListener('click', () => GM.openInTab(found.image, false));
-
       if (img.getAttribute('src')) {
         imgContainer.classList.add('bg-warning', 'p-2');
         imgContainer.title = `<pending>\n${found.image}`;
-        img.addEventListener('load', async () => {
+        const handleExistingImage = async () => {
           const newImage = await compareImages(img, found.image);
           if (newImage instanceof Error) {
             console.error('[backlog] error comparing image', newImage);
             return;
           }
           if (newImage === null) {
-            img.classList.add('bg-primary');
-            img.classList.remove('bg-warning');
-            img.title = `<already added>\nshould mark the entry on the backlog sheet as completed\n\n${found.image}`;
+            imgContainer.classList.add('bg-primary');
+            imgContainer.classList.remove('bg-warning');
+            imgContainer.title = `<already added>\nshould mark the entry on the backlog sheet as completed\n\n${found.image}`;
           } else {
             imgContainer.classList.add('d-flex');
+
             const imgNew = document.createElement('img');
-            imgNew.style.height = '50%';
-            imgNew.style.borderLeft = '.5rem solid var(--warning)';
+            if (img.naturalHeight < img.naturalWidth) {
+              imgContainer.classList.add('flex-column');
+              imgNew.style.width = '100%';
+              imgNew.style.borderTop = '.5rem solid var(--warning)';
+            } else {
+              img.style.width = 'unset';
+              imgNew.style.height = '50%';
+              imgNew.style.borderLeft = '.5rem solid var(--warning)';
+            }
             imgNew.src = newImage;
-            imgContainer.appendChild(imgNew);
+
+            const imgNewLink = document.createElement('a');
+            imgNewLink.href = found.image;
+            imgNewLink.target = '_blank';
+            imgNewLink.rel = 'nofollow noopener noreferrer';
+            imgNewLink.appendChild(imgNew);
+
+            imgContainer.appendChild(imgNewLink);
           }
-        }, { once: true });
+        };
+
+        if (img.complete && img.naturalHeight !== 0) handleExistingImage();
+        else img.addEventListener('load', handleExistingImage, { once: true });
+
       } else {
-        img.classList.add('bg-danger', 'p-2');
-        img.title = `<MISSING>\n${found.image}`;
+        imgContainer.classList.add('bg-danger', 'p-2');
+        imgContainer.title = `<MISSING>\n${found.image}`;
         // img.src = found.image;
+        imgContainer.addEventListener('mouseover', () => imgContainer.style.cursor = 'pointer');
+        imgContainer.addEventListener('mouseout', () => imgContainer.removeAttribute('style'));
+        //@ts-expect-error
+        imgContainer.addEventListener('click', () => GM.openInTab(found.image, false));
         getImage(found.image).then((blobURL) => {
           img.src = blobURL;
         });
