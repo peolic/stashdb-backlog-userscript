@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.1.4
+// @version   1.1.5
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -66,23 +66,29 @@ async function inject() {
       wait(100),
     ]);
 
-    if (loc.object === 'scenes' && loc.uuid) {
-      if (!loc.action) await iScenePage(loc.uuid);
-      else if (loc.action === 'edit') await iSceneEditPage(loc.uuid);
+    if (loc.object === 'scenes') {
+      if (loc.uuid) {
+        // Scene page
+        if (!loc.action) return await iScenePage(loc.uuid);
+        // Scene edit page
+        // else if (loc.action === 'edit') return await iSceneEditPage(loc.uuid);
+      } else {
+        // Main scene cards list
+        return await highlightSceneCards(loc.object);
+      }
+    }
 
-    } else if (loc.object === 'scenes' && !loc.uuid && !loc.action) {
-      await highlightSceneCards(loc.object);
-
-    } else if (['performers', 'studios', 'tags'].includes(loc.object) && loc.uuid && !loc.action) {
-      await highlightSceneCards(loc.object);
+    // Scene cards lists on Performer/Studio/Tag pages
+    if (['performers', 'studios', 'tags'].includes(loc.object) && loc.uuid && !loc.action) {
+      return await highlightSceneCards(loc.object);
+    }
 
     // Home page
-    } else if (!loc.object && !loc.uuid && !loc.action) {
-      await highlightSceneCards(loc.object);
-
-    } else {
-      console.debug(`[backlog] nothing to do for ${loc.object}/${loc.uuid}/${loc.action}.`);
+    if (!loc.object && !loc.uuid && !loc.action) {
+      return await highlightSceneCards(loc.object);
     }
+
+    console.debug(`[backlog] nothing to do for ${loc.object}/${loc.uuid}/${loc.action}.`);
   }
 
   let dispatchEnabled = true;
@@ -589,12 +595,12 @@ async function inject() {
         document.querySelector('.scene-info > .card-footer > *:first-child').insertAdjacentElement('afterend', duration);
       } else {
         if (found.duration == duration.title.match(/(\d+)/)[1]) {
-        	duration.classList.add('bg-warning', 'p-1');
+          duration.classList.add('bg-warning', 'p-1');
           duration.innerHTML = escapeHTML('<already correct> ') + duration.innerHTML;
           duration.title = 'Duration already correct, should mark the entry on the backlog sheet as completed';
         } else {
-        	duration.classList.add('bg-primary', 'p-1');
-        	duration.innerHTML = (
+          duration.classList.add('bg-primary', 'p-1');
+          duration.innerHTML = (
             escapeHTML('<pending> ')
             + duration.innerHTML
             + ` => ${formatDuration(foundDuration)} (${found.duration})`
@@ -684,7 +690,7 @@ async function inject() {
                         <a href="/performers/${entry.id}" target="_blank">${escapeHTML(name)}</a>
                         ${action === 'append' ? `<br>${entry.id}` : ''}
                       </span>`
-                    : `<span style="flex: 1">&gt;create&lt; ${escapeHTML(name)}</span>`
+                    : `<span style="flex: 1">&lt;create&gt; ${escapeHTML(name)}</span>`
                 }
               </li>`;
             });
