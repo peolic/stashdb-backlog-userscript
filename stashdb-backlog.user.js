@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.1.6
+// @version   1.1.7
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -359,14 +359,46 @@ async function inject() {
 
   /**
    * @param {string} url Image URL
+   * @param {boolean} [asData=false] As data URI or as a blob
    */
-  async function getImage(url) {
+  async function getImage(url, asData=false) {
     const response = await fetch(url, {
       credentials: 'same-origin',
       referrerPolicy: 'same-origin',
     });
     const data = await response.blob();
-    return URL.createObjectURL(data);
+    if (!asData) {
+      return URL.createObjectURL(data);
+    }
+
+    const reader = new FileReader();
+    reader.readAsDataURL(data);
+    return new Promise((resolve) => {
+      reader.onloadend = () => {
+        resolve(reader.result);
+      };
+    });
+  }
+
+  /**
+   * @param {HTMLImageElement} img
+   * @param {string} newImageURL
+   * @returns {Promise<string | null | Error>} New image data URI or null if the same image
+   */
+  async function compareImages(img, newImageURL) {
+    try {
+      // https://stackoverflow.com/a/62575556
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.height = img.naturalHeight;
+      canvas.width = img.naturalWidth;
+      context.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
+      const dataURI = canvas.toDataURL();
+      const newDataURI = await getImage(newImageURL, true);
+      return dataURI === newDataURI ? null : newDataURI;
+    } catch (error) {
+      return error;
+    }
   }
 
   // SVG is rendered huge if FontAwesome was tree-shaken in compilation?
@@ -493,15 +525,35 @@ async function inject() {
 
     if (found.image) {
       let img = /** @type {HTMLImageElement} */ (document.querySelector('.scene-photo > img'));
+      const imgContainer = img.parentElement;
 
-      img.addEventListener('mouseover', () => img.style.cursor = 'pointer');
-      img.addEventListener('mouseout', () => img.removeAttribute('style'));
+      imgContainer.addEventListener('mouseover', () => imgContainer.style.cursor = 'pointer');
+      imgContainer.addEventListener('mouseout', () => imgContainer.removeAttribute('style'));
       //@ts-expect-error
-      img.addEventListener('click', () => GM.openInTab(found.image, false));
+      imgContainer.addEventListener('click', () => GM.openInTab(found.image, false));
 
       if (img.getAttribute('src')) {
-        img.classList.add('bg-warning', 'p-2');
-        img.title = `<pending>\n${found.image}`;
+        imgContainer.classList.add('bg-warning', 'p-2');
+        imgContainer.title = `<pending>\n${found.image}`;
+        img.addEventListener('load', async () => {
+          const newImage = await compareImages(img, found.image);
+          if (newImage instanceof Error) {
+            console.error('[backlog] error comparing image', newImage);
+            return;
+          }
+          if (newImage === null) {
+            img.classList.add('bg-primary');
+            img.classList.remove('bg-warning');
+            img.title = `<already added>\nshould mark the entry on the backlog sheet as completed\n\n${found.image}`;
+          } else {
+            imgContainer.classList.add('d-flex');
+            const imgNew = document.createElement('img');
+            imgNew.style.height = '50%';
+            imgNew.style.borderLeft = '.5rem solid var(--warning)';
+            imgNew.src = newImage;
+            imgContainer.appendChild(imgNew);
+          }
+        }, { once: true });
       } else {
         img.classList.add('bg-danger', 'p-2');
         img.title = `<MISSING>\n${found.image}`;
