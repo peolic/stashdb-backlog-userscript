@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.1.5
+// @version   1.1.6
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -397,8 +397,11 @@ async function inject() {
     }
     console.debug('[backlog] found', found);
 
+    const sceneHeader = sceneInfo.querySelector(':scope > .card-header');
+    sceneHeader.style.borderTop = '1rem solid var(--warning)';
+    sceneHeader.title = 'pending changes (backlog)';
+
     if (found.comments && found.comments.length > 0) {
-      const header = document.querySelector('.scene-info > .card-header');
       const comments = document.createElement('div');
       comments.classList.add('bg-info');
 
@@ -417,7 +420,7 @@ async function inject() {
         comments.appendChild(commentElement);
       });
 
-      header.appendChild(comments);
+      sceneHeader.appendChild(comments);
     }
 
     if (found.title) {
@@ -432,7 +435,7 @@ async function inject() {
     }
 
     if (found.date || found.studio_id) {
-      let studio_date = document.querySelector('.scene-info > .card-header > h6');
+      let studio_date = sceneHeader.querySelector(':scope > h6');
       let title = `<pending>`;
       let alreadyCorrectStudioId = false;
       if (found.studio_id) {
