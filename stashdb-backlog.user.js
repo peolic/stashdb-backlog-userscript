@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.1.3
+// @version   1.1.4
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -66,8 +66,9 @@ async function inject() {
       wait(100),
     ]);
 
-    if (loc.object === 'scenes' && loc.uuid && !loc.action) {
-      await iScenePage(loc.uuid);
+    if (loc.object === 'scenes' && loc.uuid) {
+      if (!loc.action) await iScenePage(loc.uuid);
+      else if (loc.action === 'edit') await iSceneEditPage(loc.uuid);
 
     } else if (loc.object === 'scenes' && !loc.uuid && !loc.action) {
       await highlightSceneCards(loc.object);
@@ -619,6 +620,96 @@ async function inject() {
       studio_url.title = `<pending>\n${found.url}`;
     }
   } // iScenePage
+
+  // =====
+
+  async function iSceneEditPage(sceneId) {
+    const pageTitle = await elementReady('h3');
+
+    const markerDataset = pageTitle.dataset;
+    if (markerDataset.backlogInjected) {
+      console.debug('[backlog] already injected, skipping');
+      return;
+    } else {
+      markerDataset.backlogInjected = true;
+    }
+
+    const found = await getDataFor('scene', sceneId);
+    if (!found) {
+      console.debug('[backlog] not found', sceneId);
+      return;
+    }
+    console.debug('[backlog] found', found);
+
+    const pendingChangesHTML = `
+      <div
+        class="PendingChanges"
+        style="position: fixed; right: 100px; top: 80px; width: 400px; height: 600px;"
+      >
+        <h3>Pending Changes</h3>
+        <dl></dl>
+      </div>
+    `;
+
+    // pageTitle.insertAdjacentElement('afterend', pendingChanges);
+    pageTitle.insertAdjacentHTML('afterend', pendingChangesHTML);
+    const pendingChanges = await elementReady('.PendingChanges dl');
+
+    Object.entries(found).forEach(([field, value]) => {
+
+      const dt = document.createElement('dt');
+      if (field === 'lastUpdated') {
+        dt.innerText = 'data last fetched at';
+      } else {
+        dt.innerText = field;
+      }
+      pendingChanges.appendChild(dt);
+
+      const dd = document.createElement('dd');
+      if (field === 'performers') {
+        const performers = Object.entries(value);
+        dd.innerHTML = (
+          '<ul class="p-0">'
+          + performers.flatMap(([action, entries]) => {
+            return entries.map(entry => {
+              const label = '[' + (action === 'append' ? 'add' : action) + ']';
+              const disambiguation = entry.disambiguation ? ` (${entry.disambiguation})` : '';
+              let name = entry.name + disambiguation;
+              if (entry.appearance) name += ` (as ${entry.appearance})`;
+              return `<li class="d-flex justify-content-between">
+                <span style="flex: 0.25 0 0;">${label}</span>
+                ${
+                  entry.id
+                    ? `<span style="flex: 1">
+                        <a href="/performers/${entry.id}" target="_blank">${escapeHTML(name)}</a>
+                        ${action === 'append' ? `<br>${entry.id}` : ''}
+                      </span>`
+                    : `<span style="flex: 1">&gt;create&lt; ${escapeHTML(name)}</span>`
+                }
+              </li>`;
+            });
+          }).join('\n')
+          + '</ul>'
+        );
+      } else if (field === 'comments') {
+        dd.innerText = value.join('\n');
+        dd.style.whiteSpace = 'pre-line';
+      } else if (field === 'details') {
+        dd.innerText = value;
+        dd.style.whiteSpace = 'pre-line';
+      } else if (field === 'lastUpdated') {
+        const date = new Date(value);
+        dd.innerText = (
+          date.toLocaleString("en-us", { month: "short", year: "numeric", day: "numeric" })
+          + ' ' + date.toLocaleTimeString(navigator.languages[0])
+        );
+      } else {
+        dd.innerText = value;
+      }
+      pendingChanges.appendChild(dd);
+    });
+
+  } // iSceneEditPage
 
   // =====
 
