@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.1.10
+// @version   1.11.0
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -85,6 +85,10 @@ async function inject() {
     // Scene cards lists on Performer/Studio/Tag pages
     if (['performers', 'studios', 'tags'].includes(loc.object) && loc.uuid && !loc.action) {
       return await highlightSceneCards(loc.object);
+    }
+
+    if (loc.object === 'performers' && loc.uuid && !loc.action) {
+      return await iPerformerPage(loc.uuid);
     }
 
     // Home page
@@ -199,7 +203,7 @@ async function inject() {
   /**
    * @typedef DataIndex
    * @property {string[] | { [uuid: string]: string }} scenes
-   * @property {string[]} performers
+   * @property {{ [uuid: string]: string }} performers
    * @property {string} [lastUpdated]
    */
   /**
@@ -883,6 +887,53 @@ async function inject() {
     });
 
   } // iSceneEditPage
+
+  // =====
+
+  /**
+   * @param {string} performerId
+   */
+  async function iPerformerPage(performerId) {
+    const performerInfo = /** @type {HTMLDivElement} */ (await elementReady('.performer-info'));
+
+    const markerDataset = performerInfo.dataset;
+    if (markerDataset.backlogInjected) {
+      console.debug('[backlog] already injected, skipping');
+      return;
+    } else {
+      markerDataset.backlogInjected = 'true';
+    }
+
+    const index = await getDataIndex();
+    if (!index) return;
+
+    const found = index.performers[performerId];
+    if (!found) return;
+
+    const info = found.split(/,/g);
+    if (info.includes('split')) {
+      const toSplit = document.createElement('div');
+      toSplit.classList.add('mb-1', 'font-weight-bold');
+      toSplit.innerHTML = 'This performer is listed on <a>"Performers To Split Up"</a>.';
+      const a = toSplit.querySelector('a');
+      a.href = 'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ/edit#gid=1067038397';
+      a.target = '_blank';
+      a.rel = 'nofollow noopener noreferrer';
+      const emoji = document.createElement('span');
+      toSplit.classList.add('mr-1');
+      toSplit.innerText = '🔀';
+      toSplit.insertAdjacentElement('afterbegin', emoji);
+      performerInfo.insertAdjacentElement('beforebegin', toSplit);
+    }
+
+    // const foundData = await getDataFor('performer', performerId, index);
+    // if (!foundData) {
+    //   console.debug('[backlog] not found', performerId);
+    //   return;
+    // }
+    // console.debug('[backlog] found', foundData);
+
+  } // iPerformerPage
 
   // =====
 
