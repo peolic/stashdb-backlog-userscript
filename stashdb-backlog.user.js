@@ -185,13 +185,13 @@ async function inject() {
   }
 
   const DATA_INDEX_KEY = 'stashdb_backlog_index';
-  async function getDataIndex() {
+  async function getDataIndex(forceFetch=false) {
     //@ts-expect-error
     const storedDataIndex = JSON.parse(await GM.getValue(DATA_INDEX_KEY, '{}'));
     if (!storedDataIndex) {
       throw new Error("[backlog] invalid stored data");
     }
-    if (shouldFetch(storedDataIndex, 1)) {
+    if (forceFetch || shouldFetch(storedDataIndex, 1)) {
       const data = await fetchJSON('https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main/index.json');
       if (data === null || data.error) {
         console.error('[backlog] index error', data);
@@ -315,11 +315,7 @@ async function inject() {
 
   async function backlogRefetch() {
     const { object: pluralObject, uuid } = parsePath();
-    if (!pluralObject || !['scenes'].includes(pluralObject) || !uuid) {
-      //@ts-expect-error
-      unsafeWindow.console.warning(`[backlog] invalid request: <${pluralObject} ${uuid}>`);
-      return;
-    }
+
     /** @type {'scene' | 'performer'} */
     const object = (pluralObject.slice(0, -1));
 
@@ -329,13 +325,21 @@ async function inject() {
       throw new Error("[backlog] invalid stored data");
     }
 
-    const index = await getDataIndex();
+    const index = await getDataIndex(true);
     if (!index) throw new Error("[backlog] failed to get index");
+
+    if (!pluralObject) return;
+
+    if (!['scenes'].includes(pluralObject) || !uuid) {
+      //@ts-expect-error
+      unsafeWindow.console.warn(`[backlog] invalid request: <${pluralObject} ${uuid}>`);
+      return;
+    }
 
     const data = await _fetchObject(object, uuid, storedData, index);
     if (data === null) {
       //@ts-expect-error
-      unsafeWindow.console.warning(`[backlog] <${object} ${uuid}> failed to refetch`);
+      unsafeWindow.console.warn(`[backlog] <${object} ${uuid}> failed to refetch`);
     }
   }
   //@ts-expect-error
