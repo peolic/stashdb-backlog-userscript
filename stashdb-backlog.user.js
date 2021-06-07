@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.1.9
+// @version   1.1.10
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -24,8 +24,11 @@ async function inject() {
   );
 
   /**
+   * @typedef {'scenes' | 'performers' | 'studios' | 'tags' | 'categories' | 'edits' | 'users'} PluralObject
+   */
+  /**
    * @typedef LocationData
-   * @property {string | null} object
+   * @property {PluralObject | null} object
    * @property {string | null} uuid
    * @property {string | null} action
    */
@@ -54,7 +57,7 @@ async function inject() {
     return result;
   };
 
-  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const wait = (/** @type {number} */ ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   async function dispatcher() {
     const loc = parsePath();
@@ -148,8 +151,15 @@ async function inject() {
   }
 
   /**
+   * @typedef FetchError
+   * @property {boolean} error
+   * @property {number} status
+   * @property {string | null} body
+   */
+
+  /**
    * @param {string} url
-   * @returns {Promise<{ [key: string]: any } | null>}
+   * @returns {Promise<DataIndex | DataObject | FetchError | null>}
    */
   async function fetchJSON(url) {
     try {
@@ -172,7 +182,7 @@ async function inject() {
   }
 
   /**
-   * @param {{ lastUpdated?: string }} storedObject
+   * @param {DataObject} storedObject
    * @param {number} maxTime in hours
    * @returns {boolean}
    */
@@ -185,6 +195,17 @@ async function inject() {
   }
 
   const DATA_INDEX_KEY = 'stashdb_backlog_index';
+
+  /**
+   * @typedef DataIndex
+   * @property {string[] | { [uuid: string]: string }} scenes
+   * @property {string[]} performers
+   * @property {string} [lastUpdated]
+   */
+  /**
+   * @param {boolean} [forceFetch=false]
+   * @returns {Promise<DataIndex>}
+   */
   async function getDataIndex(forceFetch=false) {
     //@ts-expect-error
     const storedDataIndex = JSON.parse(await GM.getValue(DATA_INDEX_KEY, '{}'));
@@ -193,32 +214,50 @@ async function inject() {
     }
     if (forceFetch || shouldFetch(storedDataIndex, 1)) {
       const data = await fetchJSON('https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main/index.json');
-      if (data === null || data.error) {
+      if (data === null || 'error' in data) {
         console.error('[backlog] index error', data);
         return null;
       }
-      const action = data.lastUpdated ? 'updated' : 'fetched';
-      data.lastUpdated = new Date().toISOString();
+      const dataIndex = /** @type {DataIndex} */ (data);
+      const action = dataIndex.lastUpdated ? 'updated' : 'fetched';
+      dataIndex.lastUpdated = new Date().toISOString();
       //@ts-expect-error
-      await GM.setValue(DATA_INDEX_KEY, JSON.stringify(data));
+      await GM.setValue(DATA_INDEX_KEY, JSON.stringify(dataIndex));
       console.debug(`[backlog] index ${action}`);
-      return data;
+      return dataIndex;
     } else {
       console.debug('[backlog] index stored');
       return storedDataIndex;
     }
   }
 
+  /** @typedef {'scene' | 'performer'} SupportedObject */
+  /** @typedef {'scenes' | 'performers'} SupportedPluralObject */
+
+  /**
+   * @param {SupportedObject} object
+   * @param {string} uuid
+   * @returns {string}
+   */
   const makeObjectKey = (object, uuid) => `${object}/${uuid}`;
+  /**
+   * @param {SupportedObject} object
+   * @param {string} uuid
+   * @returns {string}
+   */
   const makeDataPath = (object, uuid) => `${object}s/${uuid.slice(0, 2)}/${uuid}.json`;
+
+  /**
+   * @typedef {{ [field: string]: any } & { lastUpdated?: string }} DataObject
+   */
   const DATA_KEY = 'stashdb_backlog';
 
   /**
-   * @param {'scene' | 'performer'} object
+   * @param {SupportedObject} object
    * @param {string} uuid
-   * @param {*} storedData
-   * @param {*} index
-   * @returns {Promise<{ [key: string]: any } | null>}
+   * @param {{ [uuid: string]: DataObject}} storedData
+   * @param {DataIndex} index
+   * @returns {Promise<DataObject | null>}
    */
   const _fetchObject = async (object, uuid, storedData, index) => {
     const data = await fetchJSON(
@@ -228,7 +267,7 @@ async function inject() {
     const haystack = index[`${object}s`];
     const key = makeObjectKey(object, uuid);
 
-    if (data && data.error && data.status === 404) {
+    if (data && 'error' in data && data.status === 404) {
       // remove from data index
       if (Array.isArray(haystack)) {
         const index = haystack.indexOf(uuid);
@@ -248,14 +287,15 @@ async function inject() {
 
       console.debug(`[backlog] <${object} ${uuid}> removed, no longer valid`);
       return null;
-    } else if (data === null || data.error) {
+    } else if (data === null || 'error' in data) {
       console.error(`[backlog] <${object} ${uuid}> data error`, data);
       return null;
     }
 
     const action = storedData.lastUpdated ? 'updated' : 'fetched';
-    data.lastUpdated = new Date().toISOString();
-    storedData[key] = data;
+    const dataObject = /** @type {DataObject} */ (data);
+    dataObject.lastUpdated = new Date().toISOString();
+    storedData[key] = dataObject;
     //@ts-expect-error
     await GM.setValue(DATA_KEY, JSON.stringify(storedData));
     console.debug(`[backlog] <${object} ${uuid}> data ${action}`);
@@ -273,6 +313,12 @@ async function inject() {
     return data;
   };
 
+  /**
+   * @param {SupportedObject} object
+   * @param {string} uuid
+   * @param {DataIndex} [index]
+   * @returns {Promise<DataObject | null>}
+   */
   async function getDataFor(object, uuid, index = undefined) {
     if (!index) index = await getDataIndex();
     if (!index) throw new Error("[backlog] failed to get index");
@@ -316,7 +362,7 @@ async function inject() {
   async function backlogRefetch() {
     const { object: pluralObject, uuid } = parsePath();
 
-    /** @type {'scene' | 'performer'} */
+    /** @type {SupportedObject} */
     const object = (pluralObject.slice(0, -1));
 
     //@ts-expect-error
@@ -432,6 +478,9 @@ async function inject() {
     + '</svg>'
   );
 
+  /**
+   * @param {string} sceneId
+   */
   async function iScenePage(sceneId) {
     await Promise.race([
       elementReady('.StashDBContent .scene-info'),
@@ -744,6 +793,9 @@ async function inject() {
 
   // =====
 
+  /**
+   * @param {string} sceneId
+   */
   async function iSceneEditPage(sceneId) {
     const pageTitle = /** @type {HTMLHeadingElement} */ (await elementReady('h3'));
 
@@ -834,6 +886,9 @@ async function inject() {
 
   // =====
 
+  /**
+   * @param {PluralObject | null} pluralObject
+   */
   async function highlightSceneCards(pluralObject) {
     await Promise.race([
       elementReady('.SceneCard > .card'),
