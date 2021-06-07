@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.1.8
+// @version   1.1.9
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -197,7 +197,7 @@ async function inject() {
         console.error('[backlog] index error', data);
         return null;
       }
-      const action = !!data.lastUpdated ? 'updated' : 'fetched';
+      const action = data.lastUpdated ? 'updated' : 'fetched';
       data.lastUpdated = new Date().toISOString();
       //@ts-expect-error
       await GM.setValue(DATA_INDEX_KEY, JSON.stringify(data));
@@ -253,11 +253,12 @@ async function inject() {
       return null;
     }
 
-    const action = !!data.lastUpdated ? 'updated' : 'fetched';
+    const action = storedData.lastUpdated ? 'updated' : 'fetched';
     data.lastUpdated = new Date().toISOString();
     storedData[key] = data;
     //@ts-expect-error
     await GM.setValue(DATA_KEY, JSON.stringify(storedData));
+    console.debug(`[backlog] <${object} ${uuid}> data ${action}`);
 
     // add to data index if not present
     if (Array.isArray(haystack) && !haystack.includes(uuid)) {
@@ -267,8 +268,8 @@ async function inject() {
     }
     //@ts-expect-error
     await GM.setValue(DATA_INDEX_KEY, JSON.stringify(index));
+    console.debug('[backlog] stored data index updated');
 
-    console.debug(`[backlog] <${object} ${uuid}> data ${action}`);
     return data;
   };
 
