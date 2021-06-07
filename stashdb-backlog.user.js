@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.11.0
+// @version   1.11.1
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -223,7 +223,7 @@ async function inject() {
         return null;
       }
       const dataIndex = /** @type {DataIndex} */ (data);
-      const action = dataIndex.lastUpdated ? 'updated' : 'fetched';
+      const action = storedDataIndex.lastUpdated ? 'updated' : 'fetched';
       dataIndex.lastUpdated = new Date().toISOString();
       //@ts-expect-error
       await GM.setValue(DATA_INDEX_KEY, JSON.stringify(dataIndex));
@@ -366,9 +366,6 @@ async function inject() {
   async function backlogRefetch() {
     const { object: pluralObject, uuid } = parsePath();
 
-    /** @type {SupportedObject} */
-    const object = (pluralObject.slice(0, -1));
-
     //@ts-expect-error
     const storedData = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
     if (!storedData) {
@@ -379,6 +376,9 @@ async function inject() {
     if (!index) throw new Error("[backlog] failed to get index");
 
     if (!pluralObject) return;
+
+    /** @type {SupportedObject} */
+    const object = (pluralObject.slice(0, -1));
 
     if (!['scenes'].includes(pluralObject) || !uuid) {
       //@ts-expect-error
