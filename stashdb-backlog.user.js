@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.11.1
+// @version   1.11.2
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -82,12 +82,13 @@ async function inject() {
       }
     }
 
-    // Scene cards lists on Performer/Studio/Tag pages
-    if (['performers', 'studios', 'tags'].includes(loc.object) && loc.uuid && !loc.action) {
+    // Scene cards lists on Studio/Tag pages
+    if (['studios', 'tags'].includes(loc.object) && loc.uuid && !loc.action) {
       return await highlightSceneCards(loc.object);
     }
 
     if (loc.object === 'performers' && loc.uuid && !loc.action) {
+      await highlightSceneCards(loc.object);
       return await iPerformerPage(loc.uuid);
     }
 
@@ -230,7 +231,7 @@ async function inject() {
       console.debug(`[backlog] index ${action}`);
       return dataIndex;
     } else {
-      console.debug('[backlog] index stored');
+      console.debug('[backlog] stored index');
       return storedDataIndex;
     }
   }
@@ -344,7 +345,7 @@ async function inject() {
       return await _fetchObject(object, uuid, storedData, index);
     }
 
-    console.debug(`[backlog] <${object} ${uuid}> data stored`);
+    console.debug(`[backlog] <${object} ${uuid}> stored data`);
     return storedData[key];
   }
 
@@ -914,14 +915,14 @@ async function inject() {
     if (info.includes('split')) {
       const toSplit = document.createElement('div');
       toSplit.classList.add('mb-1', 'font-weight-bold');
-      toSplit.innerHTML = 'This performer is listed on <a>"Performers To Split Up"</a>.';
+      toSplit.innerHTML = 'This performer is listed on <a>Performers To Split Up</a>.';
       const a = toSplit.querySelector('a');
       a.href = 'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ/edit#gid=1067038397';
       a.target = '_blank';
       a.rel = 'nofollow noopener noreferrer';
       const emoji = document.createElement('span');
-      toSplit.classList.add('mr-1');
-      toSplit.innerText = '🔀';
+      emoji.classList.add('mr-1');
+      emoji.innerText = '🔀';
       toSplit.insertAdjacentElement('afterbegin', emoji);
       performerInfo.insertAdjacentElement('beforebegin', toSplit);
     }
