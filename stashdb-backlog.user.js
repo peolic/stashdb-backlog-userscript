@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.11.6
+// @version   1.11.7
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -53,6 +53,11 @@ async function inject() {
     result.object = match[1] || null;
     result.ident = match[2] || null;
     result.action = match[3] || null;
+
+    if (result.ident === 'add' && !result.action) {
+      result.action = result.ident;
+      result.ident = null;
+    }
 
     return result;
   };
@@ -106,7 +111,8 @@ async function inject() {
       return await highlightSceneCards(loc.object);
     }
 
-    console.debug(`[backlog] nothing to do for ${loc.object}/${loc.ident}/${loc.action}.`);
+    const identAction = loc.ident ? `${loc.ident}/${loc.action}` : `${loc.action}`;
+    console.debug(`[backlog] nothing to do for ${loc.object}/${identAction}.`);
   }
 
   let dispatchEnabled = true;
