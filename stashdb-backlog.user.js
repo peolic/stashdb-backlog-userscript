@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.11.4
+// @version   1.11.5
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -268,29 +268,19 @@ async function inject() {
     const data = await fetchJSON(
       `https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main/${makeDataPath(object, uuid)}`
     );
-
-    const haystack = index[`${object}s`];
-    const key = makeObjectKey(object, uuid);
-
     if (data && 'error' in data && data.status === 404) {
       // remove from data index
-      if (Array.isArray(haystack)) {
-        const index = haystack.indexOf(uuid);
-        if (index !== -1) {
-          haystack.splice(index, 1);
-        }
-      } else if (haystack[uuid] !== undefined) {
-        delete haystack[uuid];
-      }
-      //@ts-expect-error
-      await GM.setValue(DATA_INDEX_KEY, JSON.stringify(index));
-
+      const removedIndex = await _removeCachedIndexEntry(object, uuid, index);
       // remove from data
-      delete storedData[key];
-      //@ts-expect-error
-      await GM.setValue(DATA_KEY, JSON.stringify(storedData));
+      const removedData = await _removeCachedObjectData(object, uuid, storedData);
 
-      console.debug(`[backlog] <${object} ${uuid}> removed, no longer valid`);
+      if (removedIndex || removedData) {
+        const from = [
+          (removedIndex ? 'index cache' : null),
+          (removedData ? 'data cache' : null)
+        ].filter(Boolean).join(' and ');
+        console.debug(`[backlog] <${object} ${uuid}> removed from ${from}, no longer valid`);
+      }
       return null;
     } else if (data === null || 'error' in data) {
       console.error(`[backlog] <${object} ${uuid}> data error`, data);
@@ -300,11 +290,12 @@ async function inject() {
     const action = storedData.lastUpdated ? 'updated' : 'fetched';
     const dataObject = /** @type {DataObject} */ (data);
     dataObject.lastUpdated = new Date().toISOString();
-    storedData[key] = dataObject;
+    storedData[makeObjectKey(object, uuid)] = dataObject;
     //@ts-expect-error
     await GM.setValue(DATA_KEY, JSON.stringify(storedData));
     console.debug(`[backlog] <${object} ${uuid}> data ${action}`);
 
+    const haystack = index[`${object}s`];
     // add to data index if not present
     if (Array.isArray(haystack) && !haystack.includes(uuid)) {
       haystack.splice(haystack.length - 1, 0, uuid);
@@ -321,6 +312,62 @@ async function inject() {
   /**
    * @param {SupportedObject} object
    * @param {string} uuid
+   * @param {DataIndex} [storedIndex]
+   * @returns {Promise<boolean>}
+   */
+  async function _removeCachedIndexEntry(object, uuid, storedIndex = undefined) {
+    if (!storedIndex) {
+      //@ts-expect-error
+      storedIndex = JSON.parse(await GM.getValue(DATA_INDEX_KEY, '{}'));
+      if (!storedIndex) return false;
+    }
+
+    const haystack = storedIndex[`${object}s`];
+
+    let removed = false;
+    if (Array.isArray(haystack)) {
+      const index = haystack.indexOf(uuid);
+      if (index !== -1) {
+        haystack.splice(index, 1);
+        removed = true;
+      }
+    } else if (haystack[uuid] !== undefined) {
+      delete haystack[uuid];
+      removed = true;
+    }
+    //@ts-expect-error
+    await GM.setValue(DATA_INDEX_KEY, JSON.stringify(storedIndex));
+
+    return removed;
+  }
+
+  /**
+   * @param {SupportedObject} object
+   * @param {string} uuid
+   * @param {{ [uuid: string]: DataObject}} [storedData]
+   * @returns {Promise<boolean>}
+   */
+  async function _removeCachedObjectData(object, uuid, storedData = undefined) {
+    if (!storedData) {
+      //@ts-expect-error
+      storedData = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
+      if (!storedData) return false;
+    }
+
+    const key = makeObjectKey(object, uuid);
+    if (storedData[key]) {
+      delete storedData[key];
+      //@ts-expect-error
+      await GM.setValue(DATA_KEY, JSON.stringify(storedData));
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * @param {SupportedObject} object
+   * @param {string} uuid
    * @param {DataIndex} [index]
    * @returns {Promise<DataObject | null>}
    */
@@ -331,6 +378,10 @@ async function inject() {
     const haystack = index[`${object}s`];
     const found = Array.isArray(haystack) ? haystack.includes(uuid) : haystack[uuid] !== undefined;
     if (!found) {
+      // Clear outdated
+      if (await _removeCachedObjectData(object, uuid)) {
+        console.debug(`[backlog] <${object} ${uuid}> cleared from cache (not found in index)`);
+      }
       return null;
     }
 
