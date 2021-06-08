@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.11.5
+// @version   1.11.6
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -56,6 +56,15 @@ async function inject() {
 
     return result;
   };
+
+  const getUser = () => {
+    /** @type {HTMLAnchorElement} */
+    const profile = (document.querySelector('a[href^="/users/"]'));
+    if (!profile) return null;
+    return profile.innerText;
+  };
+
+  const isDev = () => getUser() === 'peolic';
 
   const wait = (/** @type {number} */ ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -402,20 +411,21 @@ async function inject() {
 
   // ===
 
-  async function backlogClearCache() {
-    //@ts-expect-error
-    await GM.deleteValue(DATA_INDEX_KEY);
-    //@ts-expect-error
-    await GM.deleteValue(DATA_KEY);
-    //@ts-expect-error
-    unsafeWindow.console.info('[backlog] stored data cleared');
+  async function backlogClearCache(global = globalThis) {
+    if (isDev()) {
+      //@ts-expect-error
+      await GM.deleteValue(DATA_INDEX_KEY);
+      //@ts-expect-error
+      await GM.deleteValue(DATA_KEY);
+      global.console.info('[backlog] stored data cleared');
+    }
   }
   //@ts-expect-error
-  unsafeWindow.backlogClearCache = exportFunction(backlogClearCache, unsafeWindow);
+  unsafeWindow.backlogClearCache = exportFunction(() => backlogClearCache(unsafeWindow), unsafeWindow);
 
   // ===
 
-  async function backlogRefetch() {
+  async function backlogRefetch(global = globalThis) {
     const { object: pluralObject, ident: uuid } = parsePath();
 
     //@ts-expect-error
@@ -427,40 +437,39 @@ async function inject() {
     const index = await getDataIndex(true);
     if (!index) throw new Error("[backlog] failed to get index");
 
-    if (!pluralObject) return;
+    if (!pluralObject) return false;
 
     /** @type {SupportedObject} */
     const object = (pluralObject.slice(0, -1));
 
     if (!['scenes'].includes(pluralObject) || !uuid) {
-      //@ts-expect-error
-      unsafeWindow.console.warn(`[backlog] invalid request: <${pluralObject} ${uuid}>`);
-      return;
+      global.console.warn(`[backlog] invalid request: <${pluralObject} ${uuid}>`);
+      return false;
     }
 
     const data = await _fetchObject(object, uuid, storedData, index);
     if (data === null) {
-      //@ts-expect-error
-      unsafeWindow.console.warn(`[backlog] <${object} ${uuid}> failed to refetch`);
+      global.console.warn(`[backlog] <${object} ${uuid}> failed to refetch`);
+      return false;
     }
+
+    return true;
   }
-  //@ts-expect-error
-  unsafeWindow.backlogRefetch = exportFunction(backlogRefetch, unsafeWindow);
+  // //@ts-expect-error
+  // unsafeWindow.backlogRefetch = exportFunction(() => backlogRefetch(unsafeWindow), unsafeWindow);
 
   // ===
 
-  async function backlogCacheReport() {
+  async function backlogCacheReport(global = globalThis) {
     //@ts-expect-error
     const index = JSON.parse(await GM.getValue(DATA_INDEX_KEY, '{}'));
-    //@ts-expect-error
-    unsafeWindow.console.info('index', index);
+    global.console.info('index', index);
     //@ts-expect-error
     const data = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
-    //@ts-expect-error
-    unsafeWindow.console.info('data', data);
+    global.console.info('data', data);
   }
   //@ts-expect-error
-  unsafeWindow.backlogCacheReport = exportFunction(backlogCacheReport, unsafeWindow);
+  unsafeWindow.backlogCacheReport = exportFunction(() => backlogCacheReport(unsafeWindow), unsafeWindow);
 
   // =====
 
@@ -845,6 +854,37 @@ async function inject() {
       studio_url.classList.add('bg-warning');
       studio_url.title = `<pending>\n${found.url}`;
     }
+
+    if (isDev()) {
+      // Refetch button
+      const buttonRefetch = document.createElement('button');
+      buttonRefetch.type = 'button';
+      buttonRefetch.style.margin = '2px';
+      buttonRefetch.classList.add('btn', 'btn-light', 'backlog-refetch');
+      buttonRefetch.title = 'Refetch backlog data';
+      buttonRefetch.innerText = '📥';
+
+      buttonRefetch.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        buttonRefetch.textContent = '⏳';
+        buttonRefetch.disabled = true;
+        const result = await backlogRefetch();
+        buttonRefetch.textContent = result ? '✔' : '❌';
+        buttonRefetch.style.backgroundColor = result ? 'yellow' : 'var(--gray-dark)';
+        buttonRefetch.style.fontWeight = '800';
+        if (result) {
+          setTimeout(() => {
+            window.location.reload();
+          }, 500);
+        }
+      });
+
+      const sceneButtons = document.querySelector('.card-header > .float-right');
+      if (!sceneButtons || sceneButtons.querySelector('button.backlog-refetch')) return;
+      sceneButtons.appendChild(buttonRefetch);
+    }
+
   } // iScenePage
 
   // =====
