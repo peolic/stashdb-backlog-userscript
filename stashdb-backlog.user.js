@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.11.3
+// @version   1.11.4
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -16,7 +16,7 @@
 async function inject() {
   const urlRegex = new RegExp(
     String.raw`(?:/([a-z]+)`
-      + String.raw`(?:/([0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12})`
+      + String.raw`(?:/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[\w\d-]+)`
         + String.raw`(?:/([a-z]+)`
         + String.raw`)?`
       + String.raw`)?`
@@ -29,7 +29,7 @@ async function inject() {
   /**
    * @typedef LocationData
    * @property {PluralObject | null} object
-   * @property {string | null} uuid
+   * @property {string | null} ident
    * @property {string | null} action
    */
   /**
@@ -41,7 +41,7 @@ async function inject() {
 
     const result = {
       object: null,
-      uuid: null,
+      ident: null,
       action: null,
     };
 
@@ -51,7 +51,7 @@ async function inject() {
     if (!match || match.length === 0) return null;
 
     result.object = match[1] || null;
-    result.uuid = match[2] || null;
+    result.ident = match[2] || null;
     result.action = match[3] || null;
 
     return result;
@@ -71,11 +71,11 @@ async function inject() {
     ]);
 
     if (loc.object === 'scenes') {
-      if (loc.uuid) {
+      if (loc.ident) {
         // Scene page
-        if (!loc.action) return await iScenePage(loc.uuid);
+        if (!loc.action) return await iScenePage(loc.ident);
         // Scene edit page
-        // else if (loc.action === 'edit') return await iSceneEditPage(loc.uuid);
+        // else if (loc.action === 'edit') return await iSceneEditPage(loc.ident);
       } else {
         // Main scene cards list
         return await highlightSceneCards(loc.object);
@@ -83,21 +83,21 @@ async function inject() {
     }
 
     // Scene cards lists on Studio/Tag pages
-    if (['studios', 'tags'].includes(loc.object) && loc.uuid && !loc.action) {
+    if (['studios', 'tags'].includes(loc.object) && loc.ident && !loc.action) {
       return await highlightSceneCards(loc.object);
     }
 
-    if (loc.object === 'performers' && loc.uuid && !loc.action) {
+    if (loc.object === 'performers' && loc.ident && !loc.action) {
       await highlightSceneCards(loc.object);
-      return await iPerformerPage(loc.uuid);
+      return await iPerformerPage(loc.ident);
     }
 
     // Home page
-    if (!loc.object && !loc.uuid && !loc.action) {
+    if (!loc.object && !loc.ident && !loc.action) {
       return await highlightSceneCards(loc.object);
     }
 
-    console.debug(`[backlog] nothing to do for ${loc.object}/${loc.uuid}/${loc.action}.`);
+    console.debug(`[backlog] nothing to do for ${loc.object}/${loc.ident}/${loc.action}.`);
   }
 
   let dispatchEnabled = true;
@@ -365,7 +365,7 @@ async function inject() {
   // ===
 
   async function backlogRefetch() {
-    const { object: pluralObject, uuid } = parsePath();
+    const { object: pluralObject, ident: uuid } = parsePath();
 
     //@ts-expect-error
     const storedData = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
@@ -556,7 +556,7 @@ async function inject() {
       let title = `<pending>`;
       let alreadyCorrectStudioId = false;
       if (found.studio_id) {
-        alreadyCorrectStudioId = found.studio_id === parsePath(studio_date.querySelector('a').href).uuid;
+        alreadyCorrectStudioId = found.studio_id === parsePath(studio_date.querySelector('a').href).ident;
         title += `\nStudio ID: ${found.studio_id}`;
       }
       let alreadyCorrectDate = false;
@@ -650,7 +650,7 @@ async function inject() {
       };
 
       const parsePerformerAppearance = (/** @type {HTMLAnchorElement} */ pa) => {
-        const { uuid } = parsePath(pa.href);
+        const { ident: uuid } = parsePath(pa.href);
         const fullName = Array.from(pa.childNodes).slice(1).map((n) => n.textContent).join(' ');
         return { uuid, fullName };
       };
