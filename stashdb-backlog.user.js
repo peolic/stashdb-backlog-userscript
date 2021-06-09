@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.11.7
+// @version   1.11.8
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -418,16 +418,14 @@ async function inject() {
   // ===
 
   async function backlogClearCache(global = globalThis) {
-    if (isDev()) {
-      //@ts-expect-error
-      await GM.deleteValue(DATA_INDEX_KEY);
-      //@ts-expect-error
-      await GM.deleteValue(DATA_KEY);
-      global.console.info('[backlog] stored data cleared');
-    }
+    //@ts-expect-error
+    await GM.deleteValue(DATA_INDEX_KEY);
+    //@ts-expect-error
+    await GM.deleteValue(DATA_KEY);
+    global.console.info('[backlog] stored data cleared');
   }
   //@ts-expect-error
-  unsafeWindow.backlogClearCache = exportFunction(() => backlogClearCache(unsafeWindow), unsafeWindow);
+  unsafeWindow.backlogClearCache = exportFunction(() => isDev() && backlogClearCache(unsafeWindow), unsafeWindow);
 
   // ===
 
@@ -461,8 +459,8 @@ async function inject() {
 
     return true;
   }
-  // //@ts-expect-error
-  // unsafeWindow.backlogRefetch = exportFunction(() => backlogRefetch(unsafeWindow), unsafeWindow);
+  //@ts-expect-error
+  unsafeWindow.backlogRefetch = exportFunction(() => isDev() && backlogRefetch(unsafeWindow), unsafeWindow);
 
   // ===
 
