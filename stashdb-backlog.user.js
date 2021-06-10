@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.11.9
+// @version   1.12.0
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -13,8 +13,13 @@
 
 //@ts-check
 
+const dev = false;
+
 async function inject() {
-  const BASE_URL = 'https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main';
+  const BASE_URL =
+    dev
+      ? 'http://localhost:8000'
+      : 'https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main';
 
   const urlRegex = new RegExp(
     String.raw`(?:/([a-z]+)`
@@ -173,6 +178,18 @@ async function inject() {
   }
 
   /**
+   * Format date.
+   * @param {string | Date} [date]
+   * @returns {string}
+   */
+  function formatDate(date) {
+    if (!date) return '';
+    date = date instanceof Date ? date : new Date(date);
+    return date.toLocaleString("en-us", { month: "short", year: "numeric", day: "numeric" })
+      + ' ' + date.toLocaleTimeString(navigator.languages[0]);
+  }
+
+  /**
    * @typedef FetchError
    * @property {boolean} error
    * @property {number} status
@@ -205,24 +222,40 @@ async function inject() {
 
   /**
    * @param {DataObject} storedObject
-   * @param {number} maxTime in hours
+   * @param {string | number} diff new content hash or max time in hours
    * @returns {boolean}
    */
-  function shouldFetch(storedObject, maxTime) {
+  function shouldFetch(storedObject, diff) {
     if (!storedObject) return true;
-    const { lastUpdated } = storedObject;
-    if (!lastUpdated) return true;
-    const cacheInvalidation = (new Date(lastUpdated).getTime()) + 1000 * 60 * 60 * maxTime;
-    return new Date().getTime() >= cacheInvalidation;
+
+    if (typeof diff === 'string') {
+      const { contentHash } = storedObject;
+      return !contentHash || contentHash !== diff;
+    }
+
+    if (typeof diff === 'number') {
+      const { lastUpdated } = storedObject;
+      if (!lastUpdated) return true;
+      const cacheInvalidation = (new Date(lastUpdated).getTime()) + 1000 * 60 * 60 * diff;
+      return new Date().getTime() >= cacheInvalidation;
+    }
+
+    return false;
   }
 
   const DATA_INDEX_KEY = 'stashdb_backlog_index';
 
   /**
    * @typedef DataIndex
-   * @property {{ [uuid: string]: string[] }} scenes
-   * @property {{ [uuid: string]: string }} performers
+   * @property {ScenesIndex} scenes
+   * @property {PerformersIndex} performers
    * @property {string} [lastUpdated]
+   */
+  /**
+   * @typedef {{ [uuid: string]: string[] }} ScenesIndex
+   */
+  /**
+   * @typedef {{ [uuid: string]: string }} PerformersIndex
    */
   /**
    * @param {boolean} [forceFetch=false]
@@ -247,7 +280,7 @@ async function inject() {
       for (const sceneId in scenesIndex) {
         const oldValue = /** @type {string | string[]} */ (scenesIndex[sceneId]);
         if (typeof oldValue === 'string') {
-          scenesIndex[sceneId] = [null].concat(...oldValue.split(/,/g));
+          scenesIndex[sceneId] = [''].concat(...oldValue.split(/,/g));
         }
       }
       const action = storedDataIndex.lastUpdated ? 'updated' : 'fetched';
@@ -279,7 +312,7 @@ async function inject() {
   const makeDataUrl = (object, uuid) => `${BASE_URL}/${object}s/${uuid.slice(0, 2)}/${uuid}.json`;
 
   /**
-   * @typedef {{ [field: string]: any } & { lastUpdated?: string }} DataObject
+   * @typedef {{ [field: string]: any } & { contentHash?: string, lastUpdated?: string }} DataObject
    */
   const DATA_KEY = 'stashdb_backlog';
 
@@ -311,20 +344,23 @@ async function inject() {
       return null;
     }
 
+    const haystack = index[/** @type {SupportedPluralObject} */ (`${object}s`)];
+    const indexEntry = haystack[uuid];
+
     const action = storedData.lastUpdated ? 'updated' : 'fetched';
     const dataObject = /** @type {DataObject} */ (data);
+    dataObject.contentHash = Array.isArray(indexEntry) ? indexEntry[0] : null;
     dataObject.lastUpdated = new Date().toISOString();
     storedData[makeObjectKey(object, uuid)] = dataObject;
     //@ts-expect-error
     await GM.setValue(DATA_KEY, JSON.stringify(storedData));
     console.debug(`[backlog] <${object} ${uuid}> data ${action}`);
 
-    const haystack = index[`${object}s`];
     // add to data index if not present
     if (haystack[uuid] === undefined) {
-      haystack[uuid] = [null].concat(
+      haystack[uuid] = [''].concat(
         Object.keys(data)
-          .filter((k) => !['lastUpdated', 'comments'].includes(k))
+          .filter((k) => !['contentHash', 'lastUpdated', 'comments'].includes(k))
       );
     }
     //@ts-expect-error
@@ -394,7 +430,7 @@ async function inject() {
     if (!index) index = await getDataIndex();
     if (!index) throw new Error("[backlog] failed to get index");
 
-    const haystack = index[`${object}s`];
+    const haystack = index[/** @type {SupportedPluralObject} */ (`${object}s`)];
     if (haystack[uuid] === undefined) {
       // Clear outdated
       if (await _removeCachedObjectData(object, uuid)) {
@@ -409,8 +445,10 @@ async function inject() {
       throw new Error("[backlog] invalid stored data");
     }
 
+    const indexEntry = haystack[uuid];
+    const contentHash = Array.isArray(indexEntry) ? indexEntry[0] : null;
     const key = makeObjectKey(object, uuid);
-    if (shouldFetch(storedData[key], 24)) {
+    if (shouldFetch(storedData[key], contentHash || '')) {
       return await _fetchObject(object, uuid, storedData, index);
     }
 
@@ -563,8 +601,14 @@ async function inject() {
     button.type = 'button';
     button.style.margin = '2px';
     button.classList.add('btn', 'btn-light', className);
-    button.title = data ? 'Refetch backlog data' : 'Fetch new backlog data';
-    button.innerText = data ? '📥' : '🆕';
+    if (data) {
+      const update = data.lastUpdated ? `\nLast updated: ${formatDate(data.lastUpdated)}` : '';
+      button.title = `Refetch backlog data${update}`;
+      button.innerText = '📥';
+    } else {
+      button.title = 'Fetch new backlog data';
+      button.innerText = '🆕';
+    }
 
     button.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -986,11 +1030,7 @@ async function inject() {
         dd.innerText = value;
         dd.style.whiteSpace = 'pre-line';
       } else if (field === 'lastUpdated') {
-        const date = new Date(value);
-        dd.innerText = (
-          date.toLocaleString("en-us", { month: "short", year: "numeric", day: "numeric" })
-          + ' ' + date.toLocaleTimeString(navigator.languages[0])
-        );
+        dd.innerText = formatDate(value);
       } else {
         dd.innerText = value;
       }
@@ -1024,7 +1064,7 @@ async function inject() {
     const [, info] =
       Array.isArray(found)
         ? [found[0], found.slice(1)]
-        : [null, found.split(/,/g)];
+        : ['', found.split(/,/g)];
     if (info.includes('split')) {
       const toSplit = document.createElement('div');
       toSplit.classList.add('mb-1', 'font-weight-bold');
