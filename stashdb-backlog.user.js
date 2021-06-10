@@ -14,6 +14,8 @@
 //@ts-check
 
 async function inject() {
+  const BASE_URL = 'https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main';
+
   const urlRegex = new RegExp(
     String.raw`(?:/([a-z]+)`
       + String.raw`(?:/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[\w\d-]+)`
@@ -233,7 +235,7 @@ async function inject() {
       throw new Error("[backlog] invalid stored data");
     }
     if (forceFetch || shouldFetch(storedDataIndex, 1)) {
-      const data = await fetchJSON('https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main/index.json');
+      const data = await fetchJSON(`${BASE_URL}/index.json`);
       if (data === null || 'error' in data) {
         console.error('[backlog] index error', data);
         return null;
@@ -265,7 +267,7 @@ async function inject() {
    * @param {string} uuid
    * @returns {string}
    */
-  const makeDataPath = (object, uuid) => `${object}s/${uuid.slice(0, 2)}/${uuid}.json`;
+  const makeDataUrl = (object, uuid) => `${BASE_URL}/${object}s/${uuid.slice(0, 2)}/${uuid}.json`;
 
   /**
    * @typedef {{ [field: string]: any } & { lastUpdated?: string }} DataObject
@@ -280,9 +282,7 @@ async function inject() {
    * @returns {Promise<DataObject | null>}
    */
   const _fetchObject = async (object, uuid, storedData, index) => {
-    const data = await fetchJSON(
-      `https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main/${makeDataPath(object, uuid)}`
-    );
+    const data = await fetchJSON(makeDataUrl(object, uuid));
     if (data && 'error' in data && data.status === 404) {
       // remove from data index
       const removedIndex = await _removeCachedIndexEntry(object, uuid, index);
@@ -315,13 +315,13 @@ async function inject() {
     if (Array.isArray(haystack) && !haystack.includes(uuid)) {
       haystack.splice(haystack.length - 1, 0, uuid);
     } else if (haystack[uuid] === undefined) {
-      haystack[uuid] = Object.keys(data).filter((k) => ['lastUpdated', 'comments'].includes(k)).join(',');
+      haystack[uuid] = Object.keys(data).filter((k) => !['lastUpdated', 'comments'].includes(k)).join(',');
     }
     //@ts-expect-error
     await GM.setValue(DATA_INDEX_KEY, JSON.stringify(index));
     console.debug('[backlog] stored data index updated');
 
-    return data;
+    return dataObject;
   };
 
   /**
