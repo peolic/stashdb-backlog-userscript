@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.11.8
+// @version   1.11.9
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -548,6 +548,41 @@ async function inject() {
   );
 
   /**
+   * @param {DataObject | null} data
+   * @param {Element} target Checks `target` for existence of button
+   * @returns {HTMLButtonElement}
+   */
+  const createFetchButton = (data, target) => {
+    const className = 'backlog-refetch';
+    if (!target || target.querySelector(`:scope > button.${className}`)) return null;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.style.margin = '2px';
+    button.classList.add('btn', 'btn-light', className);
+    button.title = data ? 'Refetch backlog data' : 'Fetch new backlog data';
+    button.innerText = data ? '📥' : '🆕';
+
+    button.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      button.textContent = '⏳';
+      button.disabled = true;
+      const result = await backlogRefetch();
+      button.textContent = result ? '✔' : '❌';
+      button.style.backgroundColor = result ? 'yellow' : 'var(--gray-dark)';
+      button.style.fontWeight = '800';
+      if (result) {
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      }
+    });
+
+    return button;
+  };
+
+  /**
    * @param {string} sceneId
    */
   async function iScenePage(sceneId) {
@@ -571,6 +606,13 @@ async function inject() {
     }
 
     const found = await getDataFor('scene', sceneId);
+
+    if (isDev()) {
+      const sceneButtons = document.querySelector('.scene-info > .card-header > .float-right');
+      const buttonRefetch = createFetchButton(found, sceneButtons);
+      if (buttonRefetch) sceneButtons.appendChild(buttonRefetch);
+    }
+
     if (!found) {
       console.debug('[backlog] not found', sceneId);
       return;
@@ -857,36 +899,6 @@ async function inject() {
       let studio_url = (document.querySelector('.scene-description > div:last-of-type > a'));
       studio_url.classList.add('bg-warning');
       studio_url.title = `<pending>\n${found.url}`;
-    }
-
-    if (isDev()) {
-      // Refetch button
-      const buttonRefetch = document.createElement('button');
-      buttonRefetch.type = 'button';
-      buttonRefetch.style.margin = '2px';
-      buttonRefetch.classList.add('btn', 'btn-light', 'backlog-refetch');
-      buttonRefetch.title = 'Refetch backlog data';
-      buttonRefetch.innerText = '📥';
-
-      buttonRefetch.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        buttonRefetch.textContent = '⏳';
-        buttonRefetch.disabled = true;
-        const result = await backlogRefetch();
-        buttonRefetch.textContent = result ? '✔' : '❌';
-        buttonRefetch.style.backgroundColor = result ? 'yellow' : 'var(--gray-dark)';
-        buttonRefetch.style.fontWeight = '800';
-        if (result) {
-          setTimeout(() => {
-            window.location.reload();
-          }, 500);
-        }
-      });
-
-      const sceneButtons = document.querySelector('.card-header > .float-right');
-      if (!sceneButtons || sceneButtons.querySelector('button.backlog-refetch')) return;
-      sceneButtons.appendChild(buttonRefetch);
     }
 
   } // iScenePage
