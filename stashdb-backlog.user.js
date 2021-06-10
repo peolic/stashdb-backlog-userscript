@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.12.0
+// @version   1.12.1
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -1067,8 +1067,21 @@ async function inject() {
         : ['', found.split(/,/g)];
     if (info.includes('split')) {
       const toSplit = document.createElement('div');
-      toSplit.classList.add('mb-1', 'font-weight-bold');
+      toSplit.classList.add('mb-1', 'p-1', 'font-weight-bold');
+      toSplit.style.transition = 'background-color .5s';
       toSplit.innerHTML = 'This performer is listed on <a>Performers To Split Up</a>.';
+      /** @type {HTMLDivElement} */
+      const header = (performerInfo.querySelector('.card-header'));
+      if (!header.dataset.injectedBacklog) {
+        header.dataset.injectedBacklog = 'true';
+
+        header.addEventListener('mouseover', () => {
+          toSplit.classList.add('bg-danger');
+        });
+        header.addEventListener('mouseout', () => {
+          toSplit.classList.remove('bg-danger');
+        });
+      }
       const a = toSplit.querySelector('a');
       a.href = 'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ/edit#gid=1067038397';
       a.target = '_blank';
