@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.12.1
+// @version   1.12.2
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -222,11 +222,16 @@ async function inject() {
 
   /**
    * @param {DataObject} storedObject
-   * @param {string | number} diff new content hash or max time in hours
+   * @param {string | number | Date} diff new content hash or max time in hours
    * @returns {boolean}
    */
   function shouldFetch(storedObject, diff) {
     if (!storedObject) return true;
+
+    if (diff instanceof Date) {
+      const { lastUpdated } = storedObject;
+      return !lastUpdated || diff.getTime() > new Date(lastUpdated).getTime();
+    }
 
     if (typeof diff === 'string') {
       const { contentHash } = storedObject;
@@ -241,6 +246,30 @@ async function inject() {
     }
 
     return false;
+  }
+
+  /**
+   * @returns {Promise<Date | null>}
+   */
+  async function getDataIndexLastestUpdatedDate() {
+    try {
+      console.debug('[backlog] fetching last updated date for data index');
+      const response = await fetch(
+        'https://api.github.com/repos/peolic/stashdb_backlog_data/commits?page=1&per_page=1&path=index.json',
+        { credentials: 'same-origin', referrerPolicy: 'same-origin' },
+      );
+      if (!response.ok) {
+        const body = await response.text();
+        console.error('[backlog] api fetch bad response', response.status, body);
+        return null;
+      }
+      const data = await response.json();
+      return new Date(data[0].commit.committer.date);
+
+    } catch (error) {
+      console.error('[backlog] api fetch error', error);
+      return null;
+    }
   }
 
   const DATA_INDEX_KEY = 'stashdb_backlog_index';
@@ -267,7 +296,25 @@ async function inject() {
     if (!storedDataIndex) {
       throw new Error("[backlog] invalid stored data");
     }
-    if (forceFetch || shouldFetch(storedDataIndex, 1)) {
+    let shouldFetchIndex = shouldFetch(storedDataIndex, 1);
+    try {
+      if (!dev && !forceFetch && shouldFetchIndex) {
+        // Only fetch if there really was an update
+        const lastUpdated = await getDataIndexLastestUpdatedDate();
+        if (lastUpdated) {
+          shouldFetchIndex = shouldFetch(storedDataIndex, lastUpdated);
+          console.debug(
+            `[backlog] data index lastest remote update: ${formatDate(lastUpdated)}`
+            + ` - updating: ${shouldFetchIndex}`
+          );
+        }
+      }
+    } catch (error) {
+      console.error('[backlog] error trying to determine lastest data index update');
+      shouldFetchIndex = shouldFetch(storedDataIndex, 1);
+    }
+
+    if (forceFetch || shouldFetchIndex) {
       const data = await fetchJSON(`${BASE_URL}/index.json`);
       if (data === null || 'error' in data) {
         console.error('[backlog] index error', data);
