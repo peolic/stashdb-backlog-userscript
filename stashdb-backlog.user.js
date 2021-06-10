@@ -220,7 +220,7 @@ async function inject() {
 
   /**
    * @typedef DataIndex
-   * @property {string[] | { [uuid: string]: string }} scenes
+   * @property {{ [uuid: string]: string[] }} scenes
    * @property {{ [uuid: string]: string }} performers
    * @property {string} [lastUpdated]
    */
@@ -241,6 +241,15 @@ async function inject() {
         return null;
       }
       const dataIndex = /** @type {DataIndex} */ (data);
+
+      // migration: convert comma-separated to array
+      const scenesIndex = dataIndex.scenes;
+      for (const sceneId in scenesIndex) {
+        const oldValue = /** @type {string | string[]} */ (scenesIndex[sceneId]);
+        if (typeof oldValue === 'string') {
+          scenesIndex[sceneId] = [null].concat(...oldValue.split(/,/g));
+        }
+      }
       const action = storedDataIndex.lastUpdated ? 'updated' : 'fetched';
       dataIndex.lastUpdated = new Date().toISOString();
       //@ts-expect-error
@@ -312,10 +321,11 @@ async function inject() {
 
     const haystack = index[`${object}s`];
     // add to data index if not present
-    if (Array.isArray(haystack) && !haystack.includes(uuid)) {
-      haystack.splice(haystack.length - 1, 0, uuid);
-    } else if (haystack[uuid] === undefined) {
-      haystack[uuid] = Object.keys(data).filter((k) => !['lastUpdated', 'comments'].includes(k)).join(',');
+    if (haystack[uuid] === undefined) {
+      haystack[uuid] = [null].concat(
+        Object.keys(data)
+          .filter((k) => !['lastUpdated', 'comments'].includes(k))
+      );
     }
     //@ts-expect-error
     await GM.setValue(DATA_INDEX_KEY, JSON.stringify(index));
@@ -340,13 +350,7 @@ async function inject() {
     const haystack = storedIndex[`${object}s`];
 
     let removed = false;
-    if (Array.isArray(haystack)) {
-      const index = haystack.indexOf(uuid);
-      if (index !== -1) {
-        haystack.splice(index, 1);
-        removed = true;
-      }
-    } else if (haystack[uuid] !== undefined) {
+    if (haystack[uuid] !== undefined) {
       delete haystack[uuid];
       removed = true;
     }
@@ -391,8 +395,7 @@ async function inject() {
     if (!index) throw new Error("[backlog] failed to get index");
 
     const haystack = index[`${object}s`];
-    const found = Array.isArray(haystack) ? haystack.includes(uuid) : haystack[uuid] !== undefined;
-    if (!found) {
+    if (haystack[uuid] === undefined) {
       // Clear outdated
       if (await _removeCachedObjectData(object, uuid)) {
         console.debug(`[backlog] <${object} ${uuid}> cleared from cache (not found in index)`);
@@ -1018,7 +1021,10 @@ async function inject() {
     const found = index.performers[performerId];
     if (!found) return;
 
-    const info = found.split(/,/g);
+    const [, info] =
+      Array.isArray(found)
+        ? [found[0], found.slice(1)]
+        : [null, found.split(/,/g)];
     if (info.includes('split')) {
       const toSplit = document.createElement('div');
       toSplit.classList.add('mb-1', 'font-weight-bold');
@@ -1070,15 +1076,11 @@ async function inject() {
         else markerDataset.backlogInjected = 'true';
 
         const sceneId = card.querySelector('a').href.replace(/.+\//, '');
-        const found = Array.isArray(index.scenes) ? index.scenes.includes(sceneId) : index.scenes[sceneId];
+        const found = index.scenes[sceneId];
         if (!found) return;
-        const changes = (typeof found === 'string') ? found.split(/,/g) : null;
+        const changes = found.slice(1);
         card.style.outline = '0.4rem solid var(--yellow)';
-        if (changes) {
-          card.parentElement.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
-        } else {
-          card.parentElement.title = `<pending>\n(click scene to view backlogged changes)`;
-        }
+        card.parentElement.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
       });
     };
 
