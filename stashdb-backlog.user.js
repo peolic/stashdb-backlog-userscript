@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.12.5
+// @version   1.12.6
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -825,37 +825,39 @@ async function inject() {
       const imgContainer = img.parentElement;
 
       if (img.getAttribute('src')) {
-        imgContainer.classList.add('bg-warning', 'p-2');
-        imgContainer.title = `<pending>\n${found.image}`;
         const handleExistingImage = async () => {
           const newImage = await compareImages(img, found.image);
           if (newImage instanceof Error) {
+            imgContainer.classList.add('bg-danger', 'p-2');
+            imgContainer.title = 'error comparing image';
             console.error('[backlog] error comparing image', newImage);
             return;
           }
+
+          imgContainer.classList.add('bg-warning', 'p-2');
+          imgContainer.title = `<pending>\n${found.image}`;
           if (newImage === null) {
-            imgContainer.classList.add('bg-primary');
+            imgContainer.style.backgroundColor = 'var(--pink)';
             imgContainer.classList.remove('bg-warning');
             imgContainer.title = `${makeAlreadyCorrectTitle('added')}\n\n${found.image}`;
           } else {
             imgContainer.classList.add('d-flex');
 
-            const imgNew = document.createElement('img');
-            if (img.naturalHeight < img.naturalWidth) {
-              imgContainer.classList.add('flex-column');
-              imgNew.style.width = '100%';
-              imgNew.style.borderTop = '.5rem solid var(--warning)';
-            } else {
-              img.style.width = 'unset';
-              imgNew.style.height = '50%';
-              imgNew.style.borderLeft = '.5rem solid var(--warning)';
-            }
-            imgNew.src = newImage;
-
             const imgNewLink = document.createElement('a');
             imgNewLink.href = found.image;
             imgNewLink.target = '_blank';
             imgNewLink.rel = 'nofollow noopener noreferrer';
+
+            const imgNew = document.createElement('img');
+            imgNew.src = newImage;
+
+            const isVertical = img.naturalHeight > img.naturalWidth;
+            img.style.flex = '50%';
+            imgNewLink.style.flex = '50%';
+            imgNew.style.width = '100%';
+            imgNew.style.borderLeft = '.5rem solid var(--warning)';
+            imgNew.style.height = isVertical ? 'auto' : '100%';
+
             imgNewLink.appendChild(imgNew);
 
             imgContainer.appendChild(imgNewLink);
@@ -866,6 +868,7 @@ async function inject() {
         else img.addEventListener('load', handleExistingImage, { once: true });
 
       } else {
+        // missing image
         imgContainer.classList.add('bg-danger', 'p-2');
         imgContainer.title = `<MISSING>\n${found.image}`;
         // img.src = found.image;
