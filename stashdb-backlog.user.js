@@ -962,27 +962,22 @@ async function inject() {
       /** @type {HTMLDivElement | null} */
       let duration = (document.querySelector('.scene-info > .card-footer > div[title $= " seconds"]'));
       const foundDuration = Number(found.duration);
+      const formattedDuration = `${formatDuration(foundDuration)} (${found.duration})`;
       if (!duration) {
         duration = document.createElement('div');
-        duration.innerHTML = (
-          escapeHTML('<MISSING>')
-          + ` Duration: <b>${formatDuration(foundDuration)} (${found.duration})</b>`
-        );
+        duration.innerHTML = `${escapeHTML('<MISSING>')} Duration: <b>${formattedDuration}</b>`;
         duration.classList.add('bg-danger', 'p-1');
         duration.title = 'Duration is missing';
-        document.querySelector('.scene-info > .card-footer > *:first-child').insertAdjacentElement('afterend', duration);
+        document.querySelector('.scene-info .scene-performers').insertAdjacentElement('afterend', duration);
       } else {
         if (found.duration == duration.title.match(/(\d+)/)[1]) {
           duration.classList.add('bg-warning', 'p-1');
-          duration.innerHTML = escapeHTML('<already correct> ') + duration.innerHTML;
-          duration.title = 'Duration already correct, should mark the entry on the backlog sheet as completed';
+          duration.insertAdjacentText('afterbegin', '<already correct> ');
+          duration.title = makeAlreadyCorrectTitle('correct');
         } else {
           duration.classList.add('bg-primary', 'p-1');
-          duration.innerHTML = (
-            escapeHTML('<pending> ')
-            + duration.innerHTML
-            + ` => ${formatDuration(foundDuration)} (${found.duration})`
-          );
+          duration.insertAdjacentText('beforeend', ` \u{1F87A} ${formattedDuration}`);
+          duration.title = `<pending> Duration\n${formattedDuration}`;
         }
       }
     }
