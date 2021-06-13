@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.12.4
+// @version   1.12.5
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -762,35 +762,62 @@ async function inject() {
       }
     }
 
-    if (found.date || found.studio_id) {
-      let studio_date = /** @type {HTMLHeadingElement | null} */ (sceneHeader.querySelector(':scope > h6'));
-      let title = `<pending>`;
-      let alreadyCorrectStudioId = false;
-      if (found.studio_id) {
-        alreadyCorrectStudioId = found.studio_id === parsePath(studio_date.querySelector('a').href).ident;
-        title += `\nStudio ID: ${found.studio_id}`;
-      }
-      let alreadyCorrectDate = false;
-      if (found.date) {
-        alreadyCorrectDate = found.date === Array.from(studio_date.childNodes).slice(-1)[0].nodeValue.trim();
-        title += `\nDate: ${found.date}`;
-      }
-      if (alreadyCorrectStudioId || alreadyCorrectDate) {
-        studio_date.classList.add('bg-warning', 'p-1');
-        if (alreadyCorrectDate) {
-          studio_date.innerHTML = studio_date.innerHTML + escapeHTML(' \u{1F878} <already correct>');
+    if (found.date || found.studio) {
+      const studio_date = /** @type {HTMLHeadingElement | null} */ (sceneHeader.querySelector(':scope > h6'));
+
+      const studioElement = studio_date.querySelector('a');
+      const dateNode = Array.from(studio_date.childNodes).slice(-1)[0];
+      const separator = studio_date.querySelector('span.mx-1');
+
+      if (found.studio) {
+        const alreadyCorrectStudioId = found.studio[0] === parsePath(studioElement.href).ident;
+        const [studioId, studioName] = found.studio;
+
+        const newStudio = document.createElement('span');
+        let title, colorClass;
+        if (!alreadyCorrectStudioId) {
+          colorClass = 'bg-primary';
+          title = `<pending> Studio\n${studioName ? `${studioName} (${studioId})` : studioId}`;
+          newStudio.innerHTML = `<a href="/studios/${studioId}">${escapeHTML(studioName)}</a> \u{1F878}`;
         } else {
-          studio_date.innerHTML = escapeHTML('<already correct> \u{1F87A} ') + studio_date.innerHTML;
+          colorClass = 'bg-warning';
+          title = makeAlreadyCorrectTitle('correct', 'Studio');
+          newStudio.innerText = '<already correct> \u{1F878}';
         }
-        studio_date.title = (
-          [alreadyCorrectStudioId ? 'Studio ID' : null, alreadyCorrectDate ? 'Date' : null]
-            .filter(Boolean).join(' and ')
-          + ' already correct, should mark the entry on the backlog sheet as completed'
-        );
-      } else {
-        studio_date.classList.add('bg-primary', 'p-1');
+
+        newStudio.classList.add(colorClass, 'p-1');
+        newStudio.title = title;
+        studioElement.title = title;
+        studioElement.classList.add(colorClass, 'p-1');
+        studioElement.insertAdjacentElement('beforebegin', newStudio);
       }
-      studio_date.title = title;
+
+      if (found.date) {
+        const alreadyCorrectDate = found.date === dateNode.nodeValue.trim();
+
+        // convert date text node to element
+        const dateElement = document.createElement('span');
+        dateElement.append(dateNode);
+        separator.insertAdjacentElement('afterend', dateElement);
+
+        const newDate = document.createElement('span');
+        let title, colorClass;
+        if (!alreadyCorrectDate) {
+          colorClass = 'bg-primary';
+          title = `<pending> Date\n${found.date}`;
+          newDate.innerText = `\u{1F87A} ${found.date}`;
+        } else {
+          colorClass = 'bg-warning';
+          title = makeAlreadyCorrectTitle('correct', 'Date');
+          newDate.innerText = '\u{1F87A} <already correct>';
+        }
+
+        newDate.classList.add(colorClass, 'p-1');
+        newDate.title = title;
+        dateElement.title = title;
+        dateElement.classList.add(colorClass, 'p-1');
+        dateElement.insertAdjacentElement('afterend', newDate);
+      }
     }
 
     if (found.image) {
