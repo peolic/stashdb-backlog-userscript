@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.12.3
+// @version   1.12.4
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -23,7 +23,7 @@ async function inject() {
 
   const urlRegex = new RegExp(
     String.raw`(?:/([a-z]+)`
-      + String.raw`(?:/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[\w\d-]+)`
+      + String.raw`(?:/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[\w\d.-]+)`
         + String.raw`(?:/([a-z]+)`
         + String.raw`)?`
       + String.raw`)?`
@@ -109,8 +109,9 @@ async function inject() {
     }
 
     if (loc.object === 'performers' && loc.ident && !loc.action) {
+      await iPerformerPage(loc.ident);
       await highlightSceneCards(loc.object);
-      return await iPerformerPage(loc.ident);
+      return;
     }
 
     // Home page
