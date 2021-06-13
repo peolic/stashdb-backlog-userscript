@@ -725,6 +725,9 @@ async function inject() {
     sceneHeader.style.borderTop = '1rem solid var(--warning)';
     sceneHeader.title = 'pending changes (backlog)';
 
+    const makeAlreadyCorrectTitle = (/** @type {string} */ status='correct', /** @type {string} */ field='') =>
+      `<already ${status}>${field ? ` ${field}`: ''}\nshould mark the entry on the backlog sheet as completed`;
+
     if (found.comments && found.comments.length > 0) {
       const comments = document.createElement('div');
       comments.classList.add('bg-info');
@@ -806,7 +809,7 @@ async function inject() {
           if (newImage === null) {
             imgContainer.classList.add('bg-primary');
             imgContainer.classList.remove('bg-warning');
-            imgContainer.title = `<already added>\nshould mark the entry on the backlog sheet as completed\n\n${found.image}`;
+            imgContainer.title = `${makeAlreadyCorrectTitle('added')}\n\n${found.image}`;
           } else {
             imgContainer.classList.add('d-flex');
 
@@ -898,7 +901,7 @@ async function inject() {
           const entryFullName = formatName(toAppend);
           if (fullName === entryFullName) {
             highlight(performer, 'warning');
-            performer.title = `<already added>\nshould mark the entry on the backlog sheet as completed`;
+            performer.title = makeAlreadyCorrectTitle('added');
           } else {
             highlight(performer, 'primary');
             performer.title = `<already added>\nbut needs an update to\n${entryFullName}`;
@@ -909,7 +912,7 @@ async function inject() {
           const entryFullName = formatName(toUpdate);
           if (fullName === entryFullName) {
             highlight(performer, 'warning');
-            performer.title = `<already updated>\nshould mark the entry on the backlog sheet as completed`;
+            performer.title = makeAlreadyCorrectTitle('updated');
           } else {
             highlight(performer, 'primary');
             performer.title = `<pending>\nupdate to\n${entryFullName}`;
