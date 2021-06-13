@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.12.6
+// @version   1.12.7
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -851,12 +851,12 @@ async function inject() {
             const imgNew = document.createElement('img');
             imgNew.src = newImage;
 
-            const isVertical = img.naturalHeight > img.naturalWidth;
+            // const isVertical = img.naturalHeight > img.naturalWidth;
             img.style.flex = '50%';
             imgNewLink.style.flex = '50%';
-            imgNew.style.width = '100%';
             imgNew.style.borderLeft = '.5rem solid var(--warning)';
-            imgNew.style.height = isVertical ? 'auto' : '100%';
+            imgNew.style.width = '100%';
+            imgNew.style.height = 'auto';
 
             imgNewLink.appendChild(imgNew);
 
