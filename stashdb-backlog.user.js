@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.13.0
+// @version   1.13.1
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -1098,6 +1098,8 @@ async function inject() {
         if (matches) fpInfo.appendChild(makeElement('Reported incorrect fingerprints:', `${matches} ℹ`));
         if (notFound) fpInfo.appendChild(makeElement('Missing reported fingerprints:', `${notFound} ⚠`));
         document.querySelector('nav[role="tablist"]').insertAdjacentElement('beforebegin', fpInfo);
+        // Hook to remove it
+        window.addEventListener('locationchange', () => fpInfo.remove(), { once: true });
       }
     }
 
