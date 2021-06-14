@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.13.1
+// @version   1.13.2
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -80,16 +80,23 @@ async function inject() {
 
   const wait = (/** @type {number} */ ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  /**
+   * @param {string} selector
+   * @param {number} [timeout] fail after, in milliseconds
+   */
+   const elementReadyIn = (selector, timeout = undefined) => {
+    const promises = [elementReady(selector)];
+    if (timeout) promises.push(wait(timeout).then(() => null));
+    return Promise.race(promises);
+  };
+
   async function dispatcher() {
     const loc = parsePath();
     if (!loc) {
       throw new Error('[backlog] Failed to parse location!');
     }
 
-    await Promise.race([
-      elementReady('.StashDBContent > .LoadingIndicator'),
-      wait(100),
-    ]);
+    await elementReadyIn('.StashDBContent > .LoadingIndicator', 100);
 
     if (loc.object === 'scenes') {
       if (loc.ident) {
@@ -688,10 +695,7 @@ async function inject() {
    * @param {string} sceneId
    */
   async function iScenePage(sceneId) {
-    await Promise.race([
-      elementReady('.StashDBContent .scene-info'),
-      wait(2000),
-    ]);
+    await elementReadyIn('.StashDBContent .scene-info', 2000);
 
     const sceneInfo = /** @type {HTMLDivElement | null} */ (document.querySelector('.scene-info'));
     if (!sceneInfo) {
@@ -1111,7 +1115,8 @@ async function inject() {
    * @param {string} sceneId
    */
   async function iSceneEditPage(sceneId) {
-    const pageTitle = /** @type {HTMLHeadingElement} */ (await elementReady('h3'));
+    const pageTitle = /** @type {HTMLHeadingElement} */ (await elementReadyIn('h3', 1000));
+    if (!pageTitle) return;
 
     const markerDataset = pageTitle.dataset;
     if (markerDataset.backlogInjected) {
@@ -1200,7 +1205,8 @@ async function inject() {
    * @param {string} performerId
    */
   async function iPerformerPage(performerId) {
-    const performerInfo = /** @type {HTMLDivElement} */ (await elementReady('.performer-info'));
+    const performerInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.performer-info', 1000));
+    if (!performerInfo) return;
 
     const markerDataset = performerInfo.dataset;
     if (markerDataset.backlogInjected) {
@@ -1263,12 +1269,7 @@ async function inject() {
    * @param {PluralObject | null} pluralObject
    */
   async function highlightSceneCards(pluralObject) {
-    await Promise.race([
-      elementReady('.SceneCard > .card'),
-      wait(2000),
-    ]);
-
-    if (document.querySelectorAll('.SceneCard > .card').length === 0) {
+    if (!await elementReadyIn('.SceneCard > .card', 2000)) {
       console.debug('[backlog] no scene cards found, skipping');
       return;
     }
@@ -1300,10 +1301,7 @@ async function inject() {
       );
       const observer = new MutationObserver(async (mutations, observer) => {
         console.debug('[backlog] detected change in performers studios selector, re-highlighting scene cards');
-        await Promise.race([
-          elementReady('.SceneCard > .card'),
-          wait(2000),
-        ]);
+        if (!await elementReadyIn('.SceneCard > .card', 2000)) return;
         await highlight();
       }).observe(studioSelectorValue, { childList: true, subtree: true });
     }
