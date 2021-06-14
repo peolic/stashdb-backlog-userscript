@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.12.7
+// @version   1.12.8
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -752,7 +752,8 @@ async function inject() {
     }
 
     if (found.title) {
-      let title = /** @type {HTMLHeadingElement | null} */ (document.querySelector('.scene-info h3'));
+      /** @type {HTMLHeadingElement | null} */
+      const title = (document.querySelector('.scene-info h3'));
       if (!title.innerText.trim()) {
         title.innerText = `<MISSING> ${found.title}`;
         title.classList.add('bg-danger', 'p-1');
@@ -821,7 +822,8 @@ async function inject() {
     }
 
     if (found.image) {
-      let img = /** @type {HTMLImageElement} */ (document.querySelector('.scene-photo > img'));
+      /** @type {HTMLImageElement} */
+      const img = (document.querySelector('.scene-photo > img'));
       const imgContainer = img.parentElement;
 
       if (img.getAttribute('src')) {
@@ -992,29 +994,29 @@ async function inject() {
       /** @type {HTMLDivElement | null} */
       let duration = (document.querySelector('.scene-info > .card-footer > div[title $= " seconds"]'));
       const foundDuration = Number(found.duration);
-      const formattedDuration = `${formatDuration(foundDuration)} (${found.duration})`;
+      const formattedDuration = formatDuration(foundDuration);
       if (!duration) {
         duration = document.createElement('div');
         duration.innerHTML = `${escapeHTML('<MISSING>')} Duration: <b>${formattedDuration}</b>`;
         duration.classList.add('bg-danger', 'p-1');
-        duration.title = 'Duration is missing';
+        duration.title = `Duration is missing; ${foundDuration} seconds`;
         document.querySelector('.scene-info .scene-performers').insertAdjacentElement('afterend', duration);
       } else {
         if (found.duration == duration.title.match(/(\d+)/)[1]) {
           duration.classList.add('bg-warning', 'p-1');
           duration.insertAdjacentText('afterbegin', '<already correct> ');
-          duration.title = makeAlreadyCorrectTitle('correct');
+          duration.title = `${makeAlreadyCorrectTitle('correct')}; ${foundDuration} seconds`;
         } else {
           duration.classList.add('bg-primary', 'p-1');
           duration.insertAdjacentText('beforeend', ` \u{1F87A} ${formattedDuration}`);
-          duration.title = `<pending> Duration\n${formattedDuration}`;
+          duration.title = `<pending> Duration: ${formattedDuration}; ${foundDuration} seconds`;
         }
       }
     }
 
     if (found.details) {
       /** @type {HTMLDivElement} */
-      let desc = (document.querySelector('.scene-description > h4 + div'));
+      const desc = (document.querySelector('.scene-description > h4 + div'));
       if (!desc.innerText.trim()) {
         desc.innerText = `<MISSING> ${found.details}`;
         desc.classList.add('bg-danger');
@@ -1026,7 +1028,7 @@ async function inject() {
 
     if (found.url) {
       /** @type {HTMLAnchorElement} */
-      let studio_url = (document.querySelector('.scene-description > div:last-of-type > a'));
+      const studio_url = (document.querySelector('.scene-description > div:last-of-type > a'));
       studio_url.classList.add('bg-warning');
       studio_url.title = `<pending>\n${found.url}`;
     }
