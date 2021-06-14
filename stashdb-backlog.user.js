@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.12.8
+// @version   1.13.0
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -1031,6 +1031,74 @@ async function inject() {
       const studio_url = (document.querySelector('.scene-description > div:last-of-type > a'));
       studio_url.classList.add('bg-warning');
       studio_url.title = `<pending>\n${found.url}`;
+    }
+
+    if (found.fingerprints) {
+      // Parse current
+      /** @type {HTMLTableRowElement[]} */
+      const fingerprintsTableRows = (Array.from(document.querySelectorAll('.scene-fingerprints > table tr')));
+      /** @type {{ algorithm?: number, hash?: number, duration?: number, submissions?: number }} */
+      const headers = {};
+      const currentFingerprints = fingerprintsTableRows.map((row, rowIndex) => {
+        /** @type {HTMLTableCellElement[]} */
+        const cells = (Array.from(row.children));
+
+        if (rowIndex === 0) {
+          cells.forEach((cell, cellIndex) => {
+            if (cell.innerText === 'Algorithm') headers.algorithm = cellIndex;
+            else if (cell.innerText === 'Hash') headers.hash = cellIndex;
+            else if (cell.innerText === 'Duration') headers.duration = cellIndex;
+            else if (cell.innerText === 'Submissions') headers.submissions = cellIndex;
+          });
+          return;
+        }
+
+        return {
+          row,
+          algorithm: cells[headers.algorithm].innerText,
+          hash: cells[headers.hash].innerText,
+          duration: cells[headers.duration].innerText,
+          submissions: cells[headers.submissions].innerText,
+        };
+      }).slice(1);
+
+      // Compare
+      let matches = 0;
+      let notFound = 0;
+      /** @type {{ algorithm: string, hash: string, correct_scene_id: string | null }[]} */
+      (found.fingerprints).forEach((fp) => {
+        const cfp = currentFingerprints
+          .find(({ algorithm, hash }) => algorithm === fp.algorithm.toUpperCase() && hash === fp.hash);
+        if (!cfp) return notFound++;
+        matches++;
+        const { row } = cfp;
+        row.classList.add('bg-warning');
+        if (fp.correct_scene_id) {
+          const html = ` | <a href="/scenes/${fp.correct_scene_id}"><b>correct scene</b></a>`;
+          row.children[headers.submissions].insertAdjacentHTML('beforeend', html);
+        }
+      });
+
+      if (matches || notFound) {
+        const fpInfo = document.createElement('div');
+        fpInfo.classList.add('float-right', 'my-2', 'd-flex', 'flex-column');
+
+        const makeElement = (...content) => {
+          const span = document.createElement('span');
+          span.classList.add('d-flex', 'justify-content-between');
+          content.forEach((c) => {
+            const b = document.createElement('b');
+            b.classList.add('ml-2', 'text-warning');
+            b.innerText = c;
+            span.appendChild(b);
+          });
+          return span;
+        };
+
+        if (matches) fpInfo.appendChild(makeElement('Reported incorrect fingerprints:', `${matches} ℹ`));
+        if (notFound) fpInfo.appendChild(makeElement('Missing reported fingerprints:', `${notFound} ⚠`));
+        document.querySelector('nav[role="tablist"]').insertAdjacentElement('beforebegin', fpInfo);
+      }
     }
 
   } // iScenePage
