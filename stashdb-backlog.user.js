@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.13.3
+// @version   1.13.4
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -922,7 +922,10 @@ async function inject() {
     }
 
     if (found.performers) {
-      const { remove, append, update } = found.performers;
+      const remove = Array.from(found.performers.remove); // shallow clone
+      const append = Array.from(found.performers.append); // shallow clone
+      const update = Array.from(found.performers.update || []); // shallow clone
+
       const removeFrom = (entry, from) => {
         const index = from.indexOf(entry);
         if (index === -1) console.error('[backlog] entry not found', entry, 'in', from);
@@ -939,6 +942,31 @@ async function inject() {
         const disambiguation = entry.disambiguation ? ` (${entry.disambiguation})` : '';
         if (!entry.appearance) return entry.name + disambiguation;
         return entry.appearance + ` (${entry.name})` + disambiguation;
+      };
+
+      const makePerformerAppearance = (entry) => {
+        const pa = document.createElement('a');
+        pa.classList.add('scene-performer');
+        if (entry.id) {
+          pa.href = `/performers/${entry.id}`;
+        }
+
+        const formattedName =
+          !entry.appearance
+            ? `<span>${escapeHTML(entry.name)}</span>`
+            : `<span>${escapeHTML(entry.appearance)}</span><small class="ml-1 text-small text-muted">(${escapeHTML(entry.name)})</small>`;
+        const dsmbg =
+          !entry.disambiguation
+            ? ''
+            : `<small class="ml-1 text-small text-muted">(${escapeHTML(entry.disambiguation)})</small>`;
+
+        pa.innerHTML = (
+          genderIcon(existingPerformers.length === 0)
+          + (entry.id ? '' : `[${escapeHTML(entry.status)}] `)
+          + formattedName
+          + dsmbg
+        );
+        return pa;
       };
 
       const highlight = (/** @type {HTMLElement} */ e, /** @type {string} */ v) => {
@@ -959,13 +987,32 @@ async function inject() {
         const { uuid, fullName } = parsePerformerAppearance(performer);
         const toRemove = remove.find((e) => e.id === uuid) || null;
         const toAppend = append.find((e) => e.id === uuid) || null;
-        const toUpdate = !update ? null : update.find((e) => e.id === uuid) || null;
+        const toUpdate = update.find((e) => e.id === uuid) || null;
+
         if (toRemove) {
           highlight(performer, 'danger');
-          performer.style.textDecoration = 'line-through';
-          performer.title = `<pending>\nremoval`;
+          if (toRemove.status) {
+            performer.children[1].insertAdjacentText('afterbegin', `[${toRemove.status}] `);
+            performer.title = `<pending>\n${toRemove.status}`;
+            performer.style.color = 'var(--yellow)';
+            if (toRemove.status == 'edit') {
+              performer.title += (
+                ' (performer needs to edited to become \n'
+                + 'one of the performers that need to be created)'
+              );
+            } else if (toRemove.status == 'merge') {
+              performer.title += (
+                ' (performer needs to be merged into \n'
+                + 'one of the performers that need to be added to the scene)'
+              );
+            }
+          } else {
+            performer.style.textDecoration = 'line-through';
+            performer.title = `<pending>\nremoval`;
+          }
           removeFrom(toRemove, remove);
         }
+
         if (toAppend) {
           const entryFullName = formatName(toAppend);
           if (fullName === entryFullName) {
@@ -977,6 +1024,7 @@ async function inject() {
           }
           removeFrom(toAppend, append);
         }
+
         if (toUpdate) {
           const entryFullName = formatName(toUpdate);
           if (fullName === entryFullName) {
@@ -991,40 +1039,38 @@ async function inject() {
       });
 
       append.forEach((entry) => {
-        const p = document.createElement('a');
-        p.classList.add('scene-performer');
-        highlight(p, 'success');
-        p.title = `<pending>\naddition`;
-        if (entry.id) {
-          p.href = `/performers/${entry.id}`;
-        } else {
-          p.title = `${p.title} (performer needs to be created)`;
+        const pa = makePerformerAppearance(entry);
+        highlight(pa, 'success');
+        pa.title = `<pending>\naddition`;
+        if (!entry.id) {
+          if (entry.status === 'new') {
+            pa.title += ' (performer needs to be created)';
+          } else if (entry.status == 'c') {
+          	pa.title += ' (performer created, pending approval)';
+          } else {
+          	pa.title += ' (missing performer ID)';
+          }
         }
-        const formattedName = (
-          !entry.appearance
-            ? `<span>${escapeHTML(entry.name)}</span>`
-            : `<span>${escapeHTML(entry.appearance)}</span><small class="ml-1 text-small text-muted">(${escapeHTML(entry.name)})</small>`
-        );
-        const dsmbg = !entry.disambiguation ? '' : `<small class="ml-1 text-small text-muted">(${escapeHTML(entry.disambiguation)})</small>`;
-        p.innerHTML = (
-          genderIcon(existingPerformers.length === 0)
-          + (entry.id ? '' : `[${escapeHTML(entry.status)}] `)
-          + formattedName
-          + dsmbg
-        );
-        scenePerformers.appendChild(p);
+        scenePerformers.appendChild(pa);
       });
 
       remove.forEach((entry) => {
-        // FIXME: Make it a visible warning
         console.warn('[backlog] entry to remove not found. already removed?', entry);
+        const pa = makePerformerAppearance(entry);
+        highlight(pa, 'warning');
+        pa.style.color = 'var(--yellow)';
+        pa.title = `performer-to-remove not found. already removed?`;
+        scenePerformers.appendChild(pa);
       });
-      if (update) {
-        update.forEach((entry) => {
-          // FIXME: Make it a visible warning
-          console.warn('[backlog] entry to update not found.', entry);
-        });
-      }
+
+      update.forEach((entry) => {
+        console.warn('[backlog] entry to update not found.', entry);
+        const pa = makePerformerAppearance(entry);
+        highlight(pa, 'warning');
+        pa.style.color = 'var(--yellow)';
+        pa.title = `performer-to-update is missing.`;
+        scenePerformers.appendChild(pa);
+      });
     }
 
     if (found.duration) {
