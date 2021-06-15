@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.13.4
+// @version   1.13.5
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -789,7 +789,7 @@ async function inject() {
         const arrow = document.createElement('span');
         arrow.classList.add('mx-2');
         arrow.style.fontSize = '1.25rem';
-        arrow.innerText = '\u{1F878}';
+        arrow.innerText = '\u{1F87A}';
         titleSpan.insertAdjacentElement('afterend', arrow);
 
         const newTitle = document.createElement('span');
@@ -812,21 +812,23 @@ async function inject() {
         const [studioId, studioName] = found.studio;
 
         const newStudio = document.createElement('span');
-        let title, colorClass;
+        let title, colorClass, currentColorClass;
         if (!alreadyCorrectStudioId) {
           colorClass = 'bg-primary';
+          currentColorClass = 'bg-danger';
           title = `<pending> Studio\n${studioName ? `${studioName} (${studioId})` : studioId}`;
           newStudio.innerHTML = `<a href="/studios/${studioId}">${escapeHTML(studioName)}</a> \u{1F878}`;
         } else {
           colorClass = 'bg-warning';
+          currentColorClass = 'bg-warning';
           title = makeAlreadyCorrectTitle('correct', 'Studio');
-          newStudio.innerText = '<already correct> \u{1F878}';
+          newStudio.innerText = '<already correct> \u{1F87A}';
         }
 
         newStudio.classList.add(colorClass, 'p-1');
         newStudio.title = title;
         studioElement.title = title;
-        studioElement.classList.add(colorClass, 'p-1');
+        studioElement.classList.add(currentColorClass, 'p-1');
         studioElement.insertAdjacentElement('beforebegin', newStudio);
       }
 
@@ -839,21 +841,23 @@ async function inject() {
         separator.insertAdjacentElement('afterend', dateElement);
 
         const newDate = document.createElement('span');
-        let title, colorClass;
+        let title, colorClass, currentColorClass;
         if (!alreadyCorrectDate) {
           colorClass = 'bg-primary';
+          currentColorClass = 'bg-danger';
           title = `<pending> Date\n${found.date}`;
           newDate.innerText = `\u{1F87A} ${found.date}`;
         } else {
           colorClass = 'bg-warning';
+          currentColorClass = 'bg-warning';
           title = makeAlreadyCorrectTitle('correct', 'Date');
-          newDate.innerText = '\u{1F87A} <already correct>';
+          newDate.innerText = '\u{1F878} <already correct>';
         }
 
         newDate.classList.add(colorClass, 'p-1');
         newDate.title = title;
         dateElement.title = title;
-        dateElement.classList.add(colorClass, 'p-1');
+        dateElement.classList.add('bg-danger', 'p-1');
         dateElement.insertAdjacentElement('afterend', newDate);
       }
     }
