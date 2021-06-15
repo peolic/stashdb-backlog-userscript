@@ -666,10 +666,10 @@ async function inject() {
     if (data) {
       const update = data.lastUpdated ? `\nLast updated: ${formatDate(data.lastUpdated)}` : '';
       button.title = `Refetch backlog data${update}`;
-      button.innerText = '📥';
+      button.innerText = '🔄';
     } else {
       button.title = 'Fetch new backlog data';
-      button.innerText = '🆕';
+      button.innerText = '📥';
     }
 
     button.addEventListener('click', async (e) => {
