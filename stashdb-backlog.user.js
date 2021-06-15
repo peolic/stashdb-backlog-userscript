@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.13.2
+// @version   1.13.3
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -758,12 +758,45 @@ async function inject() {
     if (found.title) {
       /** @type {HTMLHeadingElement | null} */
       const title = (document.querySelector('.scene-info h3'));
-      if (!title.innerText.trim()) {
-        title.innerText = `<MISSING> ${found.title}`;
+      const currentTitle = title.innerText;
+      if (!currentTitle) {
         title.classList.add('bg-danger', 'p-1');
-      } else {
+        title.innerText = found.title;
+        title.title = '<MISSING> Title';
+
+        const status = document.createElement('span');
+        status.classList.add('mr-2');
+        status.style.fontSize = '1.25rem';
+        status.innerText = '<MISSING> \u{1F87A}';
+        title.insertAdjacentElement('afterbegin', status);
+      } else if (currentTitle === found.title) {
         title.classList.add('bg-warning', 'p-1');
-        title.title = `<pending>\n${found.title}`;
+        title.title = makeAlreadyCorrectTitle('correct', 'Title');
+
+        const status = document.createElement('span');
+        status.classList.add('mr-2');
+        status.style.fontSize = '1.25rem';
+        status.innerText = '<already correct> \u{1F87A}';
+        title.insertAdjacentElement('afterbegin', status);
+      } else {
+        title.title = `<pending> Title`;
+        // convert title text node to element
+        const titleSpan = document.createElement('span');
+        titleSpan.append(title.childNodes[0]);
+        titleSpan.classList.add('bg-danger', 'p-1');
+        title.insertAdjacentElement('afterbegin', titleSpan);
+
+        const arrow = document.createElement('span');
+        arrow.classList.add('mx-2');
+        arrow.style.fontSize = '1.25rem';
+        arrow.innerText = '\u{1F878}';
+        titleSpan.insertAdjacentElement('afterend', arrow);
+
+        const newTitle = document.createElement('span');
+        newTitle.classList.add('bg-primary', 'p-1');
+        newTitle.style.fontSize = '1.25rem';
+        newTitle.innerText = found.title;
+        title.insertAdjacentElement('beforeend', newTitle);
       }
     }
 
