@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.13.5
+// @version   1.14.0
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -103,7 +103,7 @@ async function inject() {
         // Scene page
         if (!loc.action) return await iScenePage(loc.ident);
         // Scene edit page
-        // else if (loc.action === 'edit') return await iSceneEditPage(loc.ident);
+        else if (loc.action === 'edit') return await iSceneEditPage(loc.ident);
       } else {
         // Main scene cards list
         return await highlightSceneCards(loc.object);
@@ -738,7 +738,7 @@ async function inject() {
 
       /** @type {string[]} */
       (found.comments).forEach((comment, index) => {
-        if (index > 0) comments.appendChild(document.createElement('br'));
+        if (index > 0) comments.insertAdjacentHTML('beforeend', '<br>');
         let commentElement;
         if (/https?:/.test(comment)) {
           commentElement = document.createElement('a');
@@ -808,8 +808,8 @@ async function inject() {
       const separator = studio_date.querySelector('span.mx-1');
 
       if (found.studio) {
-        const alreadyCorrectStudioId = found.studio[0] === parsePath(studioElement.href).ident;
         const [studioId, studioName] = found.studio;
+        const alreadyCorrectStudioId = studioId === parsePath(studioElement.href).ident;
 
         const newStudio = document.createElement('span');
         let title, colorClass, currentColorClass;
@@ -1216,68 +1216,220 @@ async function inject() {
     }
     console.debug('[backlog] found', found);
 
-    const pendingChangesHTML = `
-      <div
-        class="PendingChanges"
-        style="position: fixed; right: 100px; top: 80px; width: 400px; height: 600px;"
-      >
-        <h3>Pending Changes</h3>
-        <dl></dl>
-      </div>
-    `;
+    const StashDBContent = /** @type {HTMLDivElement} */ (document.querySelector('.StashDBContent'));
+    StashDBContent.style.maxWidth = '1600px';
+    // Hook to the global style
+    window.addEventListener('locationchange', () => {
+      StashDBContent.style.maxWidth = null;
+      if (StashDBContent.getAttribute('style') === '') StashDBContent.removeAttribute('style');
+    }, { once: true });
 
-    // pageTitle.insertAdjacentElement('afterend', pendingChanges);
-    pageTitle.insertAdjacentHTML('afterend', pendingChangesHTML);
-    const pendingChanges = await elementReady('.PendingChanges dl');
+    const sceneFormRow = /** @type {HTMLDivElement} */ (document.querySelector('.SceneForm > .row'));
+    const sceneFormCol = /** @type {HTMLDivElement} */ (sceneFormRow.querySelector(':scope > div:first-child'));
+    sceneFormCol.classList.replace('col-10', 'col-9');
 
-    Object.entries(found).forEach(([field, value]) => {
+    const pendingChangesContainer = document.createElement('div');
+    pendingChangesContainer.classList.add('col-3', 'PendingChanges');
+    const pendingChangesTitle = document.createElement('h3');
+    pendingChangesTitle.innerText = 'Backlogged Changes';
+    pendingChangesContainer.appendChild(pendingChangesTitle);
+    const pendingChanges = document.createElement('dl');
+    pendingChangesContainer.appendChild(pendingChanges);
+
+    sceneFormRow.appendChild(pendingChangesContainer);
+
+    /**
+     * @param {{ [key: string]: any }} obj
+     * @param {string[]} keySortOrder
+     * @returns {[string, any][]}
+     */
+    const sortedEntries = (obj, keySortOrder) =>
+      Object.entries(obj)
+        .sort(([aKey,], [bKey,]) => {
+          const aPos = keySortOrder.indexOf(aKey);
+          const bPos = keySortOrder.indexOf(bKey);
+          if (bPos === -1) return -1;
+          else if (aPos === -1) return 1;
+          else if (aPos < bPos) return -1;
+          else if (aPos > bPos) return 1;
+          else return 0;
+        });
+
+    const keySortOrder = [
+      'title', 'date', 'duration',
+      'performers', 'studio', 'url',
+      'details', 'director', 'tags',
+      'image', 'fingerprints',
+    ];
+    sortedEntries(found, keySortOrder).forEach((entry) => {
+      const [field, value] = entry;
+      if (['contentHash'].includes(field)) return;
 
       const dt = document.createElement('dt');
-      if (field === 'lastUpdated') {
-        dt.innerText = 'data last fetched at';
-      } else {
-        dt.innerText = field;
-      }
+      dt.innerText = field;
       pendingChanges.appendChild(dt);
 
       const dd = document.createElement('dd');
-      if (field === 'performers') {
-        const performers = Object.entries(value);
-        dd.innerHTML = (
-          '<ul class="p-0">'
-          + performers.flatMap(([action, entries]) => {
-            return entries.map(entry => {
-              const label = '[' + (action === 'append' ? 'add' : action) + ']';
-              const disambiguation = entry.disambiguation ? ` (${entry.disambiguation})` : '';
-              let name = entry.name + disambiguation;
-              if (entry.appearance) name += ` (as ${entry.appearance})`;
-              return `<li class="d-flex justify-content-between">
-                <span style="flex: 0.25 0 0;">${label}</span>
-                ${
-                  entry.id
-                    ? `<span style="flex: 1">
-                        <a href="/performers/${entry.id}" target="_blank">${escapeHTML(name)}</a>
-                        ${action === 'append' ? `<br>${entry.id}` : ''}
-                      </span>`
-                    : `<span style="flex: 1">&lt;create&gt; ${escapeHTML(name)}</span>`
-                }
-              </li>`;
-            });
-          }).join('\n')
-          + '</ul>'
-        );
-      } else if (field === 'comments') {
-        dd.innerText = value.join('\n');
-        dd.style.whiteSpace = 'pre-line';
-      } else if (field === 'details') {
-        dd.innerText = value;
-        dd.style.whiteSpace = 'pre-line';
-      } else if (field === 'lastUpdated') {
-        dd.innerText = formatDate(value);
-      } else {
-        dd.innerText = value;
-      }
       pendingChanges.appendChild(dd);
+
+      // title
+      // date
+
+      if (field === 'duration') {
+        dd.innerText = value;
+        dd.style.userSelect = 'all';
+      }
+
+      if (field === 'performers') {
+        const ul = document.createElement('ul');
+        ul.classList.add('p-0');
+        sortedEntries(value, ['update', 'remove', 'append']).forEach((actionEntries) => {
+          /** @type {[string, { [key: string]: any }[]]}  */
+          const [action, entries] = (actionEntries);
+          entries.forEach((entry) => {
+            const li = document.createElement('li');
+            li.classList.add('d-flex', 'justify-content-between');
+
+            const label = document.createElement('span');
+            label.style.flex = '0.25 0 0';
+            label.innerText = '[' + (action === 'append' ? 'add' : action) + ']';
+            li.appendChild(label);
+
+            const disambiguation = entry.disambiguation ? ` (${entry.disambiguation})` : '';
+            let name = entry.name + disambiguation;
+            if (entry.appearance) name += ` (as ${entry.appearance})`;
+
+            const info = document.createElement('span');
+            info.style.flex = '1';
+
+            if (!entry.id) {
+              info.innerText = `<${entry.status}> ${name}`;
+            } else {
+              const a = document.createElement('a');
+              a.href = `/performers/${entry.id}`;
+              a.target = '_blank';
+              a.innerText = name;
+              a.style.color = 'var(--teal)';
+              info.appendChild(a);
+              if (action === 'append') {
+                a.insertAdjacentHTML('afterend', `<br><span style="user-select: all">${entry.id}</span>`);
+              }
+              if (action === 'update' && entry.old_appearance) {
+                const previous = `${entry.name} (as ${entry.old_appearance}) \u{1F87A} `;
+                a.insertAdjacentText('beforebegin', previous);
+              }
+              if (entry.status) {
+                a.insertAdjacentText('beforebegin', `<${entry.status}> `);
+              }
+            }
+            li.appendChild(info);
+
+            ul.appendChild(li);
+          });
+        });
+        dd.appendChild(ul);
+        return;
+      }
+
+      if (field === 'studio') {
+        const [studioId, studioName] = value;
+        const a = document.createElement('a');
+        a.href = `/studios/${studioId}`;
+        a.target = '_blank';
+        a.innerText = studioName;
+        a.style.color = 'var(--teal)';
+        dd.appendChild(a);
+        a.insertAdjacentHTML('afterend', `<br><span style="user-select: all">${studioId}</span>`);
+        return;
+      }
+
+      if (field === 'url') {
+        const a = document.createElement('a');
+        a.innerText = value;
+        a.href = value;
+        a.target = '_blank';
+        a.rel = 'nofollow noopener noreferrer';
+        dd.appendChild(a);
+        return;
+      }
+
+      if (field === 'details') {
+        dd.innerText = value;
+        dd.style.whiteSpace = 'pre-line';
+        return;
+      }
+
+      // director
+      // tags
+
+      if (field === 'image') {
+        const imgLink = document.createElement('a');
+        // imgLink.innerText = value;
+        imgLink.href = value;
+        imgLink.target = '_blank';
+        imgLink.rel = 'nofollow noopener noreferrer';
+        dd.appendChild(imgLink);
+        imgLink.insertAdjacentHTML('afterbegin', '<br>');
+        const img = document.createElement('img');
+        img.style.maxHeight = '200px';
+        img.alt = value;
+        img.style.border = '2px solid var(--teal)';
+        imgLink.insertAdjacentElement('afterbegin', img);
+        getImage(value)
+          .then((blob) => img.src = blob);
+        return;
+      }
+
+      if (field === 'fingerprints') {
+        /** @type {{ [key: string]: string }[]} */
+        (value).forEach((fp, index) => {
+          if (index > 0) dd.insertAdjacentHTML('beforeend', '<br>');
+          const fpElement = document.createElement('span');
+          fpElement.innerText = `${fp.algorithm.toUpperCase()} ${fp.hash}`;
+          if (fp.correct_scene_id) {
+            const correctSceneLink = document.createElement('a');
+            correctSceneLink.href = `/scenes/${fp.correct_scene_id}`;
+            correctSceneLink.target = '_blank';
+            correctSceneLink.innerText = 'correct scene';
+            correctSceneLink.style.color = 'var(--teal)';
+            const correctSceneId = `<span style="user-select: all">${fp.correct_scene_id}</span>`;
+            const correctSceneHTML = ` \u{1F87A} ${correctSceneLink.outerHTML}: ${correctSceneId}`;
+            fpElement.insertAdjacentHTML('beforeend', correctSceneHTML);
+          }
+          dd.appendChild(fpElement);
+        });
+        return;
+      }
+
+      if (field === 'comments') {
+        /** @type {string[]} */
+        (value).forEach((comment, index) => {
+          if (index > 0) dd.insertAdjacentHTML('beforeend', '<br>');
+          let commentElement;
+          if (/https?:/.test(comment)) {
+            commentElement = document.createElement('a');
+            commentElement.href = comment;
+            commentElement.target = '_blank';
+            commentElement.rel = 'nofollow noopener noreferrer';
+            commentElement.style.color = 'var(--teal)';
+          } else {
+            commentElement = document.createElement('span');
+          }
+          commentElement.innerText = comment;
+          dd.appendChild(commentElement);
+        });
+        return;
+      }
+
+      if (field === 'lastUpdated') {
+        dt.insertAdjacentHTML('beforebegin', '<hr class="mt-4" style="border-top-color: initial;">');
+        dt.innerText = 'data last fetched at';
+        dd.innerText = formatDate(value);
+        return;
+      }
+
+      // unmatched
+      dd.innerText = value;
     });
 
   } // iSceneEditPage
