@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.15.1
+// @version   1.15.2
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -1508,6 +1508,19 @@ async function inject() {
   // =====
 
   /**
+   * @param {PluralObject} pluralObject
+   * @param {string[]} changes
+   * @returns {string}
+   */
+  const getHighlightStyle = (pluralObject, changes) => {
+    let color = 'var(--yellow)';
+    if (pluralObject === 'scenes' && changes.length === 1 && changes[0] === 'fingerprints') {
+      color = 'var(--cyan)';
+    }
+    return `0.4rem solid ${color}`;
+  }
+
+  /**
    * @param {PluralObject | null} pluralObject
    */
   async function highlightSceneCards(pluralObject) {
@@ -1530,7 +1543,7 @@ async function inject() {
         const found = index.scenes[sceneId];
         if (!found) return;
         const changes = found.slice(1);
-        card.style.outline = '0.4rem solid var(--yellow)';
+        card.style.outline = getHighlightStyle('scenes', changes);
         card.parentElement.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
       });
     };
@@ -1584,7 +1597,7 @@ async function inject() {
       }
       if (changes) {
         const card = /** @type {HTMLDivElement} */ (cardLink.querySelector(':scope > .card'));
-        card.style.outline = '0.4rem solid var(--yellow)';
+        card.style.outline = getHighlightStyle(pluralObject, changes);
       }
     });
   }
