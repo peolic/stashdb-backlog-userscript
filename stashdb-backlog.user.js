@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.14.0
+// @version   1.15.0
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -31,7 +31,7 @@ async function inject() {
   );
 
   /**
-   * @typedef {'scenes' | 'performers' | 'studios' | 'tags' | 'categories' | 'edits' | 'users'} PluralObject
+   * @typedef {'scenes' | 'performers' | 'studios' | 'tags' | 'categories' | 'edits' | 'users' | 'search'} PluralObject
    */
   /**
    * @typedef LocationData
@@ -119,6 +119,11 @@ async function inject() {
       await iPerformerPage(loc.ident);
       await highlightSceneCards(loc.object);
       return;
+    }
+
+    // Search results
+    if (loc.object === 'search') {
+      return await highlightSearchResults();
     }
 
     // Home page
@@ -292,7 +297,7 @@ async function inject() {
    * @typedef {{ [uuid: string]: string[] }} ScenesIndex
    */
   /**
-   * @typedef {{ [uuid: string]: string }} PerformersIndex
+   * @typedef {{ [uuid: string]: (string | string[]) }} PerformersIndex
    */
   /**
    * @param {boolean} [forceFetch=false]
@@ -661,7 +666,7 @@ async function inject() {
 
     const button = document.createElement('button');
     button.type = 'button';
-    button.style.margin = '2px';
+    button.classList.add('ml-2');
     button.classList.add('btn', 'btn-light', className);
     if (data) {
       const update = data.lastUpdated ? `\nLast updated: ${formatDate(data.lastUpdated)}` : '';
@@ -1050,9 +1055,9 @@ async function inject() {
           if (entry.status === 'new') {
             pa.title += ' (performer needs to be created)';
           } else if (entry.status == 'c') {
-          	pa.title += ' (performer created, pending approval)';
+            pa.title += ' (performer created, pending approval)';
           } else {
-          	pa.title += ' (missing performer ID)';
+            pa.title += ' (missing performer ID)';
           }
         }
         scenePerformers.appendChild(pa);
@@ -1461,6 +1466,7 @@ async function inject() {
       Array.isArray(found)
         ? [found[0], found.slice(1)]
         : ['', found.split(/,/g)];
+
     if (info.includes('split')) {
       const toSplit = document.createElement('div');
       toSplit.classList.add('mb-1', 'p-1', 'font-weight-bold');
@@ -1472,10 +1478,10 @@ async function inject() {
         header.dataset.injectedBacklog = 'true';
 
         header.addEventListener('mouseover', () => {
-          toSplit.classList.add('bg-danger');
+          toSplit.style.backgroundColor = '#8c2020';
         });
         header.addEventListener('mouseout', () => {
-          toSplit.classList.remove('bg-danger');
+          toSplit.style.backgroundColor = null;
         });
       }
       const a = toSplit.querySelector('a');
@@ -1540,6 +1546,46 @@ async function inject() {
         await highlight();
       }).observe(studioSelectorValue, { childList: true, subtree: true });
     }
+  }
+
+  async function highlightSearchResults() {
+    if (!await elementReadyIn('a.SearchPage-scene, a.SearchPage-performer', 2000)) {
+      console.debug('[backlog] no scene/performer search results found, skipping');
+      return;
+    }
+
+    const index = await getDataIndex();
+    if (!index) return;
+
+
+    /** @type {HTMLAnchorElement[]} */
+    (Array.from(document.querySelectorAll('a.SearchPage-scene, a.SearchPage-performer'))).forEach((cardLink) => {
+      const markerDataset = cardLink.dataset;
+      if (markerDataset.backlogInjected) return;
+      else markerDataset.backlogInjected = 'true';
+
+      const { object: pluralObject, ident: uuid } = parsePath(cardLink.href);
+      /** @type {string[]} */
+      let changes = null;
+      if (pluralObject === 'scenes') {
+        const found = index.scenes[uuid];
+        if (!found) return;
+        changes = found.slice(1);
+        cardLink.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
+      } else if (pluralObject === 'performers') {
+        const found = index.performers[uuid];
+        if (!found) return;
+        changes =
+          Array.isArray(found)
+            ? found.slice(1)
+            : found.split(/,/g);
+        cardLink.title = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
+      }
+      if (changes) {
+        const card = /** @type {HTMLDivElement} */ (cardLink.querySelector(':scope > .card'));
+        card.style.outline = '0.4rem solid var(--yellow)';
+      }
+    });
   }
 }
 
