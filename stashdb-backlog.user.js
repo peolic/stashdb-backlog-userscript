@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.15.0
+// @version   1.15.1
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -221,14 +221,15 @@ async function inject() {
       });
       if (!response.ok) {
         const body = await response.text();
-        console.error('[backlog] fetch bad response', response.status, body);
+        console.error('[backlog] fetch bad response', response.status, response.url);
+        console.debug(body);
         return { error: true, status: response.status, body };
       }
       const data = await response.json();
       return data;
 
     } catch (error) {
-      console.error('[backlog] fetch error', error);
+      console.error('[backlog] fetch error', url, error);
       return null;
     }
   }
@@ -551,13 +552,13 @@ async function inject() {
 
     if (!pluralObject) return false;
 
-    /** @type {SupportedObject} */
-    const object = (pluralObject.slice(0, -1));
-
     if (!['scenes'].includes(pluralObject) || !uuid) {
       global.console.warn(`[backlog] invalid request: <${pluralObject} ${uuid}>`);
       return false;
     }
+
+    /** @type {SupportedObject} */
+    const object = (pluralObject.slice(0, -1));
 
     const data = await _fetchObject(object, uuid, storedData, index);
     if (data === null) {
