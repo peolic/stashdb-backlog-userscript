@@ -352,7 +352,7 @@ async function inject() {
       console.debug(`[backlog] index ${action}`);
       return dataIndex;
     } else {
-      console.debug('[backlog] stored index');
+      console.debug('[backlog] using stored index');
       return storedDataIndex;
     }
   }
@@ -541,7 +541,7 @@ async function inject() {
       return await _fetchObject(object, uuid, storedData, index);
     }
 
-    console.debug(`[backlog] <${object} ${uuid}> stored data`);
+    console.debug(`[backlog] <${object} ${uuid}> using stored data`);
     return storedData[key];
   }
 
