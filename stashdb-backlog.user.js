@@ -286,30 +286,71 @@ async function inject() {
     }
   }
 
-  const DATA_INDEX_KEY = 'stashdb_backlog_index';
-
+  /** @typedef {{ [uuid: string]: string[] }} ScenesIndex */
+  /** @typedef {{ [uuid: string]: string[] }} PerformersIndex */
   /**
    * @typedef DataIndex
    * @property {ScenesIndex} scenes
    * @property {PerformersIndex} performers
    * @property {string} [lastUpdated]
    */
-  /**
-   * @typedef {{ [uuid: string]: string[] }} ScenesIndex
-   */
-  /**
-   * @typedef {{ [uuid: string]: string[] }} PerformersIndex
-   */
+
+  /** @typedef {{ [field: string]: any } & { contentHash?: string, lastUpdated?: string }} DataObject */
+
+  class Cache {
+    static _DATA_INDEX_KEY = 'stashdb_backlog_index';
+    static _DATA_KEY = 'stashdb_backlog';
+
+    static async getStoredDataIndex() {
+      return /** @type {DataIndex} */ (await this._getValue(this._DATA_INDEX_KEY));
+    }
+    static async setDataIndex(/** @type {DataIndex} */ data) {
+      return await this._setValue(this._DATA_INDEX_KEY, data);
+    }
+    static async clearDataIndex() {
+      return await this._deleteValue(this._DATA_INDEX_KEY);
+    }
+
+    static async getStoredData() {
+      return /** @type {{ [uuid: string]: DataObject}} */ (await this._getValue(this._DATA_KEY));
+    }
+    static async setData(/** @type {{ [uuid: string]: DataObject}} */ data) {
+      return await this._setValue(this._DATA_KEY, data);
+    }
+    static async clearData() {
+      return await this._deleteValue(this._DATA_KEY);
+    }
+
+    // ===
+
+    static async _getValue(/** @type {string} */ key) {
+      //@ts-expect-error
+      let stored = await GM.getValue(key, {});
+      // Legacy stored as JSON
+      if (typeof stored === 'string') stored = JSON.parse(stored);
+      if (!stored) {
+        throw new Error(`[backlog] invalid data stored in ${key}`);
+      }
+      return /** @type {Promise<{ [k: string]: any }>} */ (stored);
+    }
+
+    static async _setValue(/** @type {string} */ key, /** @type {{ [k: string]: any }} */ value) {
+      //@ts-expect-error
+      return await GM.setValue(key, value);
+    }
+
+    static async _deleteValue(/** @type {string} */ key) {
+      //@ts-expect-error
+      return await GM.deleteValue(key);
+    }
+  } // Cache
+
   /**
    * @param {boolean} [forceFetch=false]
    * @returns {Promise<DataIndex>}
    */
   async function getDataIndex(forceFetch=false) {
-    //@ts-expect-error
-    const storedDataIndex = JSON.parse(await GM.getValue(DATA_INDEX_KEY, '{}'));
-    if (!storedDataIndex) {
-      throw new Error("[backlog] invalid stored data");
-    }
+    const storedDataIndex = await Cache.getStoredDataIndex();
     let shouldFetchIndex = shouldFetch(storedDataIndex, 1);
     try {
       if (!dev && !forceFetch && shouldFetchIndex) {
@@ -325,8 +366,7 @@ async function inject() {
           if (!shouldFetchIndex) {
             // Use this as a "last checked" timestamp as to not spam GitHub API
             storedDataIndex.lastUpdated = new Date().toISOString();
-            //@ts-expect-error
-            await GM.setValue(DATA_INDEX_KEY, JSON.stringify(storedDataIndex));
+            await Cache.setDataIndex(storedDataIndex);
           }
         }
       }
@@ -347,8 +387,7 @@ async function inject() {
 
       const action = storedDataIndex.lastUpdated ? 'updated' : 'fetched';
       dataIndex.lastUpdated = new Date().toISOString();
-      //@ts-expect-error
-      await GM.setValue(DATA_INDEX_KEY, JSON.stringify(dataIndex));
+      await Cache.setDataIndex(dataIndex);
       console.debug(`[backlog] index ${action}`);
       return dataIndex;
     } else {
@@ -395,11 +434,6 @@ async function inject() {
   const makeDataUrl = (object, uuid) => `${BASE_URL}/${object}s/${uuid.slice(0, 2)}/${uuid}.json`;
 
   /**
-   * @typedef {{ [field: string]: any } & { contentHash?: string, lastUpdated?: string }} DataObject
-   */
-  const DATA_KEY = 'stashdb_backlog';
-
-  /**
    * @param {SupportedObject} object
    * @param {string} uuid
    * @param {{ [uuid: string]: DataObject}} storedData
@@ -435,8 +469,7 @@ async function inject() {
     dataObject.contentHash = indexEntry[0];
     dataObject.lastUpdated = new Date().toISOString();
     storedData[makeObjectKey(object, uuid)] = dataObject;
-    //@ts-expect-error
-    await GM.setValue(DATA_KEY, JSON.stringify(storedData));
+    await Cache.setData(storedData);
     console.debug(`[backlog] <${object} ${uuid}> data ${action}`);
 
     // add to data index if not present
@@ -446,8 +479,7 @@ async function inject() {
           .filter((k) => !['contentHash', 'lastUpdated', 'comments'].includes(k))
       );
     }
-    //@ts-expect-error
-    await GM.setValue(DATA_INDEX_KEY, JSON.stringify(index));
+    await Cache.setDataIndex(index);
     console.debug('[backlog] stored data index updated');
 
     return dataObject;
@@ -461,9 +493,11 @@ async function inject() {
    */
   async function _removeCachedIndexEntry(object, uuid, storedIndex = undefined) {
     if (!storedIndex) {
-      //@ts-expect-error
-      storedIndex = JSON.parse(await GM.getValue(DATA_INDEX_KEY, '{}'));
-      if (!storedIndex) return false;
+      try {
+        storedIndex = await Cache.getStoredDataIndex();
+      } catch (error) {
+        return false;
+      }
     }
 
     const haystack = storedIndex[`${object}s`];
@@ -473,8 +507,7 @@ async function inject() {
       delete haystack[uuid];
       removed = true;
     }
-    //@ts-expect-error
-    await GM.setValue(DATA_INDEX_KEY, JSON.stringify(storedIndex));
+    await Cache.setDataIndex(storedIndex);
 
     return removed;
   }
@@ -487,16 +520,17 @@ async function inject() {
    */
   async function _removeCachedObjectData(object, uuid, storedData = undefined) {
     if (!storedData) {
-      //@ts-expect-error
-      storedData = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
-      if (!storedData) return false;
+      try {
+        storedData = await Cache.getStoredData();
+      } catch (error) {
+        return false;
+      }
     }
 
     const key = makeObjectKey(object, uuid);
     if (storedData[key]) {
       delete storedData[key];
-      //@ts-expect-error
-      await GM.setValue(DATA_KEY, JSON.stringify(storedData));
+      await Cache.setData(storedData);
       return true;
     }
 
@@ -522,11 +556,7 @@ async function inject() {
       return null;
     }
 
-    //@ts-expect-error
-    const storedData = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
-    if (!storedData) {
-      throw new Error("[backlog] invalid stored data");
-    }
+    const storedData = await Cache.getStoredData();
 
     const indexEntry = haystack[uuid];
     const contentHash = indexEntry[0];
@@ -548,10 +578,8 @@ async function inject() {
   // ===
 
   async function backlogClearCache(global = globalThis) {
-    //@ts-expect-error
-    await GM.deleteValue(DATA_INDEX_KEY);
-    //@ts-expect-error
-    await GM.deleteValue(DATA_KEY);
+    await Cache.clearDataIndex();
+    await Cache.clearData();
     global.console.info('[backlog] stored data cleared');
   }
   //@ts-expect-error
@@ -562,11 +590,7 @@ async function inject() {
   async function backlogRefetch(global = globalThis) {
     const { object: pluralObject, ident: uuid } = parsePath();
 
-    //@ts-expect-error
-    const storedData = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
-    if (!storedData) {
-      throw new Error("[backlog] invalid stored data");
-    }
+    const storedData = await Cache.getStoredData();
 
     const index = await getDataIndex(true);
     if (!index) throw new Error("[backlog] failed to get index");
@@ -595,11 +619,9 @@ async function inject() {
   // ===
 
   async function backlogCacheReport(global = globalThis) {
-    //@ts-expect-error
-    const index = JSON.parse(await GM.getValue(DATA_INDEX_KEY, '{}'));
+    const index = await Cache.getStoredDataIndex();
     global.console.info('index', index);
-    //@ts-expect-error
-    const data = JSON.parse(await GM.getValue(DATA_KEY, '{}'));
+    const data = await Cache.getStoredData();
     global.console.info('data', data);
   }
   //@ts-expect-error
