@@ -349,7 +349,7 @@ async function inject() {
    * @param {boolean} [forceFetch=false]
    * @returns {Promise<DataIndex>}
    */
-  async function getDataIndex(forceFetch=false) {
+  async function getOrFetchDataIndex(forceFetch=false) {
     const storedDataIndex = await Cache.getStoredDataIndex();
     let shouldFetchIndex = shouldFetch(storedDataIndex, 1);
     try {
@@ -544,7 +544,7 @@ async function inject() {
    * @returns {Promise<DataObject | null>}
    */
   async function getDataFor(object, uuid, index = undefined) {
-    if (!index) index = await getDataIndex();
+    if (!index) index = await getOrFetchDataIndex();
     if (!index) throw new Error("[backlog] failed to get index");
 
     const haystack = index[/** @type {SupportedPluralObject} */ (`${object}s`)];
@@ -592,7 +592,7 @@ async function inject() {
 
     const storedData = await Cache.getStoredData();
 
-    const index = await getDataIndex(true);
+    const index = await getOrFetchDataIndex(true);
     if (!index) throw new Error("[backlog] failed to get index");
 
     if (!pluralObject) return false;
@@ -1525,7 +1525,7 @@ async function inject() {
       markerDataset.backlogInjected = 'true';
     }
 
-    const index = await getDataIndex();
+    const index = await getOrFetchDataIndex();
     if (!index) return;
 
     const found = index.performers[performerId];
@@ -1648,7 +1648,7 @@ async function inject() {
       return;
     }
 
-    const index = await getDataIndex();
+    const index = await getOrFetchDataIndex();
     if (!index) return;
 
     const highlight = async () => {
@@ -1687,7 +1687,7 @@ async function inject() {
       return;
     }
 
-    const index = await getDataIndex();
+    const index = await getOrFetchDataIndex();
     if (!index) return;
 
 
