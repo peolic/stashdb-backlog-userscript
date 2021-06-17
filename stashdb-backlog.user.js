@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.16.0
+// @version   1.16.1
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -1125,6 +1125,29 @@ async function inject() {
           duration.insertAdjacentText('beforeend', ` \u{1F87A} ${formattedDuration}`);
           duration.title = `<pending> Duration: ${formattedDuration}; ${foundDuration} seconds`;
         }
+      }
+    }
+
+    if (found.director) {
+      /** @type {HTMLDivElement | null} */
+      let director = (document.querySelector('.scene-info > .card-footer > div:last-of-type'));
+      if (!director || !/^Director:/.test(director.innerText)) {
+        director = document.createElement('div');
+        director.innerHTML = `${escapeHTML('<MISSING>')} Director: <b>${found.director}</b>`;
+        director.title = '<MISSING> Director';
+        director.classList.add('ml-3', 'bg-danger', 'p-1');
+        document.querySelector('.scene-info > .card-footer').insertAdjacentElement('beforeend', director);
+      } else {
+        if (found.director === director.innerText.match(/^Director: (.+)$/)[1]) {
+          director.classList.add('bg-warning', 'p-1');
+          director.insertAdjacentText('afterbegin', '<already correct> ');
+          director.title = makeAlreadyCorrectTitle('correct');
+        } else {
+          director.classList.add('bg-primary', 'p-1');
+          director.insertAdjacentText('beforeend', ` \u{1F87A} ${found.director}`);
+          director.title = `<pending> Director\n${found.director}`;
+        }
+
       }
     }
 
