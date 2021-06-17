@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.15.2
+// @version   1.15.3
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -298,7 +298,7 @@ async function inject() {
    * @typedef {{ [uuid: string]: string[] }} ScenesIndex
    */
   /**
-   * @typedef {{ [uuid: string]: (string | string[]) }} PerformersIndex
+   * @typedef {{ [uuid: string]: string[] }} PerformersIndex
    */
   /**
    * @param {boolean} [forceFetch=false]
@@ -343,14 +343,8 @@ async function inject() {
       }
       const dataIndex = /** @type {DataIndex} */ (data);
 
-      // migration: convert comma-separated to array
-      const scenesIndex = dataIndex.scenes;
-      for (const sceneId in scenesIndex) {
-        const oldValue = /** @type {string | string[]} */ (scenesIndex[sceneId]);
-        if (typeof oldValue === 'string') {
-          scenesIndex[sceneId] = [''].concat(...oldValue.split(/,/g));
-        }
-      }
+      applyDataIndexMigrations(dataIndex);
+
       const action = storedDataIndex.lastUpdated ? 'updated' : 'fetched';
       dataIndex.lastUpdated = new Date().toISOString();
       //@ts-expect-error
@@ -360,6 +354,27 @@ async function inject() {
     } else {
       console.debug('[backlog] stored index');
       return storedDataIndex;
+    }
+  }
+
+  /**
+   * Mutates `dataIndex`
+   * @param {DataIndex | {
+   *  scenes: { [uuid: string]: string },
+   *  performers: { [uuid: string]: string }
+   * }} dataIndex
+   */
+  function applyDataIndexMigrations(dataIndex) {
+    console.debug('[backlog] migration: convert comma-separated to array');
+    for (const key in dataIndex) {
+      if (key === 'lastUpdated') continue;
+      const thisIndex = dataIndex[/** @type {SupportedPluralObject} */ (key)];
+      for (const thisId in thisIndex) {
+        let oldValue = thisIndex[thisId];
+        if (typeof oldValue === 'string') {
+          thisIndex[thisId] = oldValue = [''].concat(...oldValue.split(/,/g));
+        }
+      }
     }
   }
 
@@ -417,7 +432,7 @@ async function inject() {
 
     const action = storedData.lastUpdated ? 'updated' : 'fetched';
     const dataObject = /** @type {DataObject} */ (data);
-    dataObject.contentHash = Array.isArray(indexEntry) ? indexEntry[0] : null;
+    dataObject.contentHash = indexEntry[0];
     dataObject.lastUpdated = new Date().toISOString();
     storedData[makeObjectKey(object, uuid)] = dataObject;
     //@ts-expect-error
@@ -1463,10 +1478,7 @@ async function inject() {
     const found = index.performers[performerId];
     if (!found) return;
 
-    const [, info] =
-      Array.isArray(found)
-        ? [found[0], found.slice(1)]
-        : ['', found.split(/,/g)];
+    const info = found.slice(1);
 
     if (info.includes('split')) {
       const toSplit = document.createElement('div');
@@ -1578,26 +1590,23 @@ async function inject() {
       if (markerDataset.backlogInjected) return;
       else markerDataset.backlogInjected = 'true';
 
-      const { object: pluralObject, ident: uuid } = parsePath(cardLink.href);
-      /** @type {string[]} */
-      let changes = null;
-      if (pluralObject === 'scenes') {
-        const found = index.scenes[uuid];
-        if (!found) return;
-        changes = found.slice(1);
-        cardLink.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
-      } else if (pluralObject === 'performers') {
-        const found = index.performers[uuid];
-        if (!found) return;
-        changes =
-          Array.isArray(found)
-            ? found.slice(1)
-            : found.split(/,/g);
-        cardLink.title = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
-      }
+      const { object: rawPluralObject, ident: uuid } = parsePath(cardLink.href);
+      if (!['scenes', 'performers'].includes(rawPluralObject)) return;
+      /** @type {SupportedPluralObject} */
+      const pluralObject = (rawPluralObject);
+
+      const found = index[pluralObject][uuid];
+      if (!found) return;
+      const changes = found.slice(1);
+
       if (changes) {
         const card = /** @type {HTMLDivElement} */ (cardLink.querySelector(':scope > .card'));
         card.style.outline = getHighlightStyle(pluralObject, changes);
+        if (pluralObject === 'scenes') {
+          cardLink.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
+        } else if (pluralObject === 'performers') {
+          cardLink.title = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
+        }
       }
     });
   }
