@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.17.0
+// @version   1.17.1
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -1573,15 +1573,16 @@ async function inject() {
     }
     console.debug('[backlog] found', foundData);
 
+    const isMarkedForSplit = (/** @type {string} */ uuid) => {
+      const indexEntry = index.performers[uuid];
+      return indexEntry && indexEntry.includes('split');
+    };
+
     if (foundData.duplicates) {
       const hasDuplicates = document.createElement('div');
       hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
       hasDuplicates.innerHTML = 'This performer has duplicates:';
       highlightElements.push(hasDuplicates);
-      const isMarkedForSplit = (/** @type {string} */ uuid) => {
-        const indexEntry = index.performers[uuid];
-        return indexEntry && indexEntry.includes('split');
-      }
       /** @type {string[]} */
       (foundData.duplicates).forEach((dupId) => {
         hasDuplicates.insertAdjacentHTML('beforeend', '<br>');
@@ -1615,6 +1616,7 @@ async function inject() {
       a.classList.add('font-weight-normal');
       a.style.color = 'var(--teal)';
       duplicateOf.insertAdjacentElement('beforeend', a);
+      if (isMarkedForSplit(foundData.duplicate_of)) a.insertAdjacentText('afterend', ' 🔀 needs to be split up');
       const emoji = document.createElement('span');
       emoji.classList.add('mr-1');
       emoji.innerText = '♊';
