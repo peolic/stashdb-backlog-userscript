@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.16.2
+// @version   1.17.0
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -311,6 +311,33 @@ async function inject() {
       return await this._deleteValue(this._DATA_INDEX_KEY);
     }
 
+    /**
+     * @param {SupportedObject} object
+     * @param {string} uuid
+     * @param {DataIndex} [storedIndex]
+     * @returns {Promise<boolean>}
+     */
+    static async removeIndexEntry(object, uuid, storedIndex = undefined) {
+      if (!storedIndex) {
+        try {
+          storedIndex = await this.getStoredDataIndex();
+        } catch (error) {
+          return false;
+        }
+      }
+
+      const haystack = storedIndex[/** @type {SupportedPluralObject} */ (`${object}s`)];
+
+      let removed = false;
+      if (haystack[uuid] !== undefined) {
+        delete haystack[uuid];
+        removed = true;
+      }
+      await this.setDataIndex(storedIndex);
+
+      return removed;
+    }
+
     static async getStoredData() {
       return /** @type {{ [uuid: string]: DataObject}} */ (await this._getValue(this._DATA_KEY));
     }
@@ -319,6 +346,31 @@ async function inject() {
     }
     static async clearData() {
       return await this._deleteValue(this._DATA_KEY);
+    }
+
+    /**
+     * @param {SupportedObject} object
+     * @param {string} uuid
+     * @param {{ [uuid: string]: DataObject}} [storedData]
+     * @returns {Promise<boolean>}
+     */
+    static async removeObjectData(object, uuid, storedData = undefined) {
+      if (!storedData) {
+        try {
+          storedData = await this.getStoredData();
+        } catch (error) {
+          return false;
+        }
+      }
+
+      const key = makeObjectKey(object, uuid);
+      if (storedData[key]) {
+        delete storedData[key];
+        await this.setData(storedData);
+        return true;
+      }
+
+      return false;
     }
 
     // ===
@@ -444,9 +496,9 @@ async function inject() {
     const data = await fetchJSON(makeDataUrl(object, uuid));
     if (data && 'error' in data && data.status === 404) {
       // remove from data index
-      const removedIndex = await _removeCachedIndexEntry(object, uuid, index);
+      const removedIndex = await Cache.removeIndexEntry(object, uuid, index);
       // remove from data
-      const removedData = await _removeCachedObjectData(object, uuid, storedData);
+      const removedData = await Cache.removeObjectData(object, uuid, storedData);
 
       if (removedIndex || removedData) {
         const from = [
@@ -488,58 +540,6 @@ async function inject() {
   /**
    * @param {SupportedObject} object
    * @param {string} uuid
-   * @param {DataIndex} [storedIndex]
-   * @returns {Promise<boolean>}
-   */
-  async function _removeCachedIndexEntry(object, uuid, storedIndex = undefined) {
-    if (!storedIndex) {
-      try {
-        storedIndex = await Cache.getStoredDataIndex();
-      } catch (error) {
-        return false;
-      }
-    }
-
-    const haystack = storedIndex[`${object}s`];
-
-    let removed = false;
-    if (haystack[uuid] !== undefined) {
-      delete haystack[uuid];
-      removed = true;
-    }
-    await Cache.setDataIndex(storedIndex);
-
-    return removed;
-  }
-
-  /**
-   * @param {SupportedObject} object
-   * @param {string} uuid
-   * @param {{ [uuid: string]: DataObject}} [storedData]
-   * @returns {Promise<boolean>}
-   */
-  async function _removeCachedObjectData(object, uuid, storedData = undefined) {
-    if (!storedData) {
-      try {
-        storedData = await Cache.getStoredData();
-      } catch (error) {
-        return false;
-      }
-    }
-
-    const key = makeObjectKey(object, uuid);
-    if (storedData[key]) {
-      delete storedData[key];
-      await Cache.setData(storedData);
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * @param {SupportedObject} object
-   * @param {string} uuid
    * @param {DataIndex} [index]
    * @returns {Promise<DataObject | null>}
    */
@@ -550,7 +550,7 @@ async function inject() {
     const haystack = index[/** @type {SupportedPluralObject} */ (`${object}s`)];
     if (haystack[uuid] === undefined) {
       // Clear outdated
-      if (await _removeCachedObjectData(object, uuid)) {
+      if (await Cache.removeObjectData(object, uuid)) {
         console.debug(`[backlog] <${object} ${uuid}> cleared from cache (not found in index)`);
       }
       return null;
