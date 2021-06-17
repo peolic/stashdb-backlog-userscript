@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.15.3
+// @version   1.16.0
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -529,9 +529,15 @@ async function inject() {
     }
 
     const indexEntry = haystack[uuid];
-    const contentHash = Array.isArray(indexEntry) ? indexEntry[0] : null;
+    const contentHash = indexEntry[0];
     const key = makeObjectKey(object, uuid);
-    if (shouldFetch(storedData[key], contentHash || '')) {
+
+    // for performers, empty content hash = no file, usually
+    if (object === 'performer' && contentHash === '' && !storedData[key]) {
+      return null;
+    }
+
+    if (shouldFetch(storedData[key], contentHash)) {
       return await _fetchObject(object, uuid, storedData, index);
     }
 
@@ -567,7 +573,7 @@ async function inject() {
 
     if (!pluralObject) return false;
 
-    if (!['scenes'].includes(pluralObject) || !uuid) {
+    if (!['scenes', 'performers'].includes(pluralObject) || !uuid) {
       global.console.warn(`[backlog] invalid request: <${pluralObject} ${uuid}>`);
       return false;
     }
@@ -1480,23 +1486,28 @@ async function inject() {
 
     const info = found.slice(1);
 
+    /** @type {HTMLElement[]} */
+    const highlightElements = [];
+
+    /** @type {HTMLDivElement} */
+    const header = (performerInfo.querySelector('.card-header'));
+    if (!header.dataset.injectedBacklog) {
+      header.dataset.injectedBacklog = 'true';
+
+      header.addEventListener('mouseover', () => {
+        highlightElements.forEach((el) => el.style.backgroundColor = '#8c2020');
+      });
+      header.addEventListener('mouseout', () => {
+        highlightElements.forEach((el) => el.style.backgroundColor = null);
+      });
+    }
+
     if (info.includes('split')) {
       const toSplit = document.createElement('div');
       toSplit.classList.add('mb-1', 'p-1', 'font-weight-bold');
       toSplit.style.transition = 'background-color .5s';
       toSplit.innerHTML = 'This performer is listed on <a>Performers To Split Up</a>.';
-      /** @type {HTMLDivElement} */
-      const header = (performerInfo.querySelector('.card-header'));
-      if (!header.dataset.injectedBacklog) {
-        header.dataset.injectedBacklog = 'true';
-
-        header.addEventListener('mouseover', () => {
-          toSplit.style.backgroundColor = '#8c2020';
-        });
-        header.addEventListener('mouseout', () => {
-          toSplit.style.backgroundColor = null;
-        });
-      }
+      highlightElements.push(toSplit);
       const a = toSplit.querySelector('a');
       a.href = 'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ/edit#gid=1067038397';
       a.target = '_blank';
@@ -1508,12 +1519,55 @@ async function inject() {
       performerInfo.insertAdjacentElement('afterbegin', toSplit);
     }
 
-    // const foundData = await getDataFor('performer', performerId, index);
-    // if (!foundData) {
-    //   console.debug('[backlog] not found', performerId);
-    //   return;
-    // }
-    // console.debug('[backlog] found', foundData);
+    const foundData = await getDataFor('performer', performerId, index);
+    if (!foundData) {
+      console.debug('[backlog] not found', performerId);
+      return;
+    }
+    console.debug('[backlog] found', foundData);
+
+    if (foundData.duplicates) {
+      const hasDuplicates = document.createElement('div');
+      hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
+      hasDuplicates.innerHTML = 'This performer has duplicates:';
+      highlightElements.push(hasDuplicates);
+      /** @type {string[]} */
+      (foundData.duplicates).forEach((dupId) => {
+        hasDuplicates.insertAdjacentHTML('beforeend', '<br>');
+        const a = document.createElement('a');
+        a.href = `/performers/${dupId}`;
+        a.target = '_blank';
+        a.innerText = dupId;
+        a.classList.add('font-weight-normal');
+        a.style.color = 'var(--teal)';
+        a.style.marginLeft = '1.75rem';
+        hasDuplicates.insertAdjacentElement('beforeend', a);
+      });
+      const emoji = document.createElement('span');
+      emoji.classList.add('mr-1');
+      emoji.innerText = '♊';
+      hasDuplicates.insertAdjacentElement('afterbegin', emoji);
+      performerInfo.insertAdjacentElement('afterbegin', hasDuplicates);
+    }
+
+    if (foundData.duplicate_of) {
+      const duplicateOf = document.createElement('div');
+      duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
+      duplicateOf.innerText = 'This performer is a duplicate of: ';
+      highlightElements.push(duplicateOf);
+      const a = document.createElement('a');
+      a.href = `/performers/${foundData.duplicate_of}`;
+      a.target = '_blank';
+      a.innerText = foundData.duplicate_of;
+      a.classList.add('font-weight-normal');
+      a.style.color = 'var(--teal)';
+      duplicateOf.insertAdjacentElement('beforeend', a);
+      const emoji = document.createElement('span');
+      emoji.classList.add('mr-1');
+      emoji.innerText = '♊';
+      duplicateOf.insertAdjacentElement('afterbegin', emoji);
+      performerInfo.insertAdjacentElement('afterbegin', duplicateOf);
+    }
 
   } // iPerformerPage
 
