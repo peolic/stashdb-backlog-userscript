@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.16.1
+// @version   1.16.2
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -1554,6 +1554,10 @@ async function inject() {
       hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
       hasDuplicates.innerHTML = 'This performer has duplicates:';
       highlightElements.push(hasDuplicates);
+      const isMarkedForSplit = (/** @type {string} */ uuid) => {
+        const indexEntry = index.performers[uuid];
+        return indexEntry && indexEntry.includes('split');
+      }
       /** @type {string[]} */
       (foundData.duplicates).forEach((dupId) => {
         hasDuplicates.insertAdjacentHTML('beforeend', '<br>');
@@ -1565,6 +1569,8 @@ async function inject() {
         a.style.color = 'var(--teal)';
         a.style.marginLeft = '1.75rem';
         hasDuplicates.insertAdjacentElement('beforeend', a);
+
+        if (isMarkedForSplit(dupId)) a.insertAdjacentText('afterend', ' 🔀 needs to be split up');
       });
       const emoji = document.createElement('span');
       emoji.classList.add('mr-1');
