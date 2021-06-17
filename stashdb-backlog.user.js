@@ -265,7 +265,7 @@ async function inject() {
   /**
    * @returns {Promise<Date | null>}
    */
-  async function getDataIndexLastestUpdatedDate() {
+  async function getDataIndexLastUpdatedDate() {
     try {
       console.debug('[backlog] fetching last updated date for data index');
       const response = await fetch(
@@ -314,7 +314,7 @@ async function inject() {
     try {
       if (!dev && !forceFetch && shouldFetchIndex) {
         // Only fetch if there really was an update
-        const lastUpdated = await getDataIndexLastestUpdatedDate();
+        const lastUpdated = await getDataIndexLastUpdatedDate();
         if (lastUpdated) {
           shouldFetchIndex = shouldFetch(storedDataIndex, lastUpdated);
           console.debug(
