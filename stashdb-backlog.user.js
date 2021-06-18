@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.2
+// @version     1.19.3
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -872,66 +872,65 @@ async function inject() {
       }
     }
 
-    if (found.date || found.studio) {
+    if (found.studio) {
       const studio_date = /** @type {HTMLHeadingElement | null} */ (sceneHeader.querySelector(':scope > h6'));
-
       const studioElement = studio_date.querySelector('a');
+
+      const [studioId, studioName] = found.studio;
+      const alreadyCorrectStudioId = studioId === parsePath(studioElement.href).ident;
+
+      const newStudio = document.createElement('span');
+      let title, colorClass, currentColorClass;
+      if (!alreadyCorrectStudioId) {
+        colorClass = 'bg-primary';
+        currentColorClass = 'bg-danger';
+        title = `<pending> Studio\n${studioName ? `${studioName} (${studioId})` : studioId}`;
+        newStudio.innerHTML = `<a href="/studios/${studioId}">${escapeHTML(studioName)}</a> \u{1F878}`;
+      } else {
+        colorClass = 'bg-warning';
+        currentColorClass = 'bg-warning';
+        title = makeAlreadyCorrectTitle('correct', 'Studio');
+        newStudio.innerText = '<already correct> \u{1F87A}';
+      }
+
+      newStudio.classList.add(colorClass, 'p-1');
+      newStudio.title = title;
+      studioElement.title = title;
+      studioElement.classList.add(currentColorClass, 'p-1');
+      studioElement.insertAdjacentElement('beforebegin', newStudio);
+    }
+
+    if (found.date) {
+      const studio_date = /** @type {HTMLHeadingElement | null} */ (sceneHeader.querySelector(':scope > h6'));
       const dateNode = Array.from(studio_date.childNodes).slice(-1)[0];
       const separator = studio_date.querySelector('span.mx-1');
 
-      if (found.studio) {
-        const [studioId, studioName] = found.studio;
-        const alreadyCorrectStudioId = studioId === parsePath(studioElement.href).ident;
+      const alreadyCorrectDate = found.date === dateNode.nodeValue.trim();
 
-        const newStudio = document.createElement('span');
-        let title, colorClass, currentColorClass;
-        if (!alreadyCorrectStudioId) {
-          colorClass = 'bg-primary';
-          currentColorClass = 'bg-danger';
-          title = `<pending> Studio\n${studioName ? `${studioName} (${studioId})` : studioId}`;
-          newStudio.innerHTML = `<a href="/studios/${studioId}">${escapeHTML(studioName)}</a> \u{1F878}`;
-        } else {
-          colorClass = 'bg-warning';
-          currentColorClass = 'bg-warning';
-          title = makeAlreadyCorrectTitle('correct', 'Studio');
-          newStudio.innerText = '<already correct> \u{1F87A}';
-        }
+      // convert date text node to element
+      const dateElement = document.createElement('span');
+      dateElement.append(dateNode);
+      separator.insertAdjacentElement('afterend', dateElement);
 
-        newStudio.classList.add(colorClass, 'p-1');
-        newStudio.title = title;
-        studioElement.title = title;
-        studioElement.classList.add(currentColorClass, 'p-1');
-        studioElement.insertAdjacentElement('beforebegin', newStudio);
+      const newDate = document.createElement('span');
+      let title, colorClass, currentColorClass;
+      if (!alreadyCorrectDate) {
+        colorClass = 'bg-primary';
+        currentColorClass = 'bg-danger';
+        title = `<pending> Date\n${found.date}`;
+        newDate.innerText = `\u{1F87A} ${found.date}`;
+      } else {
+        colorClass = 'bg-warning';
+        currentColorClass = 'bg-warning';
+        title = makeAlreadyCorrectTitle('correct', 'Date');
+        newDate.innerText = '\u{1F878} <already correct>';
       }
 
-      if (found.date) {
-        const alreadyCorrectDate = found.date === dateNode.nodeValue.trim();
-
-        // convert date text node to element
-        const dateElement = document.createElement('span');
-        dateElement.append(dateNode);
-        separator.insertAdjacentElement('afterend', dateElement);
-
-        const newDate = document.createElement('span');
-        let title, colorClass, currentColorClass;
-        if (!alreadyCorrectDate) {
-          colorClass = 'bg-primary';
-          currentColorClass = 'bg-danger';
-          title = `<pending> Date\n${found.date}`;
-          newDate.innerText = `\u{1F87A} ${found.date}`;
-        } else {
-          colorClass = 'bg-warning';
-          currentColorClass = 'bg-warning';
-          title = makeAlreadyCorrectTitle('correct', 'Date');
-          newDate.innerText = '\u{1F878} <already correct>';
-        }
-
-        newDate.classList.add(colorClass, 'p-1');
-        newDate.title = title;
-        dateElement.title = title;
-        dateElement.classList.add('bg-danger', 'p-1');
-        dateElement.insertAdjacentElement('afterend', newDate);
-      }
+      newDate.classList.add(colorClass, 'p-1');
+      newDate.title = title;
+      dateElement.title = title;
+      dateElement.classList.add('bg-danger', 'p-1');
+      dateElement.insertAdjacentElement('afterend', newDate);
     }
 
     if (found.image) {
