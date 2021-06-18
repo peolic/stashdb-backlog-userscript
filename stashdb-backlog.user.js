@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.3
+// @version     1.19.4
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -839,7 +839,7 @@ async function inject() {
         const status = document.createElement('span');
         status.classList.add('mr-2');
         status.style.fontSize = '1.25rem';
-        status.innerText = '<MISSING> \u{1F87A}';
+        status.innerText = '<MISSING> \u{22D9}';
         title.insertAdjacentElement('afterbegin', status);
       } else if (currentTitle === found.title) {
         title.classList.add('bg-warning', 'p-1');
@@ -848,7 +848,7 @@ async function inject() {
         const status = document.createElement('span');
         status.classList.add('mr-2');
         status.style.fontSize = '1.25rem';
-        status.innerText = '<already correct> \u{1F87A}';
+        status.innerText = '<already correct> \u{22D9}';
         title.insertAdjacentElement('afterbegin', status);
       } else {
         title.title = `<pending> Title`;
@@ -861,7 +861,7 @@ async function inject() {
         const arrow = document.createElement('span');
         arrow.classList.add('mx-2');
         arrow.style.fontSize = '1.25rem';
-        arrow.innerText = '\u{1F87A}';
+        arrow.innerText = '\u{22D9}';
         titleSpan.insertAdjacentElement('afterend', arrow);
 
         const newTitle = document.createElement('span');
@@ -885,12 +885,12 @@ async function inject() {
         colorClass = 'bg-primary';
         currentColorClass = 'bg-danger';
         title = `<pending> Studio\n${studioName ? `${studioName} (${studioId})` : studioId}`;
-        newStudio.innerHTML = `<a href="/studios/${studioId}">${escapeHTML(studioName)}</a> \u{1F878}`;
+        newStudio.innerHTML = `<a href="/studios/${studioId}">${escapeHTML(studioName)}</a> \u{22D8}`;
       } else {
         colorClass = 'bg-warning';
         currentColorClass = 'bg-warning';
         title = makeAlreadyCorrectTitle('correct', 'Studio');
-        newStudio.innerText = '<already correct> \u{1F87A}';
+        newStudio.innerText = '<already correct> \u{22D9}';
       }
 
       newStudio.classList.add(colorClass, 'p-1');
@@ -918,12 +918,12 @@ async function inject() {
         colorClass = 'bg-primary';
         currentColorClass = 'bg-danger';
         title = `<pending> Date\n${found.date}`;
-        newDate.innerText = `\u{1F87A} ${found.date}`;
+        newDate.innerText = `\u{22D9} ${found.date}`;
       } else {
         colorClass = 'bg-warning';
         currentColorClass = 'bg-warning';
         title = makeAlreadyCorrectTitle('correct', 'Date');
-        newDate.innerText = '\u{1F878} <already correct>';
+        newDate.innerText = '\u{22D8} <already correct>';
       }
 
       newDate.classList.add(colorClass, 'p-1');
@@ -1163,7 +1163,7 @@ async function inject() {
           duration.title = `${makeAlreadyCorrectTitle('correct')}; ${foundDuration} seconds`;
         } else {
           duration.classList.add('bg-primary', 'p-1');
-          duration.insertAdjacentText('beforeend', ` \u{1F87A} ${formattedDuration}`);
+          duration.insertAdjacentText('beforeend', ` \u{22D9} ${formattedDuration}`);
           duration.title = `<pending> Duration: ${formattedDuration}; ${foundDuration} seconds`;
         }
       }
@@ -1185,7 +1185,7 @@ async function inject() {
           director.title = makeAlreadyCorrectTitle('correct');
         } else {
           director.classList.add('bg-primary', 'p-1');
-          director.insertAdjacentText('beforeend', ` \u{1F87A} ${found.director}`);
+          director.insertAdjacentText('beforeend', ` \u{22D9} ${found.director}`);
           director.title = `<pending> Director\n${found.director}`;
         }
       }
@@ -1241,7 +1241,7 @@ async function inject() {
 
         const arrow = document.createElement('span');
         arrow.classList.add('mx-1');
-        arrow.innerText = '\u{1F87A}';
+        arrow.innerText = '\u{22D9}';
         compareSpan.appendChild(arrow);
 
         const newURL = document.createElement('a');
@@ -1449,7 +1449,7 @@ async function inject() {
                 a.insertAdjacentHTML('afterend', `<br><span style="user-select: all">${entry.id}</span>`);
               }
               if (action === 'update' && entry.old_appearance) {
-                const previous = `${entry.name} (as ${entry.old_appearance}) \u{1F87A} `;
+                const previous = `${entry.name} (as ${entry.old_appearance}) \u{22D9} `;
                 a.insertAdjacentText('beforebegin', previous);
               }
               if (entry.status) {
@@ -1527,7 +1527,7 @@ async function inject() {
             correctSceneLink.innerText = 'correct scene';
             correctSceneLink.style.color = 'var(--teal)';
             const correctSceneId = `<span style="user-select: all">${fp.correct_scene_id}</span>`;
-            const correctSceneHTML = ` \u{1F87A} ${correctSceneLink.outerHTML}: ${correctSceneId}`;
+            const correctSceneHTML = ` \u{22D9} ${correctSceneLink.outerHTML}: ${correctSceneId}`;
             fpElement.insertAdjacentHTML('beforeend', correctSceneHTML);
           }
           dd.appendChild(fpElement);
