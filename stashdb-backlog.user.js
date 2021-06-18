@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name      StashDB Backlog
 // @author    peolic
-// @version   1.17.2
+// @version   1.18.0
 // @namespace https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @grant     GM.setValue
@@ -19,7 +19,7 @@ async function inject() {
   const BASE_URL =
     dev
       ? 'http://localhost:8000'
-      : 'https://raw.githubusercontent.com/peolic/stashdb_backlog_data/main';
+      : 'https://api.github.com/repos/peolic/stashdb_backlog_data/contents';
 
   const urlRegex = new RegExp(
     String.raw`(?:/([a-z]+)`
@@ -218,6 +218,7 @@ async function inject() {
       const response = await fetch(url, {
         credentials: 'same-origin',
         referrerPolicy: 'same-origin',
+        cache: 'no-cache',
       });
       if (!response.ok) {
         const body = await response.text();
@@ -225,7 +226,17 @@ async function inject() {
         console.debug(body);
         return { error: true, status: response.status, body };
       }
-      const data = await response.json();
+
+      let data = await response.json();
+
+      // Handle GitHub Content API
+      if ('content' in data) {
+        const { content, encoding } = data;
+        if (encoding !== 'base64') throw new Error(`Content in unsupported encoding ${encoding}`);
+        const decodedContent = atob(content);
+        data = JSON.parse(decodedContent);
+      }
+
       return data;
 
     } catch (error) {
