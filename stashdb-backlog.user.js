@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.1
+// @version     1.19.2
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1224,9 +1224,35 @@ async function inject() {
 
     if (found.url) {
       /** @type {HTMLAnchorElement} */
-      const studio_url = (document.querySelector('.scene-description > div:last-of-type > a'));
-      studio_url.classList.add('bg-warning');
-      studio_url.title = `<pending>\n${found.url}`;
+      const studioUrl = (document.querySelector('.scene-description > div:last-of-type > a'));
+      const currentURL = studioUrl.innerText || studioUrl.getAttribute('href');
+      if (!currentURL) {
+        studioUrl.classList.add('bg-success', 'p-1');
+        studioUrl.innerText = found.url;
+        studioUrl.title = `<MISSING> Studio URL`;
+      } else if (currentURL === found.url) {
+        studioUrl.classList.add('bg-warning', 'p-1');
+        studioUrl.title = makeAlreadyCorrectTitle('correct', 'Studio URL');
+      } else {
+        const compareSpan = document.createElement('span');
+        compareSpan.title = '<pending> Studio URL';
+        studioUrl.insertAdjacentElement('beforebegin', compareSpan);
+        studioUrl.classList.add('bg-danger', 'p-1');
+        compareSpan.appendChild(studioUrl);
+
+        const arrow = document.createElement('span');
+        arrow.classList.add('mx-1');
+        arrow.innerText = '\u{1F87A}';
+        compareSpan.appendChild(arrow);
+
+        const newURL = document.createElement('a');
+        newURL.classList.add('bg-primary', 'p-1');
+        newURL.href = found.url;
+        newURL.innerText = found.url;
+        newURL.target = studioUrl.target;
+        newURL.rel = studioUrl.rel;
+        compareSpan.appendChild(newURL);
+      }
     }
 
     if (found.fingerprints) {
