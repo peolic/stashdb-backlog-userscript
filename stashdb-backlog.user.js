@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.18.0
+// @version     1.19.0
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -119,10 +119,16 @@ async function inject() {
       return await highlightSceneCards(loc.object);
     }
 
-    if (loc.object === 'performers' && loc.ident && !loc.action) {
-      await iPerformerPage(loc.ident);
-      await highlightSceneCards(loc.object);
-      return;
+    if (loc.object === 'performers') {
+      if (!loc.ident && !loc.action) {
+        return await highlightPerformerCards();
+      }
+
+      if (loc.ident && !loc.action) {
+        await iPerformerPage(loc.ident);
+        await highlightSceneCards(loc.object);
+        return;
+      }
     }
 
     // Search results
@@ -1672,7 +1678,7 @@ async function inject() {
         if (markerDataset.backlogInjected) return;
         else markerDataset.backlogInjected = 'true';
 
-        const sceneId = card.querySelector('a').href.replace(/.+\//, '');
+        const sceneId = parsePath(card.querySelector('a').href).ident;
         const found = index.scenes[sceneId];
         if (!found) return;
         const changes = found.slice(1);
@@ -1693,6 +1699,30 @@ async function inject() {
         await highlight();
       }).observe(studioSelectorValue, { childList: true, subtree: true });
     }
+  }
+
+  async function highlightPerformerCards() {
+    if (!await elementReadyIn('.PerformerCard', 2000)) {
+      console.debug('[backlog] no performer cards found, skipping');
+      return;
+    }
+
+    const index = await getOrFetchDataIndex();
+    if (!index) return;
+
+    /** @type {HTMLDivElement[]} */
+    (Array.from(document.querySelectorAll('.PerformerCard'))).forEach((card) => {
+      const markerDataset = card.dataset;
+      if (markerDataset.backlogInjected) return;
+      else markerDataset.backlogInjected = 'true';
+
+      const performerId = parsePath(card.querySelector('a').href).ident;
+      const found = index.performers[performerId];
+      if (!found) return;
+      const changes = found.slice(1);
+      card.style.outline = getHighlightStyle('performers', changes);
+      card.title = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
+    });
   }
 
   async function highlightSearchResults() {
