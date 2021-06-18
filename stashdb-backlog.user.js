@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.4
+// @version     1.19.5
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -941,38 +941,39 @@ async function inject() {
       if (img.getAttribute('src')) {
         const handleExistingImage = async () => {
           const newImage = await compareImages(img, found.image);
-          if (newImage instanceof Error) {
-            imgContainer.classList.add('bg-danger', 'p-2');
-            imgContainer.title = 'error comparing image';
-            console.error('[backlog] error comparing image', newImage);
-            return;
-          }
-
-          imgContainer.classList.add('bg-warning', 'p-2');
-          imgContainer.title = `<pending>\n${found.image}`;
+          imgContainer.classList.add('p-2');
           if (newImage === null) {
             imgContainer.style.backgroundColor = 'var(--pink)';
-            imgContainer.classList.remove('bg-warning');
             imgContainer.title = `${makeAlreadyCorrectTitle('added')}\n\n${found.image}`;
           } else {
             imgContainer.classList.add('d-flex');
+            imgContainer.title = `<pending>\n${found.image}`;
 
             const imgNewLink = document.createElement('a');
             imgNewLink.href = found.image;
             imgNewLink.target = '_blank';
             imgNewLink.rel = 'nofollow noopener noreferrer';
-
-            const imgNew = document.createElement('img');
-            imgNew.src = newImage;
-
-            // const isVertical = img.naturalHeight > img.naturalWidth;
-            img.style.flex = '50%';
             imgNewLink.style.flex = '50%';
-            imgNew.style.borderLeft = '.5rem solid var(--warning)';
-            imgNew.style.width = '100%';
-            imgNew.style.height = 'auto';
 
-            imgNewLink.appendChild(imgNew);
+            if (newImage instanceof Error) {
+              imgContainer.style.backgroundColor = 'var(--purple)';
+              imgContainer.title = 'error comparing image';
+              console.error('[backlog] error comparing image', newImage);
+              imgNewLink.innerText = found.image;
+              imgNewLink.classList.add('p-1');
+            } else {
+              imgContainer.classList.add('bg-warning');
+              const imgNew = document.createElement('img');
+              imgNew.src = newImage;
+
+              img.style.borderRight = '.5rem solid var(--warning)';
+              // const isVertical = img.naturalHeight > img.naturalWidth;
+              img.style.flex = '50%';
+              imgNew.style.width = '100%';
+              imgNew.style.height = 'auto';
+
+              imgNewLink.appendChild(imgNew);
+            }
 
             imgContainer.appendChild(imgNewLink);
           }
@@ -990,9 +991,9 @@ async function inject() {
         imgContainer.addEventListener('mouseout', () => imgContainer.removeAttribute('style'));
         //@ts-expect-error
         imgContainer.addEventListener('click', () => GM.openInTab(found.image, false));
-        getImage(found.image).then((blobURL) => {
-          img.src = blobURL;
-        });
+        const onSuccess = (/** @type {string} **/ blob) => img.src = blob;
+        const onFailure = () => img.replaceWith(document.createTextNode(found.image));
+        getImage(found.image).then(onSuccess, onFailure);
       }
     }
 
@@ -1498,19 +1499,20 @@ async function inject() {
 
       if (field === 'image') {
         const imgLink = document.createElement('a');
-        // imgLink.innerText = value;
         imgLink.href = value;
         imgLink.target = '_blank';
         imgLink.rel = 'nofollow noopener noreferrer';
+        imgLink.style.color = 'var(--teal)';
         dd.appendChild(imgLink);
-        imgLink.insertAdjacentHTML('afterbegin', '<br>');
-        const img = document.createElement('img');
-        img.style.maxHeight = '200px';
-        img.alt = value;
-        img.style.border = '2px solid var(--teal)';
-        imgLink.insertAdjacentElement('afterbegin', img);
-        getImage(value)
-          .then((blob) => img.src = blob);
+        const onSuccess = (/** @type {string} **/ blob) => {
+          const img = document.createElement('img');
+          img.style.maxHeight = '200px';
+          img.style.border = '2px solid var(--teal)';
+          img.src = blob;
+          imgLink.insertAdjacentElement('afterbegin', img);
+        };
+        const onFailure = () => imgLink.innerText = value;
+        getImage(value).then(onSuccess, onFailure);
         return;
       }
 
