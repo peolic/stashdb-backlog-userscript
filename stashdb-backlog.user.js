@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.5
+// @version     1.19.6
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -10,6 +10,7 @@
 // @grant       GM.getValue
 // @grant       GM.deleteValue
 // @grant       GM.openInTab
+// @grant       GM.xmlHttpRequest
 // @homepageURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7
 // @downloadURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL   https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
@@ -653,22 +654,47 @@ async function inject() {
   /**
    * @param {string} url Image URL
    * @param {boolean} [asData=false] As data URI or as a blob
+   * @returns {Promise<string>}
+   * @throws {RequestError}
    */
-  async function getImage(url, asData=false) {
-    const response = await fetch(url, {
-      credentials: 'same-origin',
-      referrerPolicy: 'same-origin',
+   async function getImage(url, asData=false) {
+    const response = await new Promise((resolve, reject) => {
+      const details = {
+        method: 'GET',
+        url,
+        responseType: 'blob',
+        anonymous: true,
+        timeout: 10000,
+        onload: (response) => resolve(response),
+        onerror: (response) => reject(response),
+      };
+      //@ts-expect-error
+      GM.xmlHttpRequest(details);
     });
-    const data = await response.blob();
+
+    const ok = response.status >= 200 && response.status <= 299;
+    if (!ok) {
+      class RequestError extends Error {
+        constructor(message, response) {
+          super(message);
+          this.response = response;
+        }
+      }
+      throw new RequestError(`HTTP ${response.status} ${response.statusText}`, response);
+    }
+
+    /** @type {Blob} */
+    const blob = (response.response);
+
     if (!asData) {
-      return URL.createObjectURL(data);
+      return URL.createObjectURL(blob);
     }
 
     const reader = new FileReader();
-    reader.readAsDataURL(data);
+    reader.readAsDataURL(blob);
     return new Promise((resolve) => {
       reader.addEventListener('loadend', () => {
-        resolve(reader.result);
+        resolve(/** @type {string} */ (reader.result));
       });
     });
   }
@@ -937,6 +963,9 @@ async function inject() {
       /** @type {HTMLImageElement} */
       const img = (document.querySelector('.scene-photo > img'));
       const imgContainer = img.parentElement;
+
+      // Enable CORS on the https://cdn.stashdb.org/* request
+      img.crossOrigin = 'anonymous';
 
       if (img.getAttribute('src')) {
         const handleExistingImage = async () => {
