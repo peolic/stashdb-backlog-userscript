@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.6
+// @version     1.19.7
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -720,6 +720,16 @@ async function inject() {
     }
   }
 
+  /**
+   * @typedef PerformerEntry
+   * @property {string | null} id
+   * @property {string} name
+   * @property {string} [disambiguation]
+   * @property {string | null} appearance
+   * @property {string | null} [status] Only for remove/append
+   * @property {string | null} [old_appearance] Only for update
+   */
+
   // SVG is rendered huge if FontAwesome was tree-shaken in compilation?
   const svgStyleFix = [
     'overflow: visible', // svg:not(:root).svg-inline--fa
@@ -1027,11 +1037,11 @@ async function inject() {
     }
 
     if (found.performers) {
-      const remove = Array.from(found.performers.remove); // shallow clone
-      const append = Array.from(found.performers.append); // shallow clone
-      const update = Array.from(found.performers.update || []); // shallow clone
+      const remove = /** @type {PerformerEntry[]} */ (Array.from(found.performers.remove)); // shallow clone
+      const append = /** @type {PerformerEntry[]} */ (Array.from(found.performers.append)); // shallow clone
+      const update = /** @type {PerformerEntry[]} */ (Array.from(found.performers.update || [])); // shallow clone
 
-      const removeFrom = (entry, from) => {
+      const removeFrom = (/** @type {PerformerEntry} */ entry, /** @type {PerformerEntry[]} */ from) => {
         const index = from.indexOf(entry);
         if (index === -1) console.error('[backlog] entry not found', entry, 'in', from);
         from.splice(index, 1);
@@ -1043,31 +1053,39 @@ async function inject() {
         return { uuid, fullName };
       };
 
-      const formatName = (entry) => {
+      const formatName = (/** @type {PerformerEntry} */ entry) => {
         const disambiguation = entry.disambiguation ? ` (${entry.disambiguation})` : '';
         if (!entry.appearance) return entry.name + disambiguation;
         return entry.appearance + ` (${entry.name})` + disambiguation;
       };
 
-      const makePerformerAppearance = (entry) => {
+      const nameElements = (/** @type {PerformerEntry} */ entry) => {
+        const c = (/** @type {string} */ text, small=false) => {
+          const el = document.createElement(small ? 'small' : 'span');
+          if (small) el.classList.add('ml-1', 'text-small', 'text-muted');
+          el.innerText = small ? `(${text})` : text;
+          return el;
+        };
+
+        const { status, appearance, name, disambiguation } = entry;
+        /** @type {(HTMLElement | Text)[]} */
+        const parts = [];
+        if (status) parts.push(document.createTextNode(`[${entry.status}] `));
+        if (!appearance) parts.push(c(name))
+        else parts.push(c(appearance), c(name, true));
+        if (disambiguation) parts.push(c(disambiguation, true));
+        return parts;
+      }
+
+      const makePerformerAppearance = (/** @type {PerformerEntry} */ entry) => {
         const pa = document.createElement('a');
         pa.classList.add('scene-performer');
         if (entry.id) {
           pa.href = `/performers/${entry.id}`;
         }
 
-        const formattedName =
-          !entry.appearance
-            ? `<span>${escapeHTML(entry.name)}</span>`
-            : `<span>${escapeHTML(entry.appearance)}</span><small class="ml-1 text-small text-muted">(${escapeHTML(entry.name)})</small>`;
-        const dsmbg =
-          !entry.disambiguation
-            ? ''
-            : `<small class="ml-1 text-small text-muted">(${escapeHTML(entry.disambiguation)})</small>`;
-
         pa.insertAdjacentHTML('afterbegin', genderIcon(existingPerformers.length === 0));
-        pa.insertAdjacentText('beforeend', entry.id ? '' : `[${entry.status}] `);
-        pa.insertAdjacentHTML('beforeend', formattedName + dsmbg);
+        pa.append(...nameElements(entry));
         return pa;
       };
 
@@ -1133,6 +1151,11 @@ async function inject() {
             highlight(performer, 'warning');
             performer.title = makeAlreadyCorrectTitle('updated');
           } else {
+            const arrow = document.createElement('span');
+            arrow.classList.add('mx-1');
+            arrow.innerText = '\u{22D9}';
+            performer.appendChild(arrow);
+            performer.append(...nameElements(toUpdate));
             highlight(performer, 'primary');
             performer.title = `<pending>\nupdate to\n${entryFullName}`;
           }
@@ -1448,7 +1471,7 @@ async function inject() {
         const ul = document.createElement('ul');
         ul.classList.add('p-0');
         sortedEntries(value, ['update', 'remove', 'append']).forEach((actionEntries) => {
-          /** @type {[string, { [key: string]: any }[]]}  */
+          /** @type {[string, PerformerEntry[]]}  */
           const [action, entries] = (actionEntries);
           entries.forEach((entry) => {
             const li = document.createElement('li');
