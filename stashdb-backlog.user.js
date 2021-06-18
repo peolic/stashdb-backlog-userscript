@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.0
+// @version     1.19.1
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1189,19 +1189,36 @@ async function inject() {
           director.insertAdjacentText('beforeend', ` \u{1F87A} ${found.director}`);
           director.title = `<pending> Director\n${found.director}`;
         }
-
       }
     }
 
     if (found.details) {
       /** @type {HTMLDivElement} */
       const desc = (document.querySelector('.scene-description > h4 + div'));
-      if (!desc.innerText.trim()) {
-        desc.innerText = `<MISSING> ${found.details}`;
-        desc.classList.add('bg-danger');
+      const currentDetails = desc.innerText;
+      if (!currentDetails) {
+        desc.classList.add('bg-success', 'p-1');
+        desc.innerText = found.details;
+        desc.title = `<MISSING> Description`;
+      } else if (currentDetails === found.details) {
+        desc.classList.add('bg-warning', 'p-1');
+        desc.title = makeAlreadyCorrectTitle('correct', 'Description');
       } else {
-        desc.classList.add('bg-warning');
-        desc.title = `<pending>\n${found.details}`;
+        const compareDiv = document.createElement('div');
+        compareDiv.classList.add('d-flex', 'flex-column');
+        compareDiv.title = '<pending> Description';
+        desc.insertAdjacentElement('beforebegin', compareDiv);
+        desc.classList.add('bg-danger', 'p-1');
+        compareDiv.appendChild(desc);
+
+        const buffer = document.createElement('div');
+        buffer.classList.add('my-1');
+        compareDiv.appendChild(buffer);
+
+        const newDetails = document.createElement('div');
+        newDetails.classList.add('bg-primary', 'p-1');
+        newDetails.innerText = found.details;
+        compareDiv.appendChild(newDetails);
       }
     }
 
