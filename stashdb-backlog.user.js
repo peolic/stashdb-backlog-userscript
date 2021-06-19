@@ -84,6 +84,12 @@ async function inject() {
 
   const wait = (/** @type {number} */ ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  const once = (/** @type {() => any} */ fn) => () => {
+    if (!fn) return;
+    fn();
+    fn = null;
+  };
+
   /**
    * @param {string} selector
    * @param {number} [timeout] fail after, in milliseconds
@@ -477,13 +483,14 @@ async function inject() {
    * }} dataIndex
    */
   function applyDataIndexMigrations(dataIndex) {
-    console.debug('[backlog] migration: convert comma-separated to array');
     for (const key in dataIndex) {
       if (key === 'lastUpdated') continue;
       const thisIndex = dataIndex[/** @type {SupportedPluralObject} */ (key)];
+      const log = once(() => console.debug(`[backlog] \`index.${key}\` migration: convert comma-separated to array`));
       for (const thisId in thisIndex) {
         let oldValue = thisIndex[thisId];
         if (typeof oldValue === 'string') {
+          log();
           thisIndex[thisId] = oldValue = [''].concat(...oldValue.split(/,/g));
         }
       }
