@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.7
+// @version     1.19.8
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -653,11 +653,10 @@ async function inject() {
 
   /**
    * @param {string} url Image URL
-   * @param {boolean} [asData=false] As data URI or as a blob
-   * @returns {Promise<string>}
+   * @returns {Promise<Blob>}
    * @throws {RequestError}
    */
-   async function getImage(url, asData=false) {
+   async function getImageBlob(url) {
     const response = await new Promise((resolve, reject) => {
       const details = {
         method: 'GET',
@@ -684,12 +683,14 @@ async function inject() {
     }
 
     /** @type {Blob} */
-    const blob = (response.response);
+    return (response.response);
+  }
 
-    if (!asData) {
-      return URL.createObjectURL(blob);
-    }
-
+  /**
+   * @param {Blob} blob
+   * @returns {Promise<string>} same image?
+   */
+  async function blobAsDataURI(blob) {
     const reader = new FileReader();
     reader.readAsDataURL(blob);
     return new Promise((resolve) => {
@@ -701,20 +702,14 @@ async function inject() {
 
   /**
    * @param {HTMLImageElement} img
-   * @param {string} newImageURL
-   * @returns {Promise<string | null | Error>} New image data URI or null if the same image
+   * @param {Promise<Blob>} newImage
+   * @returns {Promise<boolean | Error>} same image?
    */
-  async function compareImages(img, newImageURL) {
+  async function compareImages(img, newImage) {
     try {
-      // https://stackoverflow.com/a/62575556
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      canvas.height = img.naturalHeight;
-      canvas.width = img.naturalWidth;
-      context.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
-      const dataURI = canvas.toDataURL();
-      const newDataURI = await getImage(newImageURL, true);
-      return dataURI === newDataURI ? null : newDataURI;
+      const dataURI = await blobAsDataURI(await getImageBlob(img.src));
+      const newDataURI = await blobAsDataURI(await newImage);
+      return dataURI === newDataURI;
     } catch (error) {
       return error;
     }
@@ -977,45 +972,82 @@ async function inject() {
       // Enable CORS on the https://cdn.stashdb.org/* request
       img.crossOrigin = 'anonymous';
 
+      const newImageBlob = getImageBlob(found.image);
+
       if (img.getAttribute('src')) {
         const handleExistingImage = async () => {
-          const newImage = await compareImages(img, found.image);
+          const newImage = await compareImages(img, newImageBlob);
           imgContainer.classList.add('p-2');
-          if (newImage === null) {
+
+          if (newImage === true) {
             imgContainer.style.backgroundColor = 'var(--pink)';
             imgContainer.title = `${makeAlreadyCorrectTitle('added')}\n\n${found.image}`;
-          } else {
-            imgContainer.classList.add('d-flex');
-            imgContainer.title = `<pending>\n${found.image}`;
+            return;
+          }
 
-            const imgNewLink = document.createElement('a');
-            imgNewLink.href = found.image;
-            imgNewLink.target = '_blank';
-            imgNewLink.rel = 'nofollow noopener noreferrer';
+          imgContainer.classList.add('d-flex');
+          imgContainer.title = `<pending>\n${found.image}`;
+
+          const imgNewLink = document.createElement('a');
+          imgNewLink.href = found.image;
+          imgNewLink.target = '_blank';
+          imgNewLink.rel = 'nofollow noopener noreferrer';
+
+          if (newImage instanceof Error) {
+            imgContainer.style.backgroundColor = 'var(--purple)';
+            imgContainer.title = 'error comparing image';
+            console.error('[backlog] error comparing image', newImage);
+            imgNewLink.innerText = found.image;
+            imgNewLink.classList.add('p-1');
             imgNewLink.style.flex = '50%';
 
-            if (newImage instanceof Error) {
-              imgContainer.style.backgroundColor = 'var(--purple)';
-              imgContainer.title = 'error comparing image';
-              console.error('[backlog] error comparing image', newImage);
-              imgNewLink.innerText = found.image;
-              imgNewLink.classList.add('p-1');
-            } else {
-              imgContainer.classList.add('bg-warning');
-              const imgNew = document.createElement('img');
-              imgNew.src = newImage;
-
-              img.style.borderRight = '.5rem solid var(--warning)';
-              // const isVertical = img.naturalHeight > img.naturalWidth;
-              img.style.flex = '50%';
-              imgNew.style.width = '100%';
-              imgNew.style.height = 'auto';
-
-              imgNewLink.appendChild(imgNew);
-            }
-
             imgContainer.appendChild(imgNewLink);
+            return;
           }
+
+          const cImgRes = document.createElement('div');
+          cImgRes.classList.add('position-absolute', 'ml-2', 'px-2', 'font-weight-bold');
+          cImgRes.style.left = '0';
+          cImgRes.style.backgroundColor = '#2fb59c';
+          cImgRes.style.transition = 'opacity .2s ease';
+          cImgRes.innerText = `${img.naturalWidth} x ${img.naturalHeight}`;
+          img.addEventListener('mouseover', () => cImgRes.style.opacity = '0');
+          img.addEventListener('mouseout', () => cImgRes.style.opacity = null);
+
+          const currentImageContainer = document.createElement('div');
+          currentImageContainer.style.borderRight = '.5rem solid var(--warning)';
+          currentImageContainer.style.flex = '50%';
+          img.style.width = '100%';
+          currentImageContainer.append(cImgRes, img);
+
+          imgContainer.appendChild(currentImageContainer);
+
+          imgContainer.classList.add('bg-warning');
+
+          const imgNew = document.createElement('img');
+          imgNew.src = URL.createObjectURL(await newImageBlob);
+          imgNew.style.width = '100%';
+          imgNew.style.height = 'auto';
+
+          imgNewLink.appendChild(imgNew);
+
+          const imgRes = document.createElement('div');
+          imgRes.classList.add('position-absolute', 'mr-2', 'px-2', 'font-weight-bold');
+          imgRes.style.right = '0';
+          imgRes.style.backgroundColor = '#2fb59c';
+          imgRes.style.transition = 'opacity .2s ease';
+          imgNew.addEventListener('load', () => {
+            imgRes.innerText = `${imgNew.naturalWidth} x ${imgNew.naturalHeight}`;
+          }, { once: true });
+          imgNew.addEventListener('mouseover', () => imgRes.style.opacity = '0');
+          imgNew.addEventListener('mouseout', () => imgRes.style.opacity = null);
+
+          const newImageContainer = document.createElement('div');
+          const isCurrentVertical = img.naturalHeight > img.naturalWidth;
+          newImageContainer.style.flex = isCurrentVertical ? 'auto' : '50%';
+          newImageContainer.append(imgRes, imgNewLink);
+
+          imgContainer.appendChild(newImageContainer);
         };
 
         if (img.complete && img.naturalHeight !== 0) handleExistingImage();
@@ -1030,9 +1062,9 @@ async function inject() {
         imgContainer.addEventListener('mouseout', () => imgContainer.removeAttribute('style'));
         //@ts-expect-error
         imgContainer.addEventListener('click', () => GM.openInTab(found.image, false));
-        const onSuccess = (/** @type {string} **/ blob) => img.src = blob;
+        const onSuccess = (/** @type {Blob} **/ blob) => img.src = URL.createObjectURL(blob);
         const onFailure = () => img.replaceWith(document.createTextNode(found.image));
-        getImage(found.image).then(onSuccess, onFailure);
+        newImageBlob.then(onSuccess, onFailure);
       }
     }
 
@@ -1556,15 +1588,15 @@ async function inject() {
         imgLink.rel = 'nofollow noopener noreferrer';
         imgLink.style.color = 'var(--teal)';
         dd.appendChild(imgLink);
-        const onSuccess = (/** @type {string} **/ blob) => {
+        const onSuccess = (/** @type {Blob} **/ blob) => {
           const img = document.createElement('img');
           img.style.maxHeight = '200px';
           img.style.border = '2px solid var(--teal)';
-          img.src = blob;
+          img.src = URL.createObjectURL(blob);
           imgLink.insertAdjacentElement('afterbegin', img);
         };
         const onFailure = () => imgLink.innerText = value;
-        getImage(value).then(onSuccess, onFailure);
+        getImageBlob(value).then(onSuccess, onFailure);
         return;
       }
 
