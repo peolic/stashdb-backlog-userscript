@@ -1,3 +1,7 @@
-# StashDB Backlog
+# StashDB Backlog Userscript
 
-## [Install: StashDB Backlog Userscript](https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js)
+This userscript is used to be able to view pending changes from the StashDB Backlog spreadsheet directly on StashDB.  
+The data is usually synced every ~4 hours, starting at 0:00 UTC.
+## [**INSTALL USERSCRIPT**](https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js)
+
+Installation requires a browser extension such as Tampermonkey or Greasemonkey.
