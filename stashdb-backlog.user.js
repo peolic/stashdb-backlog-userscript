@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.8
+// @version     1.19.9
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -9,7 +9,6 @@
 // @grant       GM.setValue
 // @grant       GM.getValue
 // @grant       GM.deleteValue
-// @grant       GM.openInTab
 // @grant       GM.xmlHttpRequest
 // @homepageURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7
 // @downloadURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
@@ -1057,14 +1056,33 @@ async function inject() {
         // missing image
         imgContainer.classList.add('bg-danger', 'p-2');
         imgContainer.title = `<MISSING>\n${found.image}`;
-        // img.src = found.image;
-        imgContainer.addEventListener('mouseover', () => imgContainer.style.cursor = 'pointer');
-        imgContainer.addEventListener('mouseout', () => imgContainer.removeAttribute('style'));
-        //@ts-expect-error
-        imgContainer.addEventListener('click', () => GM.openInTab(found.image, false));
-        const onSuccess = (/** @type {Blob} **/ blob) => img.src = URL.createObjectURL(blob);
-        const onFailure = () => img.replaceWith(document.createTextNode(found.image));
-        newImageBlob.then(onSuccess, onFailure);
+
+        const imgLink = imgContainer.appendChild(document.createElement('a'));
+        imgLink.href = found.image;
+        imgLink.target = '_blank';
+        imgLink.rel = 'nofollow noopener noreferrer';
+        imgLink.appendChild(img);
+
+        const imgRes = document.createElement('div');
+        imgRes.classList.add('position-absolute', 'mr-2', 'px-2', 'font-weight-bold');
+        imgRes.style.right = '0';
+        imgRes.style.backgroundColor = '#2fb59c';
+        imgRes.style.transition = 'opacity .2s ease';
+        img.addEventListener('load', () => {
+          imgRes.innerText = `${img.naturalWidth} x ${img.naturalHeight}`;
+        }, { once: true });
+
+        imgContainer.addEventListener('mouseover', () => imgRes.style.opacity = '0');
+        imgContainer.addEventListener('mouseout', () => imgRes.style.opacity = null);
+        imgContainer.insertAdjacentElement('afterbegin', imgRes);
+
+        newImageBlob.then(
+          (blob) => img.src = URL.createObjectURL(blob),
+          () => {
+            imgLink.innerText = found.image;
+            img.remove();
+          }
+        );
       }
     }
 
