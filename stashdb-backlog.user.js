@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.13
+// @version     1.19.14
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1496,13 +1496,14 @@ async function inject() {
     sceneFormRow.appendChild(pendingChangesContainer);
 
     /**
-     * @param {{ [key: string]: any }} obj
+     * @template T
+     * @param {T} obj
      * @param {string[]} keySortOrder
-     * @returns {[string, any][]}
+     * @returns {Array<keyof T>}
      */
-    const sortedEntries = (obj, keySortOrder) =>
-      Object.entries(obj)
-        .sort(([aKey,], [bKey,]) => {
+    const sortedKeys = (obj, keySortOrder) =>
+      /** @type {Array<keyof T>} */ (/** @type {unknown} */ (Object.keys(obj)
+        .sort((aKey, bKey) => {
           const aPos = keySortOrder.indexOf(aKey);
           const bPos = keySortOrder.indexOf(bKey);
           if (bPos === -1) return -1;
@@ -1510,7 +1511,7 @@ async function inject() {
           else if (aPos < bPos) return -1;
           else if (aPos > bPos) return 1;
           else return 0;
-        });
+        })));
 
     const keySortOrder = [
       'title', 'date', 'duration',
@@ -1518,8 +1519,7 @@ async function inject() {
       'details', 'director', 'tags',
       'image', 'fingerprints',
     ];
-    sortedEntries(found, keySortOrder).forEach((entry) => {
-      const [field, value] = entry;
+    sortedKeys(found, keySortOrder).forEach((field) => {
       if (['contentHash'].includes(field)) return;
 
       const dt = document.createElement('dt');
@@ -1533,17 +1533,16 @@ async function inject() {
       // date
 
       if (field === 'duration') {
-        dd.innerText = value;
+        dd.innerText = found[field];
         dd.style.userSelect = 'all';
       }
 
       if (field === 'performers') {
+        const performers = found[field];
         const ul = document.createElement('ul');
         ul.classList.add('p-0');
-        sortedEntries(value, ['update', 'remove', 'append']).forEach((actionEntries) => {
-          /** @type {[string, PerformerEntry[]]}  */
-          const [action, entries] = (actionEntries);
-          entries.forEach((entry) => {
+        sortedKeys(performers, ['update', 'remove', 'append']).forEach((action) => {
+          performers[action].forEach((entry) => {
             const li = document.createElement('li');
             li.classList.add('d-flex', 'justify-content-between');
 
@@ -1587,7 +1586,7 @@ async function inject() {
       }
 
       if (field === 'studio') {
-        const [studioId, studioName] = value;
+        const [studioId, studioName] = found[field];
         const a = makeLink(`/studios/${studioId}`, studioName);
         a.target = '_blank';
         a.style.color = 'var(--teal)';
@@ -1597,12 +1596,12 @@ async function inject() {
       }
 
       if (field === 'url') {
-        dd.appendChild(makeLink(value));
+        dd.appendChild(makeLink(found[field]));
         return;
       }
 
       if (field === 'details') {
-        dd.innerText = value;
+        dd.innerText = found[field];
         dd.style.whiteSpace = 'pre-line';
         return;
       }
@@ -1611,7 +1610,8 @@ async function inject() {
       // tags
 
       if (field === 'image') {
-        const imgLink = makeLink(value, '');
+        const image = found[field];
+        const imgLink = makeLink(image, '');
         imgLink.style.color = 'var(--teal)';
         dd.appendChild(imgLink);
         const onSuccess = (/** @type {Blob} **/ blob) => {
@@ -1621,14 +1621,13 @@ async function inject() {
           img.src = URL.createObjectURL(blob);
           imgLink.insertAdjacentElement('afterbegin', img);
         };
-        const onFailure = () => imgLink.innerText = value;
-        getImageBlob(value).then(onSuccess, onFailure);
+        const onFailure = () => imgLink.innerText = image;
+        getImageBlob(image).then(onSuccess, onFailure);
         return;
       }
 
       if (field === 'fingerprints') {
-        /** @type {{ [key: string]: string }[]} */
-        (value).forEach((fp, index) => {
+        found[field].forEach((fp, index) => {
           if (index > 0) dd.insertAdjacentHTML('beforeend', '<br>');
           const fpElement = document.createElement('span');
           fpElement.innerText = `${fp.algorithm.toUpperCase()} ${fp.hash}`;
@@ -1646,8 +1645,7 @@ async function inject() {
       }
 
       if (field === 'comments') {
-        /** @type {string[]} */
-        (value).forEach((comment, index) => {
+        found[field].forEach((comment, index) => {
           if (index > 0) dd.insertAdjacentHTML('beforeend', '<br>');
           const commentElement = /^https?:/.test(comment) ? makeLink(comment) : document.createElement('span');
           if (commentElement instanceof HTMLAnchorElement) {
@@ -1662,12 +1660,12 @@ async function inject() {
       if (field === 'lastUpdated') {
         dt.insertAdjacentHTML('beforebegin', '<hr class="mt-4" style="border-top-color: initial;">');
         dt.innerText = 'data last fetched at';
-        dd.innerText = formatDate(value);
+        dd.innerText = formatDate(found[field]);
         return;
       }
 
       // unmatched
-      dd.innerText = value;
+      dd.innerText = found[field];
     });
 
   } // iSceneEditPage
