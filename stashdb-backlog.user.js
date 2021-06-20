@@ -59,7 +59,7 @@ async function inject() {
     if (!pathname) return result;
 
     const match = urlRegex.exec(pathname);
-    if (!match || match.length === 0) return null;
+    if (!match || match.length === 0) return result;
 
     result.object = match[1] || null;
     result.ident = match[2] || null;
@@ -108,47 +108,49 @@ async function inject() {
 
     await elementReadyIn('.StashDBContent > .LoadingIndicator', 100);
 
-    if (loc.object === 'scenes') {
-      if (loc.ident) {
+    const { object, ident, action } = loc;
+
+    if (object === 'scenes') {
+      if (ident) {
         // Scene page
-        if (!loc.action) return await iScenePage(loc.ident);
+        if (!action) return await iScenePage(ident);
         // Scene edit page
-        else if (loc.action === 'edit') return await iSceneEditPage(loc.ident);
+        else if (action === 'edit') return await iSceneEditPage(ident);
       } else {
         // Main scene cards list
-        return await highlightSceneCards(loc.object);
+        return await highlightSceneCards(object);
       }
     }
 
     // Scene cards lists on Studio/Tag pages
-    if (['studios', 'tags'].includes(loc.object) && loc.ident && !loc.action) {
-      return await highlightSceneCards(loc.object);
+    if ((object === 'studios' || object === 'tags') && ident && !action) {
+      return await highlightSceneCards(object);
     }
 
-    if (loc.object === 'performers') {
-      if (!loc.ident && !loc.action) {
+    if (object === 'performers') {
+      if (!ident && !action) {
         return await highlightPerformerCards();
       }
 
-      if (loc.ident && !loc.action) {
-        await iPerformerPage(loc.ident);
-        await highlightSceneCards(loc.object);
+      if (ident && !action) {
+        await iPerformerPage(ident);
+        await highlightSceneCards(object);
         return;
       }
     }
 
     // Search results
-    if (loc.object === 'search') {
+    if (object === 'search') {
       return await highlightSearchResults();
     }
 
     // Home page
-    if (!loc.object && !loc.ident && !loc.action) {
-      return await highlightSceneCards(loc.object);
+    if (!object && !ident && !action) {
+      return await highlightSceneCards();
     }
 
-    const identAction = loc.ident ? `${loc.ident}/${loc.action}` : `${loc.action}`;
-    console.debug(`[backlog] nothing to do for ${loc.object}/${identAction}.`);
+    const identAction = ident ? `${ident}/${action}` : `${action}`;
+    console.debug(`[backlog] nothing to do for ${object}/${identAction}.`);
   }
 
   let dispatchEnabled = true;
@@ -426,7 +428,7 @@ async function inject() {
 
   /**
    * @param {boolean} [forceFetch=false]
-   * @returns {Promise<DataIndex>}
+   * @returns {Promise<DataIndex | null>}
    */
   async function getOrFetchDataIndex(forceFetch=false) {
     const storedDataIndex = await Cache.getStoredDataIndex();
@@ -568,11 +570,11 @@ async function inject() {
   /**
    * @param {SupportedObject} object
    * @param {string} uuid
-   * @param {DataIndex} [index]
+   * @param {DataIndex | null} [index]
    * @returns {Promise<DataObject | null>}
    */
   async function getDataFor(object, uuid, index = undefined) {
-    if (!index) index = await getOrFetchDataIndex();
+    if (index === undefined) index = await getOrFetchDataIndex();
     if (!index) throw new Error("[backlog] failed to get index");
 
     const haystack = index[/** @type {SupportedPluralObject} */ (`${object}s`)];
@@ -763,7 +765,7 @@ async function inject() {
   /**
    * @param {DataObject | null} data
    * @param {Element} target Checks `target` for existence of button
-   * @returns {HTMLButtonElement}
+   * @returns {HTMLButtonElement | null}
    */
   const createFetchButton = (data, target) => {
     const className = 'backlog-refetch';
@@ -866,7 +868,7 @@ async function inject() {
     }
 
     if (found.title) {
-      /** @type {HTMLHeadingElement | null} */
+      /** @type {HTMLHeadingElement} */
       const title = (document.querySelector('.scene-info h3'));
       const currentTitle = title.innerText;
       if (!currentTitle) {
@@ -911,7 +913,7 @@ async function inject() {
     }
 
     if (found.studio) {
-      const studio_date = /** @type {HTMLHeadingElement | null} */ (sceneHeader.querySelector(':scope > h6'));
+      const studio_date = /** @type {HTMLHeadingElement} */ (sceneHeader.querySelector(':scope > h6'));
       const studioElement = studio_date.querySelector('a');
 
       const [studioId, studioName] = found.studio;
@@ -939,7 +941,7 @@ async function inject() {
     }
 
     if (found.date) {
-      const studio_date = /** @type {HTMLHeadingElement | null} */ (sceneHeader.querySelector(':scope > h6'));
+      const studio_date = /** @type {HTMLHeadingElement} */ (sceneHeader.querySelector(':scope > h6'));
       const dateNode = Array.from(studio_date.childNodes).slice(-1)[0];
       const separator = studio_date.querySelector('span.mx-1');
 
@@ -967,7 +969,7 @@ async function inject() {
       newDate.classList.add(colorClass, 'p-1');
       newDate.title = title;
       dateElement.title = title;
-      dateElement.classList.add('bg-danger', 'p-1');
+      dateElement.classList.add(currentColorClass, 'p-1');
       dateElement.insertAdjacentElement('afterend', newDate);
     }
 
@@ -1019,7 +1021,7 @@ async function inject() {
           cImgRes.style.transition = 'opacity .2s ease';
           cImgRes.innerText = `${img.naturalWidth} x ${img.naturalHeight}`;
           img.addEventListener('mouseover', () => cImgRes.style.opacity = '0');
-          img.addEventListener('mouseout', () => cImgRes.style.opacity = null);
+          img.addEventListener('mouseout', () => cImgRes.style.opacity = '');
 
           const currentImageContainer = document.createElement('div');
           currentImageContainer.style.borderRight = '.5rem solid var(--warning)';
@@ -1047,7 +1049,7 @@ async function inject() {
             imgRes.innerText = `${imgNew.naturalWidth} x ${imgNew.naturalHeight}`;
           }, { once: true });
           imgNew.addEventListener('mouseover', () => imgRes.style.opacity = '0');
-          imgNew.addEventListener('mouseout', () => imgRes.style.opacity = null);
+          imgNew.addEventListener('mouseout', () => imgRes.style.opacity = '');
 
           const newImageContainer = document.createElement('div');
           const isCurrentVertical = img.naturalHeight > img.naturalWidth;
@@ -1081,7 +1083,7 @@ async function inject() {
         }, { once: true });
 
         imgContainer.addEventListener('mouseover', () => imgRes.style.opacity = '0');
-        imgContainer.addEventListener('mouseout', () => imgRes.style.opacity = null);
+        imgContainer.addEventListener('mouseout', () => imgRes.style.opacity = '');
         imgContainer.insertAdjacentElement('afterbegin', imgRes);
 
         newImageBlob.then(
@@ -1311,7 +1313,8 @@ async function inject() {
         duration.title = `Duration is missing; ${foundDuration} seconds`;
         document.querySelector('.scene-info .scene-performers').insertAdjacentElement('afterend', duration);
       } else {
-        if (found.duration == duration.title.match(/(\d+)/)[1]) {
+        const currentDuration = duration.title.match(/(\d+)/)[1];
+        if (found.duration === currentDuration) {
           duration.classList.add('bg-warning', 'p-1');
           duration.insertAdjacentText('afterbegin', '<already correct> ');
           duration.title = `${makeAlreadyCorrectTitle('correct')}; ${foundDuration} seconds`;
@@ -1333,7 +1336,8 @@ async function inject() {
         director.classList.add('ml-3', 'bg-danger', 'p-1');
         document.querySelector('.scene-info > .card-footer').insertAdjacentElement('beforeend', director);
       } else {
-        if (found.director === director.innerText.match(/^Director: (.+)$/)[1]) {
+        const currentDirector = director.innerText.match(/^Director: (.+)$/)[1];
+        if (found.director === currentDirector) {
           director.classList.add('bg-warning', 'p-1');
           director.insertAdjacentText('afterbegin', '<already correct> ');
           director.title = makeAlreadyCorrectTitle('correct');
@@ -1412,22 +1416,20 @@ async function inject() {
       // Parse current
       /** @type {HTMLTableRowElement[]} */
       const fingerprintsTableRows = (Array.from(document.querySelectorAll('.scene-fingerprints > table tr')));
-      /** @type {{ algorithm?: number, hash?: number, duration?: number, submissions?: number }} */
-      const headers = {};
-      const currentFingerprints = fingerprintsTableRows.map((row, rowIndex) => {
+      /** @typedef {{ algorithm: number, hash: number, duration: number, submissions: number }} ColumnIndices */
+      const headers =
+        /** @type {HTMLTableCellElement[]} */
+        (Array.from(fingerprintsTableRows[0].children))
+          .reduce((r, cell, cellIndex) => {
+            if (cell.innerText === 'Algorithm') r.algorithm = cellIndex;
+            else if (cell.innerText === 'Hash') r.hash = cellIndex;
+            else if (cell.innerText === 'Duration') r.duration = cellIndex;
+            else if (cell.innerText === 'Submissions') r.submissions = cellIndex;
+            return r;
+          }, /** @type {ColumnIndices} */ ({}));
+      const currentFingerprints = fingerprintsTableRows.slice(1).map((row) => {
         /** @type {HTMLTableCellElement[]} */
         const cells = (Array.from(row.children));
-
-        if (rowIndex === 0) {
-          cells.forEach((cell, cellIndex) => {
-            if (cell.innerText === 'Algorithm') headers.algorithm = cellIndex;
-            else if (cell.innerText === 'Hash') headers.hash = cellIndex;
-            else if (cell.innerText === 'Duration') headers.duration = cellIndex;
-            else if (cell.innerText === 'Submissions') headers.submissions = cellIndex;
-          });
-          return;
-        }
-
         return {
           row,
           algorithm: cells[headers.algorithm].innerText,
@@ -1435,24 +1437,24 @@ async function inject() {
           duration: cells[headers.duration].innerText,
           submissions: cells[headers.submissions].innerText,
         };
-      }).slice(1);
+      });
 
       // Compare
-      let matches = 0;
-      let notFound = 0;
       /** @type {{ algorithm: string, hash: string, correct_scene_id: string | null }[]} */
-      (found.fingerprints).forEach((fp) => {
+      const reportedFingerprints = found.fingerprints;
+      const matches = reportedFingerprints.filter((fp) => {
         const cfp = currentFingerprints
           .find(({ algorithm, hash }) => algorithm === fp.algorithm.toUpperCase() && hash === fp.hash);
-        if (!cfp) return notFound++;
-        matches++;
+        if (!cfp) return false;
         const { row } = cfp;
         row.classList.add('bg-warning');
         if (fp.correct_scene_id) {
           const html = ` | <a href="/scenes/${fp.correct_scene_id}"><b>correct scene</b></a>`;
           row.children[headers.submissions].insertAdjacentHTML('beforeend', html);
         }
-      });
+        return true;
+      }).length;
+      const notFound = reportedFingerprints.length - matches;
 
       if (matches || notFound) {
         const fpInfo = document.createElement('div');
@@ -1508,7 +1510,7 @@ async function inject() {
     StashDBContent.style.maxWidth = '1600px';
     // Hook to the global style
     window.addEventListener('locationchange', () => {
-      StashDBContent.style.maxWidth = null;
+      StashDBContent.style.maxWidth = '';
       if (StashDBContent.getAttribute('style') === '') StashDBContent.removeAttribute('style');
     }, { once: true });
 
@@ -1760,7 +1762,7 @@ async function inject() {
         highlightElements.forEach((el) => el.style.backgroundColor = '#8c2020');
       });
       header.addEventListener('mouseout', () => {
-        highlightElements.forEach((el) => el.style.backgroundColor = null);
+        highlightElements.forEach((el) => el.style.backgroundColor = '');
       });
     }
 
@@ -1768,9 +1770,10 @@ async function inject() {
       const toSplit = document.createElement('div');
       toSplit.classList.add('mb-1', 'p-1', 'font-weight-bold');
       toSplit.style.transition = 'background-color .5s';
-      toSplit.innerHTML = 'This performer is listed on <a>Performers To Split Up</a>.';
-      highlightElements.push(toSplit);
-      const a = toSplit.querySelector('a');
+      toSplit.innerText = 'This performer is listed on ';
+      const a = document.createElement('a');
+      a.innerText = 'Performers To Split Up';
+      toSplit.append(a, document.createTextNode('.'));
       a.href = 'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ/edit#gid=1067038397';
       a.target = '_blank';
       a.rel = 'nofollow noopener noreferrer';
@@ -1779,6 +1782,7 @@ async function inject() {
       emoji.innerText = '🔀';
       toSplit.insertAdjacentElement('afterbegin', emoji);
       performerInfo.insertAdjacentElement('afterbegin', toSplit);
+      highlightElements.push(toSplit);
     }
 
     const foundData = await getDataFor('performer', performerId, index);
@@ -1797,7 +1801,6 @@ async function inject() {
       const hasDuplicates = document.createElement('div');
       hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
       hasDuplicates.innerHTML = 'This performer has duplicates:';
-      highlightElements.push(hasDuplicates);
       /** @type {string[]} */
       (foundData.duplicates).forEach((dupId) => {
         hasDuplicates.insertAdjacentHTML('beforeend', '<br>');
@@ -1817,13 +1820,13 @@ async function inject() {
       emoji.innerText = '♊';
       hasDuplicates.insertAdjacentElement('afterbegin', emoji);
       performerInfo.insertAdjacentElement('afterbegin', hasDuplicates);
+      highlightElements.push(hasDuplicates);
     }
 
     if (foundData.duplicate_of) {
       const duplicateOf = document.createElement('div');
       duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
       duplicateOf.innerText = 'This performer is a duplicate of: ';
-      highlightElements.push(duplicateOf);
       const a = document.createElement('a');
       a.href = `/performers/${foundData.duplicate_of}`;
       a.target = '_blank';
@@ -1837,6 +1840,7 @@ async function inject() {
       emoji.innerText = '♊';
       duplicateOf.insertAdjacentElement('afterbegin', emoji);
       performerInfo.insertAdjacentElement('afterbegin', duplicateOf);
+      highlightElements.push(duplicateOf);
     }
 
   } // iPerformerPage
@@ -1857,7 +1861,7 @@ async function inject() {
   }
 
   /**
-   * @param {PluralObject | null} pluralObject
+   * @param {PluralObject} [pluralObject]
    */
   async function highlightSceneCards(pluralObject) {
     if (!await elementReadyIn('.SceneCard > .card', 2000)) {
@@ -1871,7 +1875,8 @@ async function inject() {
     const highlight = async () => {
       /** @type {HTMLDivElement[]} */
       (Array.from(document.querySelectorAll('.SceneCard > .card'))).forEach((card) => {
-        const markerDataset = card.parentElement.dataset;
+        const sceneCard = /** @type {HTMLDivElement} */ (card.parentElement);
+        const markerDataset = sceneCard.dataset;
         if (markerDataset.backlogInjected) return;
         else markerDataset.backlogInjected = 'true';
 
@@ -1880,7 +1885,7 @@ async function inject() {
         if (!found) return;
         const changes = found.slice(1);
         card.style.outline = getHighlightStyle('scenes', changes);
-        card.parentElement.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
+        sceneCard.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
       });
     };
 
@@ -1890,7 +1895,7 @@ async function inject() {
       const studioSelectorValue = document.querySelector(
         '.PerformerScenes > .CheckboxSelect > .react-select__control > .react-select__value-container'
       );
-      const observer = new MutationObserver(async (mutations, observer) => {
+      new MutationObserver(async (mutations, observer) => {
         console.debug('[backlog] detected change in performers studios selector, re-highlighting scene cards');
         if (!await elementReadyIn('.SceneCard > .card', 2000)) return;
         await highlight();
@@ -1930,7 +1935,6 @@ async function inject() {
 
     const index = await getOrFetchDataIndex();
     if (!index) return;
-
 
     /** @type {HTMLAnchorElement[]} */
     (Array.from(document.querySelectorAll('a.SearchPage-scene, a.SearchPage-performer'))).forEach((cardLink) => {
