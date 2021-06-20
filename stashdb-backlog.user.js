@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.10
+// @version     1.19.11
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1106,8 +1106,23 @@ async function inject() {
 
       const parsePerformerAppearance = (/** @type {HTMLAnchorElement} */ pa) => {
         const { ident: uuid } = parsePath(pa.href);
-        const fullName = Array.from(pa.childNodes).slice(1).map((n) => n.textContent).join(' ');
-        return { uuid, fullName };
+        /** @type {HTMLElement[]} */
+        const nameElements = (Array.from(pa.children).slice(1));
+        /** @type {string[]} */
+        const nameParts = [nameElements.shift().textContent];
+        const mainNameOrDsmbgEl = nameElements.shift();
+        if (mainNameOrDsmbgEl) {
+          if (!mainNameOrDsmbgEl.firstElementChild)
+            nameParts.push(mainNameOrDsmbgEl.textContent);
+          else {
+            const nodes = Array.from(mainNameOrDsmbgEl.childNodes);
+            const dsmbg = /** @type {HTMLElement} */ (nodes.pop());
+            nameParts.push(nodes.map(n => n.textContent).join(''));
+            nameParts.push(dsmbg.textContent);
+          }
+        }
+        const fullName = nameParts.join(' ');
+        return ({ uuid, fullName });
       };
 
       const formatName = (/** @type {PerformerEntry} */ entry) => {
@@ -1125,12 +1140,17 @@ async function inject() {
         };
 
         const { status, appearance, name, disambiguation } = entry;
+        const namePart = c(name, !!appearance);
         /** @type {(HTMLElement | Text)[]} */
         const parts = [];
         if (status) parts.push(document.createTextNode(`[${entry.status}] `));
-        if (!appearance) parts.push(c(name))
-        else parts.push(c(appearance), c(name, true));
-        if (disambiguation) parts.push(c(disambiguation, true));
+        if (appearance) parts.push(c(appearance));
+        parts.push(namePart);
+        if (disambiguation) {
+          const dsmbg = c(disambiguation, true);
+          if (appearance) namePart.appendChild(dsmbg);
+          else parts.push(dsmbg);
+        }
         return parts;
       }
 
@@ -1162,9 +1182,9 @@ async function inject() {
 
       existingPerformers.forEach((performer) => {
         const { uuid, fullName } = parsePerformerAppearance(performer);
-        const toRemove = remove.find((e) => e.id === uuid) || null;
-        const toAppend = append.find((e) => e.id === uuid) || null;
-        const toUpdate = update.find((e) => e.id === uuid) || null;
+        const toRemove = remove.find((e) => e.id ? e.id === uuid : formatName(e) === fullName);
+        const toAppend = append.find((e) => e.id === uuid);
+        const toUpdate = update.find((e) => e.id === uuid);
 
         if (toRemove) {
           highlight(performer, 'danger');
@@ -1186,6 +1206,10 @@ async function inject() {
           } else {
             performer.style.textDecoration = 'line-through';
             performer.title = `<pending>\nremoval`;
+          }
+          if (!toRemove.id) {
+            performer.title += '\n[missing ID - matched by name]';
+            performer.classList.add('bg-danger');
           }
           removeFrom(toRemove, remove);
         }
