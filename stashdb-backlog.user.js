@@ -743,6 +743,46 @@ async function inject() {
     img.addEventListener('mouseout', () => imgRes.style.opacity = '');
     return imgRes;
   }
+
+  /**
+   * All external links are made with `_blank` target.
+   * @param {string} url
+   * @param {string | null} [text] if not provided, text is the url itself, null to keep contents as is
+   * @param {HTMLAnchorElement} [el] anchor element to use
+   * @returns {HTMLAnchorElement}
+   */
+  function makeLink(url, text, el) {
+    const a = el instanceof HTMLAnchorElement ? el : document.createElement('a');
+
+    if (text !== null) {
+      a.innerText = text === undefined ? url : text;
+    }
+    // Relative
+    if (url.startsWith('/') || !/^https?:/.test(url)) {
+      a.href = url;
+      return a;
+    }
+
+    let urlObj;
+    try {
+      urlObj = new URL(url);
+    } catch (error) {
+      console.error(url, error);
+    }
+
+    // Safe, make relative
+    if (urlObj && urlObj.hostname === 'stashdb.org') {
+      a.href = urlObj.href.slice(urlObj.origin.length);
+      return a;
+    }
+
+    // External
+    a.href = urlObj ? urlObj.href : url;
+    a.target = '_blank';
+    a.rel = 'nofollow noopener noreferrer';
+    return a;
+  }
+
   /**
    * @typedef PerformerEntry
    * @property {string | null} id
@@ -871,15 +911,7 @@ async function inject() {
       /** @type {string[]} */
       (found.comments).forEach((comment, index) => {
         if (index > 0) comments.insertAdjacentHTML('beforeend', '<br>');
-        let commentElement;
-        if (/https?:/.test(comment)) {
-          commentElement = document.createElement('a');
-          commentElement.href = comment;
-          commentElement.target = '_blank';
-          commentElement.rel = 'nofollow noopener noreferrer';
-        } else {
-          commentElement = document.createElement('span');
-        }
+        const commentElement = /^https?:/.test(comment) ? makeLink(comment) : document.createElement('span');
         commentElement.innerText = comment;
         comments.appendChild(commentElement);
       });
@@ -1017,10 +1049,7 @@ async function inject() {
           imgContainer.classList.add('d-flex');
           imgContainer.title = `<pending>\n${found.image}`;
 
-          const imgNewLink = document.createElement('a');
-          imgNewLink.href = found.image;
-          imgNewLink.target = '_blank';
-          imgNewLink.rel = 'nofollow noopener noreferrer';
+          const imgNewLink = makeLink(found.image, '');
 
           if (newImage instanceof Error) {
             imgContainer.style.backgroundColor = 'var(--purple)';
@@ -1069,10 +1098,7 @@ async function inject() {
         imgContainer.classList.add('bg-danger', 'p-2');
         imgContainer.title = `<MISSING>\n${found.image}`;
 
-        const imgLink = imgContainer.appendChild(document.createElement('a'));
-        imgLink.href = found.image;
-        imgLink.target = '_blank';
-        imgLink.rel = 'nofollow noopener noreferrer';
+        const imgLink = imgContainer.appendChild(makeLink(found.image, ''));
         imgLink.appendChild(img);
 
         const imgRes = makeImageResolution(img, 'right');
@@ -1159,24 +1185,6 @@ async function inject() {
         pa.insertAdjacentHTML('afterbegin', genderIcon(existingPerformers.length === 0));
         pa.append(...nameElements(entry));
         return pa;
-      };
-
-      const setStatusUrl = (/** @type {PerformerEntry} */ entry, /** @type {HTMLAnchorElement} */ pa) => {
-        if (!entry.status_url) return;
-        let statusUrl;
-        try {
-          statusUrl = new URL(entry.status_url);
-        } catch (error) {
-          console.error(entry.status_url, error);
-        }
-        if (statusUrl && statusUrl.hostname === 'stashdb.org') {
-          pa.href = statusUrl.href.slice(statusUrl.origin.length);
-          return;
-        }
-        // external
-        pa.href = statusUrl ? statusUrl.href : entry.status_url;
-        pa.target = '_blank';
-        pa.rel = 'nofollow noopener noreferrer';
       };
 
       const highlight = (/** @type {HTMLElement} */ e, /** @type {string} */ v) => {
@@ -1269,7 +1277,9 @@ async function inject() {
           } else {
             pa.title += ' (missing performer ID)';
           }
-          setStatusUrl(entry, pa);
+          if (entry.status_url) {
+            makeLink(entry.status_url, null, pa);
+          }
         }
         scenePerformers.appendChild(pa);
       });
@@ -1394,11 +1404,8 @@ async function inject() {
         arrow.innerText = '\u{22D9}';
         compareSpan.appendChild(arrow);
 
-        const newURL = document.createElement('a');
+        const newURL = makeLink(found.url);
         newURL.classList.add('bg-primary', 'p-1');
-        newURL.href = found.url;
-        newURL.innerText = found.url;
-        newURL.target = studioUrl.target;
         newURL.rel = studioUrl.rel;
         compareSpan.appendChild(newURL);
       }
@@ -1587,10 +1594,8 @@ async function inject() {
             if (!entry.id) {
               info.innerText = `<${entry.status}> ${name}`;
             } else {
-              const a = document.createElement('a');
-              a.href = `/performers/${entry.id}`;
+              const a = makeLink(`/performers/${entry.id}`, name);
               a.target = '_blank';
-              a.innerText = name;
               a.style.color = 'var(--teal)';
               info.appendChild(a);
               if (action === 'append') {
@@ -1615,10 +1620,8 @@ async function inject() {
 
       if (field === 'studio') {
         const [studioId, studioName] = value;
-        const a = document.createElement('a');
-        a.href = `/studios/${studioId}`;
+        const a = makeLink(`/studios/${studioId}`, studioName);
         a.target = '_blank';
-        a.innerText = studioName;
         a.style.color = 'var(--teal)';
         dd.appendChild(a);
         a.insertAdjacentHTML('afterend', `<br><span style="user-select: all">${studioId}</span>`);
@@ -1626,12 +1629,7 @@ async function inject() {
       }
 
       if (field === 'url') {
-        const a = document.createElement('a');
-        a.innerText = value;
-        a.href = value;
-        a.target = '_blank';
-        a.rel = 'nofollow noopener noreferrer';
-        dd.appendChild(a);
+        dd.appendChild(makeLink(value));
         return;
       }
 
@@ -1645,10 +1643,7 @@ async function inject() {
       // tags
 
       if (field === 'image') {
-        const imgLink = document.createElement('a');
-        imgLink.href = value;
-        imgLink.target = '_blank';
-        imgLink.rel = 'nofollow noopener noreferrer';
+        const imgLink = makeLink(value, '');
         imgLink.style.color = 'var(--teal)';
         dd.appendChild(imgLink);
         const onSuccess = (/** @type {Blob} **/ blob) => {
@@ -1670,10 +1665,8 @@ async function inject() {
           const fpElement = document.createElement('span');
           fpElement.innerText = `${fp.algorithm.toUpperCase()} ${fp.hash}`;
           if (fp.correct_scene_id) {
-            const correctSceneLink = document.createElement('a');
-            correctSceneLink.href = `/scenes/${fp.correct_scene_id}`;
+            const correctSceneLink = makeLink(`/scenes/${fp.correct_scene_id}`, 'correct scene');
             correctSceneLink.target = '_blank';
-            correctSceneLink.innerText = 'correct scene';
             correctSceneLink.style.color = 'var(--teal)';
             const correctSceneId = `<span style="user-select: all">${fp.correct_scene_id}</span>`;
             const correctSceneHTML = ` \u{22D9} ${correctSceneLink.outerHTML}: ${correctSceneId}`;
@@ -1688,15 +1681,9 @@ async function inject() {
         /** @type {string[]} */
         (value).forEach((comment, index) => {
           if (index > 0) dd.insertAdjacentHTML('beforeend', '<br>');
-          let commentElement;
-          if (/https?:/.test(comment)) {
-            commentElement = document.createElement('a');
-            commentElement.href = comment;
-            commentElement.target = '_blank';
-            commentElement.rel = 'nofollow noopener noreferrer';
+          const commentElement = /^https?:/.test(comment) ? makeLink(comment) : document.createElement('span');
+          if (commentElement instanceof HTMLAnchorElement) {
             commentElement.style.color = 'var(--teal)';
-          } else {
-            commentElement = document.createElement('span');
           }
           commentElement.innerText = comment;
           dd.appendChild(commentElement);
@@ -1764,13 +1751,11 @@ async function inject() {
       const toSplit = document.createElement('div');
       toSplit.classList.add('mb-1', 'p-1', 'font-weight-bold');
       toSplit.style.transition = 'background-color .5s';
-      toSplit.innerText = 'This performer is listed on ';
-      const a = document.createElement('a');
-      a.innerText = 'Performers To Split Up';
-      toSplit.append(a, document.createTextNode('.'));
-      a.href = 'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ/edit#gid=1067038397';
-      a.target = '_blank';
-      a.rel = 'nofollow noopener noreferrer';
+      const a = makeLink(
+        'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ/edit#gid=1067038397',
+        'Performers To Split Up'
+      );
+      toSplit.append(document.createTextNode('This performer is listed on '), a, document.createTextNode('.'));
       const emoji = document.createElement('span');
       emoji.classList.add('mr-1');
       emoji.innerText = '🔀';
@@ -1798,10 +1783,8 @@ async function inject() {
       /** @type {string[]} */
       (foundData.duplicates).forEach((dupId) => {
         hasDuplicates.insertAdjacentHTML('beforeend', '<br>');
-        const a = document.createElement('a');
-        a.href = `/performers/${dupId}`;
+        const a = makeLink(`/performers/${dupId}`, dupId);
         a.target = '_blank';
-        a.innerText = dupId;
         a.classList.add('font-weight-normal');
         a.style.color = 'var(--teal)';
         a.style.marginLeft = '1.75rem';
@@ -1821,10 +1804,8 @@ async function inject() {
       const duplicateOf = document.createElement('div');
       duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
       duplicateOf.innerText = 'This performer is a duplicate of: ';
-      const a = document.createElement('a');
-      a.href = `/performers/${foundData.duplicate_of}`;
+      const a = makeLink(`/performers/${foundData.duplicate_of}`, foundData.duplicate_of);
       a.target = '_blank';
-      a.innerText = foundData.duplicate_of;
       a.classList.add('font-weight-normal');
       a.style.color = 'var(--teal)';
       duplicateOf.insertAdjacentElement('beforeend', a);
