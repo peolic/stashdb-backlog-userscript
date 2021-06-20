@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    /* Visit https://aka.ms/tsconfig.json to read more about this file */
+
+    /* Basic Options */
+    "target": "ES2017",                       /* Specify ECMAScript target version: 'ES3' (default), 'ES5', 'ES2015', 'ES2016', 'ES2017', 'ES2018', 'ES2019', 'ES2020', or 'ESNEXT'. */
+    "allowJs": true,                          /* Allow javascript files to be compiled. */
+    "checkJs": true,                          /* Report errors in .js files. */
+    "declaration": false,                     /* Generates corresponding '.d.ts' file. */
+    "noEmit": true,                           /* Do not emit outputs. */
+
+    /* Strict Type-Checking Options */
+    "strict": true,                           /* Enable all strict type-checking options. */
+    "noImplicitAny": true,                    /* Raise error on expressions and declarations with an implied 'any' type. */
+    "strictNullChecks": false,                /* Enable strict null checks. */
+    "strictFunctionTypes": true,              /* Enable strict checking of function types. */
+    "strictBindCallApply": true,              /* Enable strict 'bind', 'call', and 'apply' methods on functions. */
+    // "strictPropertyInitialization": true,  /* Enable strict checking of property initialization in classes. */
+    "noImplicitThis": true,                   /* Raise error on 'this' expressions with an implied 'any' type. */
+
+    /* Additional Checks */
+    "noUnusedLocals": true,                   /* Report errors on unused locals. */
+    // "noUnusedParameters": true,            /* Report errors on unused parameters. */
+    "noImplicitReturns": true,                /* Report error when not all code paths in function return a value. */
+    "noFallthroughCasesInSwitch": true,       /* Report errors for fallthrough cases in switch statement. */
+
+    /* Advanced Options */
+    "skipLibCheck": true,                     /* Skip type checking of declaration files. */
+    "forceConsistentCasingInFileNames": true  /* Disallow inconsistently-cased references to the same file. */
+  }
+}

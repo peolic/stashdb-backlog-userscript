@@ -42,6 +42,7 @@ async function inject() {
   const parsePath = (inputUrl=undefined) => {
     const { pathname } = inputUrl ? new URL(inputUrl) : window.location;
 
+    /** @type {LocationData} */
     const result = {
       object: null,
       ident: null,
@@ -53,7 +54,8 @@ async function inject() {
     const match = urlRegex.exec(pathname);
     if (!match || match.length === 0) return result;
 
-    result.object = match[1] || null;
+    /** @type {PluralObject} */
+    result.object = (match[1]) || null;
     result.ident = match[2] || null;
     result.action = match[3] || null;
 
@@ -76,7 +78,7 @@ async function inject() {
 
   const wait = (/** @type {number} */ ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  const once = (/** @type {() => any} */ fn) => () => {
+  const once = (/** @type {(() => any) | null} */ fn) => () => {
     if (!fn) return;
     fn();
     fn = null;
@@ -86,7 +88,7 @@ async function inject() {
    * @param {string} selector
    * @param {number} [timeout] fail after, in milliseconds
    */
-   const elementReadyIn = (selector, timeout = undefined) => {
+  const elementReadyIn = (selector, timeout = undefined) => {
     const promises = [elementReady(selector)];
     if (timeout) promises.push(wait(timeout).then(() => null));
     return Promise.race(promises);
@@ -652,8 +654,8 @@ async function inject() {
         responseType: 'blob',
         anonymous: true,
         timeout: 10000,
-        onload: (response) => resolve(response),
-        onerror: (response) => reject(response),
+        onload: resolve,
+        onerror: reject,
       };
       //@ts-expect-error
       GM.xmlHttpRequest(details);
@@ -661,13 +663,7 @@ async function inject() {
 
     const ok = response.status >= 200 && response.status <= 299;
     if (!ok) {
-      class RequestError extends Error {
-        constructor(message, response) {
-          super(message);
-          this.response = response;
-        }
-      }
-      throw new RequestError(`HTTP ${response.status} ${response.statusText}`, response);
+      throw new Error(`HTTP ${response.status} ${response.statusText} GET ${url}`);
     }
 
     /** @type {Blob} */
@@ -1431,7 +1427,7 @@ async function inject() {
         const fpInfo = document.createElement('div');
         fpInfo.classList.add('float-right', 'my-2', 'd-flex', 'flex-column');
 
-        const makeElement = (...content) => {
+        const makeElement = (/** @type {string[]} */ ...content) => {
           const span = document.createElement('span');
           span.classList.add('d-flex', 'justify-content-between');
           content.forEach((c) => {
@@ -1922,13 +1918,13 @@ async function inject() {
   const eventLocationChange = new Event('locationchange');
 
   history.pushState = function() {
-    pushState.apply(history, arguments);
+    pushState.apply(history, /** @type {*} */ (arguments));
     window.dispatchEvent(eventPushState);
     window.dispatchEvent(eventLocationChange);
   }
 
   history.replaceState = function() {
-    replaceState.apply(history, arguments);
+    replaceState.apply(history, /** @type {*} */ (arguments));
     window.dispatchEvent(eventReplaceState);
     window.dispatchEvent(eventLocationChange);
   }
