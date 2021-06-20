@@ -133,9 +133,7 @@ async function inject() {
       }
 
       if (ident && !action) {
-        await iPerformerPage(ident);
-        await highlightSceneCards(object);
-        return;
+        return await iPerformerPage(ident);
       }
     }
 
@@ -1745,6 +1743,8 @@ async function inject() {
     const index = await getOrFetchDataIndex();
     if (!index) return;
 
+    highlightSceneCards('performers', index);
+
     const found = index.performers[performerId];
     if (!found) return;
 
@@ -1862,14 +1862,15 @@ async function inject() {
 
   /**
    * @param {PluralObject} [pluralObject]
+   * @param {DataIndex | null} [index]
    */
-  async function highlightSceneCards(pluralObject) {
+  async function highlightSceneCards(pluralObject, index) {
     if (!await elementReadyIn('.SceneCard > .card', 2000)) {
       console.debug('[backlog] no scene cards found, skipping');
       return;
     }
 
-    const index = await getOrFetchDataIndex();
+    if (index === undefined) index = await getOrFetchDataIndex();
     if (!index) return;
 
     const highlight = async () => {
