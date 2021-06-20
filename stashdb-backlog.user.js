@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.12
+// @version     1.19.13
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1114,6 +1114,10 @@ async function inject() {
       }
     }
 
+    if (found.performers || found.duration || found.director) {
+      document.querySelector('.scene-info .scene-performers').classList.add('my-auto');
+    }
+
     if (found.performers) {
       const remove = /** @type {PerformerEntry[]} */ (Array.from(found.performers.remove)); // shallow clone
       const append = /** @type {PerformerEntry[]} */ (Array.from(found.performers.append)); // shallow clone
@@ -1188,11 +1192,10 @@ async function inject() {
       };
 
       const highlight = (/** @type {HTMLElement} */ e, /** @type {string} */ v) => {
-        // e.classList.add(`bg-${v}`, 'p-1');
-
         e.style.border = `6px solid var(--${v})`;
         e.style.borderRadius = '6px';
-        e.style.padding = '.25rem';
+        e.style.padding = '.1rem .25rem';
+        e.classList.add('d-inline-block');
       };
 
       const scenePerformers = document.querySelector('.scene-info .scene-performers');
@@ -1311,17 +1314,17 @@ async function inject() {
       if (!duration) {
         duration = document.createElement('div');
         duration.innerHTML = `${escapeHTML('<MISSING>')} Duration: <b>${formattedDuration}</b>`;
-        duration.classList.add('bg-danger', 'p-1');
+        duration.classList.add('bg-danger', 'p-1', 'my-auto');
         duration.title = `Duration is missing; ${foundDuration} seconds`;
         document.querySelector('.scene-info .scene-performers').insertAdjacentElement('afterend', duration);
       } else {
         const currentDuration = duration.title.match(/(\d+)/)[1];
         if (found.duration === currentDuration) {
-          duration.classList.add('bg-warning', 'p-1');
+          duration.classList.add('bg-warning', 'p-1', 'my-auto');
           duration.insertAdjacentText('afterbegin', '<already correct> ');
           duration.title = `${makeAlreadyCorrectTitle('correct')}; ${foundDuration} seconds`;
         } else {
-          duration.classList.add('bg-primary', 'p-1');
+          duration.classList.add('bg-primary', 'p-1', 'my-auto');
           duration.insertAdjacentText('beforeend', ` \u{22D9} ${formattedDuration}`);
           duration.title = `<pending> Duration: ${formattedDuration}; ${foundDuration} seconds`;
         }
@@ -1335,16 +1338,16 @@ async function inject() {
         director = document.createElement('div');
         director.innerHTML = `${escapeHTML('<MISSING>')} Director: <b>${found.director}</b>`;
         director.title = '<MISSING> Director';
-        director.classList.add('ml-3', 'bg-danger', 'p-1');
+        director.classList.add('ml-3', 'bg-danger', 'p-1', 'my-auto');
         document.querySelector('.scene-info > .card-footer').insertAdjacentElement('beforeend', director);
       } else {
         const currentDirector = director.innerText.match(/^Director: (.+)$/)[1];
         if (found.director === currentDirector) {
-          director.classList.add('bg-warning', 'p-1');
+          director.classList.add('bg-warning', 'p-1', 'my-auto');
           director.insertAdjacentText('afterbegin', '<already correct> ');
           director.title = makeAlreadyCorrectTitle('correct');
         } else {
-          director.classList.add('bg-primary', 'p-1');
+          director.classList.add('bg-primary', 'p-1', 'my-auto');
           director.insertAdjacentText('beforeend', ` \u{22D9} ${found.director}`);
           director.title = `<pending> Director\n${found.director}`;
         }
