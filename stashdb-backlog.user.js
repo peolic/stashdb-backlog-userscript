@@ -722,6 +722,28 @@ async function inject() {
   }
 
   /**
+   * @param {HTMLImageElement} img
+   * @param {'left' | 'right'} position
+   * @returns {HTMLDivElement}
+   */
+  function makeImageResolution(img, position) {
+    const imgRes = document.createElement('div');
+    imgRes.classList.add('position-absolute', `m${position.charAt(0)}-2`, 'px-2', 'font-weight-bold');
+    imgRes.style[position] = '0';
+    imgRes.style.backgroundColor = '#2fb59c';
+    imgRes.style.transition = 'opacity .2s ease';
+
+    const setText = () => {
+      imgRes.innerText = `${img.naturalWidth} x ${img.naturalHeight}`;
+    };
+    if (img.complete && img.naturalHeight !== 0) setText();
+    else img.addEventListener('load', setText, { once: true });
+
+    img.addEventListener('mouseover', () => imgRes.style.opacity = '0');
+    img.addEventListener('mouseout', () => imgRes.style.opacity = '');
+    return imgRes;
+  }
+  /**
    * @typedef PerformerEntry
    * @property {string | null} id
    * @property {string} name
@@ -1012,19 +1034,11 @@ async function inject() {
             return;
           }
 
-          const cImgRes = document.createElement('div');
-          cImgRes.classList.add('position-absolute', 'ml-2', 'px-2', 'font-weight-bold');
-          cImgRes.style.left = '0';
-          cImgRes.style.backgroundColor = '#2fb59c';
-          cImgRes.style.transition = 'opacity .2s ease';
-          cImgRes.innerText = `${img.naturalWidth} x ${img.naturalHeight}`;
-          img.addEventListener('mouseover', () => cImgRes.style.opacity = '0');
-          img.addEventListener('mouseout', () => cImgRes.style.opacity = '');
-
           const currentImageContainer = document.createElement('div');
           currentImageContainer.style.borderRight = '.5rem solid var(--warning)';
           currentImageContainer.style.flex = '50%';
           img.style.width = '100%';
+          const cImgRes = makeImageResolution(img, 'left');
           currentImageContainer.append(cImgRes, img);
 
           imgContainer.appendChild(currentImageContainer);
@@ -1038,20 +1052,10 @@ async function inject() {
 
           imgNewLink.appendChild(imgNew);
 
-          const imgRes = document.createElement('div');
-          imgRes.classList.add('position-absolute', 'mr-2', 'px-2', 'font-weight-bold');
-          imgRes.style.right = '0';
-          imgRes.style.backgroundColor = '#2fb59c';
-          imgRes.style.transition = 'opacity .2s ease';
-          imgNew.addEventListener('load', () => {
-            imgRes.innerText = `${imgNew.naturalWidth} x ${imgNew.naturalHeight}`;
-          }, { once: true });
-          imgNew.addEventListener('mouseover', () => imgRes.style.opacity = '0');
-          imgNew.addEventListener('mouseout', () => imgRes.style.opacity = '');
-
           const newImageContainer = document.createElement('div');
           const isCurrentVertical = img.naturalHeight > img.naturalWidth;
           newImageContainer.style.flex = isCurrentVertical ? 'auto' : '50%';
+          const imgRes = makeImageResolution(imgNew, 'right');
           newImageContainer.append(imgRes, imgNewLink);
 
           imgContainer.appendChild(newImageContainer);
@@ -1071,17 +1075,7 @@ async function inject() {
         imgLink.rel = 'nofollow noopener noreferrer';
         imgLink.appendChild(img);
 
-        const imgRes = document.createElement('div');
-        imgRes.classList.add('position-absolute', 'mr-2', 'px-2', 'font-weight-bold');
-        imgRes.style.right = '0';
-        imgRes.style.backgroundColor = '#2fb59c';
-        imgRes.style.transition = 'opacity .2s ease';
-        img.addEventListener('load', () => {
-          imgRes.innerText = `${img.naturalWidth} x ${img.naturalHeight}`;
-        }, { once: true });
-
-        imgContainer.addEventListener('mouseover', () => imgRes.style.opacity = '0');
-        imgContainer.addEventListener('mouseout', () => imgRes.style.opacity = '');
+        const imgRes = makeImageResolution(img, 'right');
         imgContainer.insertAdjacentElement('afterbegin', imgRes);
 
         newImageBlob.then(
