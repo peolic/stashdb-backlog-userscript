@@ -16,6 +16,7 @@
 // ==/UserScript==
 
 //@ts-check
+/// <reference path="typings.d.ts" />
 
 const dev = false;
 
@@ -34,15 +35,6 @@ async function inject() {
     + String.raw`)?`
   );
 
-  /**
-   * @typedef {'scenes' | 'performers' | 'studios' | 'tags' | 'categories' | 'edits' | 'users' | 'search'} PluralObject
-   */
-  /**
-   * @typedef LocationData
-   * @property {PluralObject | null} object
-   * @property {string | null} ident
-   * @property {string | null} action
-   */
   /**
    * @param {string} [inputUrl]
    * @returns {LocationData}
@@ -219,15 +211,9 @@ async function inject() {
   }
 
   /**
-   * @typedef FetchError
-   * @property {boolean} error
-   * @property {number} status
-   * @property {string | null} body
-   */
-
-  /**
+   * @template {DataIndex | DataObject} T
    * @param {string} url
-   * @returns {Promise<DataIndex | DataObject | FetchError | null>}
+   * @returns {Promise<T | FetchError | null>}
    */
   async function fetchJSON(url) {
     try {
@@ -262,7 +248,7 @@ async function inject() {
   }
 
   /**
-   * @param {DataObject} storedObject
+   * @param {BaseCache} storedObject
    * @param {string | number | Date} diff new content hash or max time in hours
    * @returns {boolean}
    */
@@ -313,17 +299,6 @@ async function inject() {
     }
   }
 
-  /** @typedef {{ [uuid: string]: string[] }} ScenesIndex */
-  /** @typedef {{ [uuid: string]: string[] }} PerformersIndex */
-  /**
-   * @typedef DataIndex
-   * @property {ScenesIndex} scenes
-   * @property {PerformersIndex} performers
-   * @property {string} [lastUpdated]
-   */
-
-  /** @typedef {{ [field: string]: any } & { contentHash?: string, lastUpdated?: string }} DataObject */
-
   class Cache {
     static _DATA_INDEX_KEY = 'stashdb_backlog_index';
     static _DATA_KEY = 'stashdb_backlog';
@@ -366,9 +341,9 @@ async function inject() {
     }
 
     static async getStoredData() {
-      return /** @type {{ [uuid: string]: DataObject}} */ (await this._getValue(this._DATA_KEY));
+      return /** @type {DataCache} */ (await this._getValue(this._DATA_KEY));
     }
-    static async setData(/** @type {{ [uuid: string]: DataObject}} */ data) {
+    static async setData(/** @type {DataCache} */ data) {
       return await this._setValue(this._DATA_KEY, data);
     }
     static async clearData() {
@@ -378,7 +353,7 @@ async function inject() {
     /**
      * @param {SupportedObject} object
      * @param {string} uuid
-     * @param {{ [uuid: string]: DataObject}} [storedData]
+     * @param {DataCache} [storedData]
      * @returns {Promise<boolean>}
      */
     static async removeObjectData(object, uuid, storedData = undefined) {
@@ -402,7 +377,12 @@ async function inject() {
 
     // ===
 
-    static async _getValue(/** @type {string} */ key) {
+    /**
+     * @template T
+     * @param {string} key
+     * @returns {Promise<T>}
+     */
+    static async _getValue(key) {
       //@ts-expect-error
       let stored = await GM.getValue(key, {});
       // Legacy stored as JSON
@@ -410,15 +390,21 @@ async function inject() {
       if (!stored) {
         throw new Error(`[backlog] invalid data stored in ${key}`);
       }
-      return /** @type {Promise<{ [k: string]: any }>} */ (stored);
+      return stored;
     }
 
-    static async _setValue(/** @type {string} */ key, /** @type {{ [k: string]: any }} */ value) {
+    /**
+     * @template T
+     * @param {string} key
+     * @param {T} value
+     */
+    static async _setValue(key, value) {
       //@ts-expect-error
       return await GM.setValue(key, value);
     }
 
-    static async _deleteValue(/** @type {string} */ key) {
+    /** @param {string} key */
+    static async _deleteValue(key) {
       //@ts-expect-error
       return await GM.deleteValue(key);
     }
@@ -477,10 +463,7 @@ async function inject() {
 
   /**
    * Mutates `dataIndex`
-   * @param {DataIndex | {
-   *  scenes: { [uuid: string]: string },
-   *  performers: { [uuid: string]: string }
-   * }} dataIndex
+   * @param {MutationDataIndex} dataIndex
    */
   function applyDataIndexMigrations(dataIndex) {
     for (const key in dataIndex) {
@@ -497,9 +480,6 @@ async function inject() {
     }
   }
 
-  /** @typedef {'scene' | 'performer'} SupportedObject */
-  /** @typedef {'scenes' | 'performers'} SupportedPluralObject */
-
   /**
    * @param {SupportedObject} object
    * @param {string} uuid
@@ -514,11 +494,12 @@ async function inject() {
   const makeDataUrl = (object, uuid) => `${BASE_URL}/${object}s/${uuid.slice(0, 2)}/${uuid}.json`;
 
   /**
+   * @template {DataObject} T
    * @param {SupportedObject} object
    * @param {string} uuid
-   * @param {{ [uuid: string]: DataObject}} storedData
+   * @param {DataCache} storedData
    * @param {DataIndex} index
-   * @returns {Promise<DataObject | null>}
+   * @returns {Promise<T | null>}
    */
   const _fetchObject = async (object, uuid, storedData, index) => {
     const data = await fetchJSON(makeDataUrl(object, uuid));
@@ -545,7 +526,7 @@ async function inject() {
     const indexEntry = haystack[uuid];
 
     const action = storedData.lastUpdated ? 'updated' : 'fetched';
-    const dataObject = /** @type {DataObject} */ (data);
+    const dataObject = /** @type {T} */ (data);
     dataObject.contentHash = indexEntry[0];
     dataObject.lastUpdated = new Date().toISOString();
     storedData[makeObjectKey(object, uuid)] = dataObject;
@@ -566,10 +547,11 @@ async function inject() {
   };
 
   /**
-   * @param {SupportedObject} object
+   * @template {SupportedObject} T
+   * @param {T} object
    * @param {string} uuid
    * @param {DataIndex | null} [index]
-   * @returns {Promise<DataObject | null>}
+   * @returns {Promise<DataObjectMap[T] | null>}
    */
   async function getDataFor(object, uuid, index = undefined) {
     if (index === undefined) index = await getOrFetchDataIndex();
@@ -600,7 +582,7 @@ async function inject() {
     }
 
     console.debug(`[backlog] <${object} ${uuid}> using stored data`);
-    return storedData[key];
+    return /** @type {DataObjectMap[T]} */ (storedData[key]);
   }
 
   // ===
@@ -782,17 +764,6 @@ async function inject() {
     a.rel = 'nofollow noopener noreferrer';
     return a;
   }
-
-  /**
-   * @typedef PerformerEntry
-   * @property {string | null} id
-   * @property {string} name
-   * @property {string} [disambiguation]
-   * @property {string | null} appearance
-   * @property {string} [status] Only for remove/append
-   * @property {string} [status_url] Only for remove/append, with specific statuses
-   * @property {string | null} [old_appearance] Only for update
-   */
 
   // SVG is rendered huge if FontAwesome was tree-shaken in compilation?
   const svgStyleFix = [
@@ -1418,7 +1389,6 @@ async function inject() {
       // Parse current
       /** @type {HTMLTableRowElement[]} */
       const fingerprintsTableRows = (Array.from(document.querySelectorAll('.scene-fingerprints > table tr')));
-      /** @typedef {{ algorithm: number, hash: number, duration: number, submissions: number }} ColumnIndices */
       const headers =
         /** @type {HTMLTableCellElement[]} */
         (Array.from(fingerprintsTableRows[0].children))
@@ -1428,7 +1398,7 @@ async function inject() {
             else if (cell.innerText === 'Duration') r.duration = cellIndex;
             else if (cell.innerText === 'Submissions') r.submissions = cellIndex;
             return r;
-          }, /** @type {ColumnIndices} */ ({}));
+          }, /** @type {FingerprintsColumnIndices} */ ({}));
       const currentFingerprints = fingerprintsTableRows.slice(1).map((row) => {
         /** @type {HTMLTableCellElement[]} */
         const cells = (Array.from(row.children));
@@ -1442,7 +1412,6 @@ async function inject() {
       });
 
       // Compare
-      /** @type {{ algorithm: string, hash: string, correct_scene_id: string | null }[]} */
       const reportedFingerprints = found.fingerprints;
       const matches = reportedFingerprints.filter((fp) => {
         const cfp = currentFingerprints
