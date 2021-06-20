@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.11
+// @version     1.19.12
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -727,7 +727,8 @@ async function inject() {
    * @property {string} name
    * @property {string} [disambiguation]
    * @property {string | null} appearance
-   * @property {string | null} [status] Only for remove/append
+   * @property {string} [status] Only for remove/append
+   * @property {string} [status_url] Only for remove/append, with specific statuses
    * @property {string | null} [old_appearance] Only for update
    */
 
@@ -1166,6 +1167,24 @@ async function inject() {
         return pa;
       };
 
+      const setStatusUrl = (/** @type {PerformerEntry} */ entry, /** @type {HTMLAnchorElement} */ pa) => {
+        if (!entry.status_url) return;
+        let statusUrl;
+        try {
+          statusUrl = new URL(entry.status_url);
+        } catch (error) {
+          console.error(entry.status_url, error);
+        }
+        if (statusUrl && statusUrl.hostname === 'stashdb.org') {
+          pa.href = statusUrl.href.slice(statusUrl.origin.length);
+          return;
+        }
+        // external
+        pa.href = statusUrl ? statusUrl.href : entry.status_url;
+        pa.target = '_blank';
+        pa.rel = 'nofollow noopener noreferrer';
+      };
+
       const highlight = (/** @type {HTMLElement} */ e, /** @type {string} */ v) => {
         // e.classList.add(`bg-${v}`, 'p-1');
 
@@ -1256,6 +1275,7 @@ async function inject() {
           } else {
             pa.title += ' (missing performer ID)';
           }
+          setStatusUrl(entry, pa);
         }
         scenePerformers.appendChild(pa);
       });
