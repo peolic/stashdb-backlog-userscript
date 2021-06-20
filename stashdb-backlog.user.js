@@ -1806,7 +1806,8 @@ async function inject() {
    * @param {DataIndex | null} [index]
    */
   async function highlightSceneCards(pluralObject, index) {
-    if (!await elementReadyIn('.SceneCard > .card', 2000)) {
+    const selector = '.SceneCard > .card';
+    if (!await elementReadyIn(selector, 2000)) {
       console.debug('[backlog] no scene cards found, skipping');
       return;
     }
@@ -1816,7 +1817,7 @@ async function inject() {
 
     const highlight = async () => {
       /** @type {HTMLDivElement[]} */
-      (Array.from(document.querySelectorAll('.SceneCard > .card'))).forEach((card) => {
+      (Array.from(document.querySelectorAll(selector))).forEach((card) => {
         const sceneCard = /** @type {HTMLDivElement} */ (card.parentElement);
         const markerDataset = sceneCard.dataset;
         if (markerDataset.backlogInjected) return;
@@ -1839,14 +1840,15 @@ async function inject() {
       );
       new MutationObserver(async (mutations, observer) => {
         console.debug('[backlog] detected change in performers studios selector, re-highlighting scene cards');
-        if (!await elementReadyIn('.SceneCard > .card', 2000)) return;
+        if (!await elementReadyIn(selector, 2000)) return;
         await highlight();
       }).observe(studioSelectorValue, { childList: true, subtree: true });
     }
   }
 
   async function highlightPerformerCards() {
-    if (!await elementReadyIn('.PerformerCard', 2000)) {
+    const selector = '.PerformerCard';
+    if (!await elementReadyIn(selector, 2000)) {
       console.debug('[backlog] no performer cards found, skipping');
       return;
     }
@@ -1855,7 +1857,7 @@ async function inject() {
     if (!index) return;
 
     /** @type {HTMLDivElement[]} */
-    (Array.from(document.querySelectorAll('.PerformerCard'))).forEach((card) => {
+    (Array.from(document.querySelectorAll(selector))).forEach((card) => {
       const markerDataset = card.dataset;
       if (markerDataset.backlogInjected) return;
       else markerDataset.backlogInjected = 'true';
@@ -1870,7 +1872,8 @@ async function inject() {
   }
 
   async function highlightSearchResults() {
-    if (!await elementReadyIn('a.SearchPage-scene, a.SearchPage-performer', 2000)) {
+    const selector = 'a.SearchPage-scene, a.SearchPage-performer';
+    if (!await elementReadyIn(selector, 2000)) {
       console.debug('[backlog] no scene/performer search results found, skipping');
       return;
     }
@@ -1879,7 +1882,7 @@ async function inject() {
     if (!index) return;
 
     /** @type {HTMLAnchorElement[]} */
-    (Array.from(document.querySelectorAll('a.SearchPage-scene, a.SearchPage-performer'))).forEach((cardLink) => {
+    (Array.from(document.querySelectorAll(selector))).forEach((cardLink) => {
       const markerDataset = cardLink.dataset;
       if (markerDataset.backlogInjected) return;
       else markerDataset.backlogInjected = 'true';
