@@ -919,21 +919,21 @@ async function inject() {
         title.insertAdjacentElement('afterbegin', status);
       } else {
         title.title = `<pending> Title`;
+        title.style.fontSize = '1.25rem';
         // convert title text node to element
         const titleSpan = document.createElement('span');
         titleSpan.append(title.childNodes[0]);
         titleSpan.classList.add('bg-danger', 'p-1');
+        titleSpan.style.fontSize = '1rem';
         title.insertAdjacentElement('afterbegin', titleSpan);
 
         const arrow = document.createElement('span');
         arrow.classList.add('mx-2');
-        arrow.style.fontSize = '1.25rem';
         arrow.innerText = '\u{22D9}';
         titleSpan.insertAdjacentElement('afterend', arrow);
 
         const newTitle = document.createElement('span');
         newTitle.classList.add('bg-primary', 'p-1');
-        newTitle.style.fontSize = '1.25rem';
         newTitle.innerText = found.title;
         title.insertAdjacentElement('beforeend', newTitle);
       }
@@ -1539,6 +1539,7 @@ async function inject() {
       if (field === 'duration') {
         dd.innerText = found[field];
         dd.style.userSelect = 'all';
+        return;
       }
 
       if (field === 'performers') {
