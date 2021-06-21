@@ -174,6 +174,17 @@ async function inject() {
   }
 
   /**
+   * @template {HTMLElement} E
+   * @param {E} el
+   * @param {Partial<CSSStyleDeclaration>} styles
+   * @returns {E}
+   */
+  function setStyles(el, styles) {
+    Object.assign(el.style, styles);
+    return el;
+  }
+
+  /**
    * Format seconds as duration, adapted from stash-box
    * @param {number | null} [dur] seconds
    * @returns {string}
@@ -707,9 +718,7 @@ async function inject() {
   function makeImageResolution(img, position) {
     const imgRes = document.createElement('div');
     imgRes.classList.add('position-absolute', `m${position.charAt(0)}-2`, 'px-2', 'font-weight-bold');
-    imgRes.style[position] = '0';
-    imgRes.style.backgroundColor = '#2fb59c';
-    imgRes.style.transition = 'opacity .2s ease';
+    setStyles(imgRes, { [position]: '0', backgroundColor: '#2fb59c', transition: 'opacity .2s ease' });
 
     const setText = () => {
       imgRes.innerText = `${img.naturalWidth} x ${img.naturalHeight}`;
@@ -818,8 +827,7 @@ async function inject() {
       button.disabled = true;
       const result = await backlogRefetch();
       button.textContent = result ? '✔' : '❌';
-      button.style.backgroundColor = result ? 'yellow' : 'var(--gray-dark)';
-      button.style.fontWeight = '800';
+      setStyles(button, { backgroundColor: result ? 'yellow' : 'var(--gray-dark)', fontWeight: '800' });
       if (result) {
         setTimeout(() => {
           window.location.reload();
@@ -1031,8 +1039,7 @@ async function inject() {
           }
 
           const currentImageContainer = document.createElement('div');
-          currentImageContainer.style.borderRight = '.5rem solid var(--warning)';
-          currentImageContainer.style.flex = '50%';
+          setStyles(currentImageContainer, { borderRight: '.5rem solid var(--warning)', flex: '50%' });
           img.style.width = '100%';
           const cImgRes = makeImageResolution(img, 'left');
           currentImageContainer.append(cImgRes, img);
@@ -1043,8 +1050,7 @@ async function inject() {
 
           const imgNew = document.createElement('img');
           imgNew.src = URL.createObjectURL(await newImageBlob);
-          imgNew.style.width = '100%';
-          imgNew.style.height = 'auto';
+          setStyles(imgNew, { width: '100%', height: 'auto' });
 
           imgNewLink.appendChild(imgNew);
 
@@ -1159,9 +1165,7 @@ async function inject() {
       };
 
       const highlight = (/** @type {HTMLElement} */ e, /** @type {string} */ v) => {
-        e.style.border = `6px solid var(--${v})`;
-        e.style.borderRadius = '6px';
-        e.style.padding = '.1rem .25rem';
+        setStyles(e, { border: `6px solid var(--${v})`, borderRadius: '6px', padding: '.1rem .25rem' });
         e.classList.add('d-inline-block');
       };
 
@@ -1616,8 +1620,7 @@ async function inject() {
         dd.appendChild(imgLink);
         const onSuccess = (/** @type {Blob} **/ blob) => {
           const img = document.createElement('img');
-          img.style.maxHeight = '200px';
-          img.style.border = '2px solid var(--teal)';
+          setStyles(img, { maxHeight: '200px', border: '2px solid var(--teal)' });
           img.src = URL.createObjectURL(blob);
           imgLink.insertAdjacentElement('afterbegin', img);
         };
@@ -1752,8 +1755,7 @@ async function inject() {
         const a = makeLink(`/performers/${dupId}`, dupId);
         a.target = '_blank';
         a.classList.add('font-weight-normal');
-        a.style.color = 'var(--teal)';
-        a.style.marginLeft = '1.75rem';
+        setStyles(a, { color: 'var(--teal)', marginLeft: '1.75rem' });
         hasDuplicates.insertAdjacentElement('beforeend', a);
 
         if (isMarkedForSplit(dupId)) a.insertAdjacentText('afterend', ' 🔀 needs to be split up');
