@@ -39,7 +39,7 @@ async function inject() {
    * @param {string} [inputUrl]
    * @returns {LocationData}
    */
-  const parsePath = (inputUrl=undefined) => {
+  const parsePath = (inputUrl) => {
     const { pathname } = inputUrl ? new URL(inputUrl) : window.location;
 
     /** @type {LocationData} */
@@ -88,7 +88,7 @@ async function inject() {
    * @param {string} selector
    * @param {number} [timeout] fail after, in milliseconds
    */
-  const elementReadyIn = (selector, timeout = undefined) => {
+  const elementReadyIn = (selector, timeout) => {
     const promises = [elementReady(selector)];
     if (timeout) promises.push(wait(timeout).then(() => null));
     return Promise.race(promises);
@@ -332,7 +332,7 @@ async function inject() {
      * @param {DataIndex} [storedIndex]
      * @returns {Promise<boolean>}
      */
-    static async removeIndexEntry(object, uuid, storedIndex = undefined) {
+    static async removeIndexEntry(object, uuid, storedIndex) {
       if (!storedIndex) {
         try {
           storedIndex = await this.getStoredDataIndex();
@@ -369,7 +369,7 @@ async function inject() {
      * @param {DataCache} [storedData]
      * @returns {Promise<boolean>}
      */
-    static async removeObjectData(object, uuid, storedData = undefined) {
+    static async removeObjectData(object, uuid, storedData) {
       if (!storedData) {
         try {
           storedData = await this.getStoredData();
@@ -566,7 +566,7 @@ async function inject() {
    * @param {DataIndex | null} [index]
    * @returns {Promise<DataObjectMap[T] | null>}
    */
-  async function getDataFor(object, uuid, index = undefined) {
+  async function getDataFor(object, uuid, index) {
     if (index === undefined) index = await getOrFetchDataIndex();
     if (!index) throw new Error("[backlog] failed to get index");
 
