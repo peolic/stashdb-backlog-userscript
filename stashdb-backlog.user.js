@@ -1069,20 +1069,24 @@ async function inject() {
       } else {
         // missing image
         imgContainer.classList.add('bg-danger', 'p-2');
+        imgContainer.style.transition = 'min-height 1s ease';
         imgContainer.title = `<MISSING>\n${found.image}`;
 
         const imgLink = imgContainer.appendChild(makeLink(found.image, ''));
         imgLink.appendChild(img);
 
-        const imgRes = makeImageResolution(img, 'right');
-        imgContainer.insertAdjacentElement('afterbegin', imgRes);
-
+        const onFailure = () => {
+          setStyles(imgContainer, { minHeight: '0', textAlign: 'center', fontSize: '1.2em', fontWeight: '600' });
+          imgLink.insertAdjacentText('afterbegin', found.image);
+          img.classList.add('d-none');
+        };
         newImageBlob.then(
-          (blob) => img.src = URL.createObjectURL(blob),
-          () => {
-            imgLink.innerText = found.image;
-            img.remove();
-          }
+          (blob) => {
+            const imgRes = makeImageResolution(img, 'right');
+            imgContainer.insertAdjacentElement('afterbegin', imgRes);
+            img.src = URL.createObjectURL(blob);
+          },
+          onFailure
         );
       }
     }
