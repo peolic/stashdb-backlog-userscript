@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.14
+// @version     1.19.15
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -224,9 +224,9 @@ async function inject() {
   }
 
   /**
-   * @template {DataIndex | DataObject} T
+   * @template {BaseCache} T
    * @param {string} url
-   * @returns {Promise<T | FetchError | null>}
+   * @returns {Promise<Omit<T, keyof BaseCache> | FetchError | null>}
    */
   async function fetchJSON(url) {
     try {
@@ -653,9 +653,8 @@ async function inject() {
   // =====
 
   /**
-   * @param {string} url Image URL
+   * @param {string} url
    * @returns {Promise<Blob>}
-   * @throws {RequestError}
    */
    async function getImageBlob(url) {
     const response = await new Promise((resolve, reject) => {
@@ -683,7 +682,7 @@ async function inject() {
 
   /**
    * @param {Blob} blob
-   * @returns {Promise<string>} same image?
+   * @returns {Promise<string>}
    */
   async function blobAsDataURI(blob) {
     const reader = new FileReader();
@@ -779,6 +778,24 @@ async function inject() {
     return a;
   }
 
+  /**
+   * @template T
+   * @param {T} obj
+   * @param {string[]} keySortOrder
+   * @returns {Array<keyof T>}
+   */
+  const sortedKeys = (obj, keySortOrder) =>
+    /** @type {Array<keyof T>} */ (/** @type {unknown} */ (Object.keys(obj)
+      .sort((aKey, bKey) => {
+        const aPos = keySortOrder.indexOf(aKey);
+        const bPos = keySortOrder.indexOf(bKey);
+        if (bPos === -1) return -1;
+        else if (aPos === -1) return 1;
+        else if (aPos < bPos) return -1;
+        else if (aPos > bPos) return 1;
+        else return 0;
+      })));
+
   // SVG is rendered huge if FontAwesome was tree-shaken in compilation?
   const svgStyleFix = [
     'overflow: visible', // svg:not(:root).svg-inline--fa
@@ -809,7 +826,7 @@ async function inject() {
 
   /**
    * @param {DataObject | null} data
-   * @param {Element} target Checks `target` for existence of button
+   * @param {HTMLElement} target Checks `target` for existence of button
    * @returns {HTMLButtonElement | null}
    */
   const createFetchButton = (data, target) => {
@@ -870,7 +887,8 @@ async function inject() {
     const found = await getDataFor('scene', sceneId);
 
     if (isDev()) {
-      const sceneButtons = document.querySelector('.scene-info > .card-header > .float-right');
+      /** @type {HTMLDivElement} */
+      const sceneButtons = (document.querySelector('.scene-info > .card-header > .float-right'));
       const buttonRefetch = createFetchButton(found, sceneButtons);
       if (buttonRefetch) sceneButtons.appendChild(buttonRefetch);
     }
@@ -892,8 +910,7 @@ async function inject() {
       const comments = document.createElement('div');
       comments.classList.add('bg-info');
 
-      /** @type {string[]} */
-      (found.comments).forEach((comment, index) => {
+      found.comments.forEach((comment, index) => {
         if (index > 0) comments.insertAdjacentHTML('beforeend', '<br>');
         const commentElement = /^https?:/.test(comment) ? makeLink(comment) : document.createElement('span');
         commentElement.innerText = comment;
@@ -1102,9 +1119,9 @@ async function inject() {
     }
 
     if (found.performers) {
-      const remove = /** @type {PerformerEntry[]} */ (Array.from(found.performers.remove)); // shallow clone
-      const append = /** @type {PerformerEntry[]} */ (Array.from(found.performers.append)); // shallow clone
-      const update = /** @type {PerformerEntry[]} */ (Array.from(found.performers.update || [])); // shallow clone
+      const remove = Array.from(found.performers.remove); // shallow clone
+      const append = Array.from(found.performers.append); // shallow clone
+      const update = Array.from(found.performers.update || []); // shallow clone
 
       const removeFrom = (/** @type {PerformerEntry} */ entry, /** @type {PerformerEntry[]} */ from) => {
         const index = from.indexOf(entry);
@@ -1114,9 +1131,7 @@ async function inject() {
 
       const parsePerformerAppearance = (/** @type {HTMLAnchorElement} */ pa) => {
         const { ident: uuid } = parsePath(pa.href);
-        /** @type {HTMLElement[]} */
-        const nameElements = (Array.from(pa.children).slice(1));
-        /** @type {string[]} */
+        const nameElements = /** @type {HTMLElement[]} */ (Array.from(pa.children).slice(1));
         const nameParts = [nameElements.shift().textContent];
         const mainNameOrDsmbgEl = nameElements.shift();
         if (mainNameOrDsmbgEl) {
@@ -1149,8 +1164,7 @@ async function inject() {
 
         const { status, appearance, name, disambiguation } = entry;
         const namePart = c(name, !!appearance);
-        /** @type {(HTMLElement | Text)[]} */
-        const parts = [];
+        const parts = /** @type {Array<HTMLElement | Text>} */ ([]);
         if (status) parts.push(document.createTextNode(`[${entry.status}] `));
         if (appearance) parts.push(c(appearance));
         parts.push(namePart);
@@ -1422,8 +1436,7 @@ async function inject() {
       });
 
       // Compare
-      const reportedFingerprints = found.fingerprints;
-      const matches = reportedFingerprints.filter((fp) => {
+      const matches = found.fingerprints.filter((fp) => {
         const cfp = currentFingerprints
           .find(({ algorithm, hash }) => algorithm === fp.algorithm.toUpperCase() && hash === fp.hash);
         if (!cfp) return false;
@@ -1435,7 +1448,7 @@ async function inject() {
         }
         return true;
       }).length;
-      const notFound = reportedFingerprints.length - matches;
+      const notFound = found.fingerprints.length - matches;
 
       if (matches || notFound) {
         const fpInfo = document.createElement('div');
@@ -1508,24 +1521,6 @@ async function inject() {
     pendingChangesContainer.appendChild(pendingChanges);
 
     sceneFormRow.appendChild(pendingChangesContainer);
-
-    /**
-     * @template T
-     * @param {T} obj
-     * @param {string[]} keySortOrder
-     * @returns {Array<keyof T>}
-     */
-    const sortedKeys = (obj, keySortOrder) =>
-      /** @type {Array<keyof T>} */ (/** @type {unknown} */ (Object.keys(obj)
-        .sort((aKey, bKey) => {
-          const aPos = keySortOrder.indexOf(aKey);
-          const bPos = keySortOrder.indexOf(bKey);
-          if (bPos === -1) return -1;
-          else if (aPos === -1) return 1;
-          else if (aPos < bPos) return -1;
-          else if (aPos > bPos) return 1;
-          else return 0;
-        })));
 
     const keySortOrder = [
       'title', 'date', 'duration',
@@ -1760,8 +1755,7 @@ async function inject() {
       const hasDuplicates = document.createElement('div');
       hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
       hasDuplicates.innerHTML = 'This performer has duplicates:';
-      /** @type {string[]} */
-      (foundData.duplicates).forEach((dupId) => {
+      foundData.duplicates.forEach((dupId) => {
         hasDuplicates.insertAdjacentHTML('beforeend', '<br>');
         const a = makeLink(`/performers/${dupId}`, dupId);
         a.target = '_blank';
@@ -1902,8 +1896,7 @@ async function inject() {
 
       const { object: rawPluralObject, ident: uuid } = parsePath(cardLink.href);
       if (!['scenes', 'performers'].includes(rawPluralObject)) return;
-      /** @type {SupportedPluralObject} */
-      const pluralObject = (rawPluralObject);
+      const pluralObject = /** @type {SupportedPluralObject} */ (rawPluralObject);
 
       const found = index[pluralObject][uuid];
       if (!found) return;
