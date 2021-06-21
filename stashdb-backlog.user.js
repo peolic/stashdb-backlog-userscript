@@ -697,6 +697,17 @@ async function inject() {
 
   /**
    * @param {HTMLImageElement} img
+   * @returns {Promise<void>}
+   */
+  async function imageReady(img) {
+    if (img.complete && img.naturalHeight !== 0) return;
+    return new Promise((resolve) => {
+      img.addEventListener('load', () => resolve(), { once: true });
+    });
+  }
+
+  /**
+   * @param {HTMLImageElement} img
    * @param {Promise<Blob>} newImage
    * @returns {Promise<boolean | Error>} same image?
    */
@@ -720,11 +731,9 @@ async function inject() {
     imgRes.classList.add('position-absolute', `m${position.charAt(0)}-2`, 'px-2', 'font-weight-bold');
     setStyles(imgRes, { [position]: '0', backgroundColor: '#2fb59c', transition: 'opacity .2s ease' });
 
-    const setText = () => {
+    imageReady(img).then(() => {
       imgRes.innerText = `${img.naturalWidth} x ${img.naturalHeight}`;
-    };
-    if (img.complete && img.naturalHeight !== 0) setText();
-    else img.addEventListener('load', setText, { once: true });
+    });
 
     img.addEventListener('mouseover', () => imgRes.style.opacity = '0');
     img.addEventListener('mouseout', () => imgRes.style.opacity = '');
@@ -1011,7 +1020,7 @@ async function inject() {
       const newImageBlob = getImageBlob(found.image);
 
       if (img.getAttribute('src')) {
-        const handleExistingImage = async () => {
+        imageReady(img).then(async () => {
           const newImage = await compareImages(img, newImageBlob);
           imgContainer.classList.add('p-2');
 
@@ -1061,10 +1070,7 @@ async function inject() {
           newImageContainer.append(imgRes, imgNewLink);
 
           imgContainer.appendChild(newImageContainer);
-        };
-
-        if (img.complete && img.naturalHeight !== 0) handleExistingImage();
-        else img.addEventListener('load', handleExistingImage, { once: true });
+        });
 
       } else {
         // missing image
