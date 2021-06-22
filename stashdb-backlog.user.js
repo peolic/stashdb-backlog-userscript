@@ -1941,7 +1941,10 @@ async function inject() {
       if (!found) return;
       const changes = found.slice(1);
       card.style.outline = getHighlightStyle('performers', changes);
-      card.title = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
+      const info = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
+      card.title = info;
+      /** @type {HTMLImageElement} */
+      (card.querySelector('.PerformerCard-image > img')).title += `\n\n${info}`;
     });
   }
 
