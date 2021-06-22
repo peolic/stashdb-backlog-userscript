@@ -1,4 +1,4 @@
-type PluralObject =
+type AnyObject =
     | 'scenes'
     | 'performers'
     | 'studios'
@@ -9,7 +9,7 @@ type PluralObject =
     | 'search'
 
 interface LocationData {
-    object: PluralObject | null;
+    object: AnyObject | null;
     ident: string | null;
     action: string | null;
 }
@@ -25,12 +25,15 @@ interface BaseCache {
     lastUpdated?: string;
 }
 
-interface DataIndex extends Omit<BaseCache, 'contentHash'> {
+interface DataIndex extends Pick<BaseCache, 'lastUpdated'> {
     scenes: { [uuid: string]: string[]; };
     performers: { [uuid: string]: string[]; };
 }
 
-type SupportedPluralObject = keyof Omit<DataIndex, keyof BaseCache>
+type MutationDataIndex = {
+    scenes: { [uuid: string]: string };
+    performers: { [uuid: string]: string };
+}
 
 interface SceneDataObject extends BaseCache {
     title?: string;
@@ -60,22 +63,17 @@ interface PerformerDataObject extends BaseCache {
     duplicate_of: string;
 }
 
-type DataObjectMap = {
-    scene: SceneDataObject;
-    performer: PerformerDataObject;
-}
-
-type SupportedObject = keyof DataObjectMap
-
-type DataObject = DataObjectMap[SupportedObject]
-
 interface DataCache {
-    [cacheKey: string]: DataObject;
+    scenes: { [uuid: string]: SceneDataObject };
+    performers: { [uuid: string]: PerformerDataObject };
 }
 
-type MutationDataIndex = DataIndex | {
-    scenes: { [uuid: string]: string };
-    performers: { [uuid: string]: string };
+type SupportedObject = keyof Omit<DataIndex, keyof BaseCache> & keyof DataCache
+
+type DataObject = DataCache[SupportedObject][string]
+
+type MutationDataCache = {
+    [cacheKey: string]: DataObject;
 }
 
 interface PerformerEntry {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.15
+// @version     1.19.16
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -54,7 +54,7 @@ async function inject() {
     const match = urlRegex.exec(pathname);
     if (!match || match.length === 0) return result;
 
-    /** @type {PluralObject} */
+    /** @type {AnyObject} */
     result.object = (match[1]) || null;
     result.ident = match[2] || null;
     result.action = match[3] || null;
@@ -82,6 +82,14 @@ async function inject() {
     if (!fn) return;
     fn();
     fn = null;
+  };
+
+  /**
+   * @param {AnyObject | null} object
+   * @returns {object is SupportedObject}
+   */
+  const isSupportedObject = (object) => {
+    return !!object && ['scenes', 'performers'].includes(object);
   };
 
   /**
@@ -314,7 +322,9 @@ async function inject() {
 
   class Cache {
     static _DATA_INDEX_KEY = 'stashdb_backlog_index';
-    static _DATA_KEY = 'stashdb_backlog';
+    static _SCENES_DATA_KEY = 'stashdb_backlog_scenes';
+    static _PERFORMERS_DATA_KEY = 'stashdb_backlog_performers';
+    static _LEGACY_DATA_KEY = 'stashdb_backlog';
 
     static async getStoredDataIndex() {
       return /** @type {DataIndex} */ (await this._getValue(this._DATA_INDEX_KEY));
@@ -341,7 +351,7 @@ async function inject() {
         }
       }
 
-      const haystack = storedIndex[/** @type {SupportedPluralObject} */ (`${object}s`)];
+      const haystack = storedIndex[object];
 
       let removed = false;
       if (haystack[uuid] !== undefined) {
@@ -354,13 +364,24 @@ async function inject() {
     }
 
     static async getStoredData() {
-      return /** @type {DataCache} */ (await this._getValue(this._DATA_KEY));
+      const scenes = /** @type {DataCache['scenes']} */ (await this._getValue(this._SCENES_DATA_KEY));
+      const performers = /** @type {DataCache['performers']} */ (await this._getValue(this._PERFORMERS_DATA_KEY));
+      /** @type {DataCache} */
+      const dataCache = { scenes, performers };
+      if (Object.values(scenes).length === 0 && Object.values(performers).length === 0) {
+        const legacyCache = /** @type {MutationDataCache} */ (await this._getValue(this._LEGACY_DATA_KEY));
+        return await applyDataCacheMigrations(legacyCache);
+      }
+      return dataCache;
     }
     static async setData(/** @type {DataCache} */ data) {
-      return await this._setValue(this._DATA_KEY, data);
+      const { scenes, performers } = data;
+      this._setValue(this._SCENES_DATA_KEY, scenes);
+      this._setValue(this._PERFORMERS_DATA_KEY, performers);
     }
     static async clearData() {
-      return await this._deleteValue(this._DATA_KEY);
+      await this._deleteValue(this._SCENES_DATA_KEY);
+      await this._deleteValue(this._PERFORMERS_DATA_KEY);
     }
 
     /**
@@ -378,9 +399,9 @@ async function inject() {
         }
       }
 
-      const key = makeObjectKey(object, uuid);
-      if (storedData[key]) {
-        delete storedData[key];
+      const objectCache = storedData[object];
+      if (objectCache[uuid]) {
+        delete objectCache[uuid];
         await this.setData(storedData);
         return true;
       }
@@ -424,6 +445,52 @@ async function inject() {
   } // Cache
 
   /**
+   * @param {MutationDataCache} legacyCache
+   * @returns {Promise<DataCache>}
+   */
+  async function applyDataCacheMigrations(legacyCache) {
+    /** @type {DataCache} */
+    const dataCache = {
+      scenes: {},
+      performers: {},
+    };
+
+    // `scene/${uuid}` | `performer/${uuid}`
+    const allKeys = Object.keys(legacyCache);
+    const oldKeys = allKeys.filter((k) => k.includes('/'));
+    if (oldKeys.length === 0) {
+      if (allKeys.length === 0) return dataCache;
+      else throw new Error(`migration failed: invalid object`);
+    }
+
+    let seen = Object.keys(dataCache);
+    const log = (/** @type {string} */ object) => {
+      if (!seen.includes(object)) {
+        console.debug(`[backlog] data-cache migration: convert from '${object}/uuid' key format`);
+        seen.splice(seen.indexOf(object), 1);
+      }
+    };
+
+    for (const cacheKey of oldKeys) {
+      const [oldObject, uuid] = /** @type {['scene' | 'performer', string]} */ (cacheKey.split('/'));
+      log(oldObject);
+      const object = /** @type {SupportedObject} */ (`${oldObject}s`);
+      if (!(object in dataCache)) {
+        throw new Error(`migration failed: ${object} missing from new data cache object`);
+      }
+      dataCache[object][uuid] = legacyCache[cacheKey];
+    }
+
+    await Cache.setData(dataCache);
+
+    if (oldKeys.length > 0) {
+      await Cache._deleteValue(Cache._LEGACY_DATA_KEY);
+    }
+
+    return dataCache;
+  }
+
+  /**
    * @param {boolean} [forceFetch=false]
    * @returns {Promise<DataIndex | null>}
    */
@@ -461,7 +528,7 @@ async function inject() {
       }
       const dataIndex = /** @type {DataIndex} */ (data);
 
-      applyDataIndexMigrations(dataIndex);
+      await applyDataIndexMigrations(dataIndex);
 
       const action = storedDataIndex.lastUpdated ? 'updated' : 'fetched';
       dataIndex.lastUpdated = new Date().toISOString();
@@ -476,12 +543,13 @@ async function inject() {
 
   /**
    * Mutates `dataIndex`
-   * @param {MutationDataIndex} dataIndex
+   * @param {MutationDataIndex | DataIndex} dataIndex
+   * @returns {Promise<DataIndex>}
    */
-  function applyDataIndexMigrations(dataIndex) {
+  async function applyDataIndexMigrations(dataIndex) {
     for (const key in dataIndex) {
       if (key === 'lastUpdated') continue;
-      const thisIndex = dataIndex[/** @type {SupportedPluralObject} */ (key)];
+      const thisIndex = dataIndex[/** @type {SupportedObject} */ (key)];
       const log = once(() => console.debug(`[backlog] \`index.${key}\` migration: convert comma-separated to array`));
       for (const thisId in thisIndex) {
         let oldValue = thisIndex[thisId];
@@ -491,6 +559,10 @@ async function inject() {
         }
       }
     }
+
+    dataIndex = /** @type {DataIndex} */ (dataIndex);
+    await Cache.setDataIndex(dataIndex);
+    return dataIndex;
   }
 
   /**
@@ -498,13 +570,7 @@ async function inject() {
    * @param {string} uuid
    * @returns {string}
    */
-  const makeObjectKey = (object, uuid) => `${object}/${uuid}`;
-  /**
-   * @param {SupportedObject} object
-   * @param {string} uuid
-   * @returns {string}
-   */
-  const makeDataUrl = (object, uuid) => `${BASE_URL}/${object}s/${uuid.slice(0, 2)}/${uuid}.json`;
+  const makeDataUrl = (object, uuid) => `${BASE_URL}/${object}/${uuid.slice(0, 2)}/${uuid}.json`;
 
   /**
    * @template {DataObject} T
@@ -514,7 +580,7 @@ async function inject() {
    * @param {DataIndex} index
    * @returns {Promise<T | null>}
    */
-  const _fetchObject = async (object, uuid, storedData, index) => {
+  const _fetchObjectData = async (object, uuid, storedData, index) => {
     const data = await fetchJSON(makeDataUrl(object, uuid));
     if (data && 'error' in data && data.status === 404) {
       // remove from data index
@@ -535,14 +601,15 @@ async function inject() {
       return null;
     }
 
-    const haystack = index[/** @type {SupportedPluralObject} */ (`${object}s`)];
+    const haystack = index[object];
     const indexEntry = haystack[uuid];
 
-    const action = storedData.lastUpdated ? 'updated' : 'fetched';
+    const objectCache = storedData[object];
+    const action = objectCache[uuid] && objectCache[uuid].lastUpdated ? 'updated' : 'fetched';
     const dataObject = /** @type {T} */ (data);
     dataObject.contentHash = indexEntry[0];
     dataObject.lastUpdated = new Date().toISOString();
-    storedData[makeObjectKey(object, uuid)] = dataObject;
+    objectCache[uuid] = dataObject;
     await Cache.setData(storedData);
     console.debug(`[backlog] <${object} ${uuid}> data ${action}`);
 
@@ -561,16 +628,17 @@ async function inject() {
 
   /**
    * @template {SupportedObject} T
+   * @template {string} I
    * @param {T} object
-   * @param {string} uuid
+   * @param {I} uuid
    * @param {DataIndex | null} [index]
-   * @returns {Promise<DataObjectMap[T] | null>}
+   * @returns {Promise<DataCache[T][I] | null>}
    */
   async function getDataFor(object, uuid, index) {
     if (index === undefined) index = await getOrFetchDataIndex();
     if (!index) throw new Error("[backlog] failed to get index");
 
-    const haystack = index[/** @type {SupportedPluralObject} */ (`${object}s`)];
+    const haystack = index[object];
     if (haystack[uuid] === undefined) {
       // Clear outdated
       if (await Cache.removeObjectData(object, uuid)) {
@@ -583,19 +651,19 @@ async function inject() {
 
     const indexEntry = haystack[uuid];
     const contentHash = indexEntry[0];
-    const key = makeObjectKey(object, uuid);
+    const objectCache = storedData[object];
 
     // for performers, empty content hash = no file, usually
-    if (object === 'performer' && contentHash === '' && !storedData[key]) {
+    if (object === 'performers' && contentHash === '' && !objectCache[uuid]) {
       return null;
     }
 
-    if (shouldFetch(storedData[key], contentHash)) {
-      return await _fetchObject(object, uuid, storedData, index);
+    if (shouldFetch(objectCache[uuid], contentHash)) {
+      return await _fetchObjectData(object, uuid, storedData, index);
     }
 
     console.debug(`[backlog] <${object} ${uuid}> using stored data`);
-    return /** @type {DataObjectMap[T]} */ (storedData[key]);
+    return objectCache[uuid];
   }
 
   // ===
@@ -611,24 +679,21 @@ async function inject() {
   // ===
 
   async function backlogRefetch(global = globalThis) {
-    const { object: pluralObject, ident: uuid } = parsePath();
+    const { object, ident: uuid } = parsePath();
 
     const storedData = await Cache.getStoredData();
 
     const index = await getOrFetchDataIndex(true);
     if (!index) throw new Error("[backlog] failed to get index");
 
-    if (!pluralObject) return false;
+    if (!object) return false;
 
-    if (!['scenes', 'performers'].includes(pluralObject) || !uuid) {
-      global.console.warn(`[backlog] invalid request: <${pluralObject} ${uuid}>`);
+    if (!isSupportedObject(object) || !uuid) {
+      global.console.warn(`[backlog] invalid request: <${object} ${uuid}>`);
       return false;
     }
 
-    /** @type {SupportedObject} */
-    const object = (pluralObject.slice(0, -1));
-
-    const data = await _fetchObject(object, uuid, storedData, index);
+    const data = await _fetchObjectData(object, uuid, storedData, index);
     if (data === null) {
       global.console.warn(`[backlog] <${object} ${uuid}> failed to refetch`);
       return false;
@@ -645,7 +710,9 @@ async function inject() {
     const index = await Cache.getStoredDataIndex();
     global.console.info('index', index);
     const data = await Cache.getStoredData();
-    global.console.info('data', data);
+    global.console.info('scenes', data.performers);
+    global.console.info('performers', data.performers);
+    return { index, ...data };
   }
   //@ts-expect-error
   unsafeWindow.backlogCacheReport = exportFunction(() => backlogCacheReport(unsafeWindow), unsafeWindow);
@@ -884,7 +951,7 @@ async function inject() {
       markerDataset.backlogInjected = 'true';
     }
 
-    const found = await getDataFor('scene', sceneId);
+    const found = await getDataFor('scenes', sceneId);
 
     if (isDev()) {
       /** @type {HTMLDivElement} */
@@ -1493,7 +1560,7 @@ async function inject() {
       markerDataset.backlogInjected = 'true';
     }
 
-    const found = await getDataFor('scene', sceneId);
+    const found = await getDataFor('scenes', sceneId);
     if (!found) {
       console.debug('[backlog] not found', sceneId);
       return;
@@ -1739,7 +1806,7 @@ async function inject() {
       highlightElements.push(toSplit);
     }
 
-    const foundData = await getDataFor('performer', performerId, index);
+    const foundData = await getDataFor('performers', performerId, index);
     if (!foundData) {
       console.debug('[backlog] not found', performerId);
       return;
@@ -1796,23 +1863,23 @@ async function inject() {
   // =====
 
   /**
-   * @param {PluralObject} pluralObject
+   * @param {AnyObject} object
    * @param {string[]} changes
    * @returns {string}
    */
-  const getHighlightStyle = (pluralObject, changes) => {
+  const getHighlightStyle = (object, changes) => {
     let color = 'var(--yellow)';
-    if (pluralObject === 'scenes' && changes.length === 1 && changes[0] === 'fingerprints') {
+    if (object === 'scenes' && changes.length === 1 && changes[0] === 'fingerprints') {
       color = 'var(--cyan)';
     }
     return `0.4rem solid ${color}`;
   }
 
   /**
-   * @param {PluralObject} [pluralObject]
+   * @param {AnyObject} [object]
    * @param {DataIndex | null} [index]
    */
-  async function highlightSceneCards(pluralObject, index) {
+  async function highlightSceneCards(object, index) {
     const selector = '.SceneCard > .card';
     if (!await elementReadyIn(selector, 2000)) {
       console.debug('[backlog] no scene cards found, skipping');
@@ -1841,7 +1908,7 @@ async function inject() {
 
     highlight();
 
-    if (pluralObject === 'performers') {
+    if (object === 'performers') {
       const studioSelectorValue = document.querySelector(
         '.PerformerScenes > .CheckboxSelect > .react-select__control > .react-select__value-container'
       );
@@ -1894,20 +1961,19 @@ async function inject() {
       if (markerDataset.backlogInjected) return;
       else markerDataset.backlogInjected = 'true';
 
-      const { object: rawPluralObject, ident: uuid } = parsePath(cardLink.href);
-      if (!['scenes', 'performers'].includes(rawPluralObject)) return;
-      const pluralObject = /** @type {SupportedPluralObject} */ (rawPluralObject);
+      const { object, ident: uuid } = parsePath(cardLink.href);
+      if (!isSupportedObject(object)) return;
 
-      const found = index[pluralObject][uuid];
+      const found = index[object][uuid];
       if (!found) return;
       const changes = found.slice(1);
 
       if (changes) {
         const card = /** @type {HTMLDivElement} */ (cardLink.querySelector(':scope > .card'));
-        card.style.outline = getHighlightStyle(pluralObject, changes);
-        if (pluralObject === 'scenes') {
+        card.style.outline = getHighlightStyle(object, changes);
+        if (object === 'scenes') {
           cardLink.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
-        } else if (pluralObject === 'performers') {
+        } else if (object === 'performers') {
           cardLink.title = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
         }
       }
