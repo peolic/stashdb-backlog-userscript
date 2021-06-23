@@ -1000,7 +1000,7 @@ async function inject() {
         status.classList.add('mr-2');
         status.style.fontSize = '1.25rem';
         status.innerText = '<MISSING> \u{22D9}';
-        title.insertAdjacentElement('afterbegin', status);
+        title.prepend(status);
       } else if (currentTitle === found.title) {
         title.classList.add('bg-warning', 'p-1');
         title.title = makeAlreadyCorrectTitle('correct', 'Title');
@@ -1009,7 +1009,7 @@ async function inject() {
         status.classList.add('mr-2');
         status.style.fontSize = '1.25rem';
         status.innerText = '<already correct> \u{22D9}';
-        title.insertAdjacentElement('afterbegin', status);
+        title.prepend(status);
       } else {
         title.title = `<pending> Title`;
         title.style.fontSize = '1.25rem';
@@ -1018,7 +1018,7 @@ async function inject() {
         titleSpan.append(title.childNodes[0]);
         titleSpan.classList.add('bg-danger', 'p-1');
         titleSpan.style.fontSize = '1rem';
-        title.insertAdjacentElement('afterbegin', titleSpan);
+        title.prepend(titleSpan);
 
         const arrow = document.createElement('span');
         arrow.classList.add('mx-2');
@@ -1167,13 +1167,13 @@ async function inject() {
 
         const onFailure = () => {
           setStyles(imgContainer, { minHeight: '0', textAlign: 'center', fontSize: '1.2em', fontWeight: '600' });
-          imgLink.insertAdjacentText('afterbegin', found.image);
+          imgLink.prepend(found.image);
           img.classList.add('d-none');
         };
         newImageBlob.then(
           (blob) => {
             const imgRes = makeImageResolution(img, 'right');
-            imgContainer.insertAdjacentElement('afterbegin', imgRes);
+            imgContainer.prepend(imgRes);
             img.src = URL.createObjectURL(blob);
           },
           onFailure
@@ -1275,7 +1275,7 @@ async function inject() {
         if (toRemove) {
           highlight(performer, 'danger');
           if (toRemove.status) {
-            performer.children[1].insertAdjacentText('afterbegin', `[${toRemove.status}] `);
+            performer.children[1].prepend(`[${toRemove.status}] `);
             performer.title = `<pending>\n${toRemove.status}`;
             performer.style.color = 'var(--yellow)';
             if (toRemove.status == 'edit') {
@@ -1387,7 +1387,7 @@ async function inject() {
         const currentDuration = duration.title.match(/(\d+)/)[1];
         if (found.duration === currentDuration) {
           duration.classList.add('bg-warning', 'p-1', 'my-auto');
-          duration.insertAdjacentText('afterbegin', '<already correct> ');
+          duration.prepend('<already correct> ');
           duration.title = `${makeAlreadyCorrectTitle('correct')}; ${foundDuration} seconds`;
         } else {
           duration.classList.add('bg-primary', 'p-1', 'my-auto');
@@ -1410,7 +1410,7 @@ async function inject() {
         const currentDirector = director.innerText.match(/^Director: (.+)$/)[1];
         if (found.director === currentDirector) {
           director.classList.add('bg-warning', 'p-1', 'my-auto');
-          director.insertAdjacentText('afterbegin', '<already correct> ');
+          director.prepend('<already correct> ');
           director.title = makeAlreadyCorrectTitle('correct');
         } else {
           director.classList.add('bg-primary', 'p-1', 'my-auto');
@@ -1772,7 +1772,7 @@ async function inject() {
           const img = document.createElement('img');
           setStyles(img, { maxHeight: '200px', border: '2px solid var(--teal)' });
           img.src = URL.createObjectURL(blob);
-          imgLink.insertAdjacentElement('afterbegin', img);
+          imgLink.prepend(img);
         };
         const onFailure = () => imgLink.innerText = image;
         getImageBlob(image).then(onSuccess, onFailure);
@@ -1878,8 +1878,8 @@ async function inject() {
       const emoji = document.createElement('span');
       emoji.classList.add('mr-1');
       emoji.innerText = '🔀';
-      toSplit.insertAdjacentElement('afterbegin', emoji);
-      performerInfo.insertAdjacentElement('afterbegin', toSplit);
+      toSplit.prepend(emoji);
+      performerInfo.prepend(toSplit);
       highlightElements.push(toSplit);
     }
 
@@ -1912,8 +1912,8 @@ async function inject() {
       const emoji = document.createElement('span');
       emoji.classList.add('mr-1');
       emoji.innerText = '♊';
-      hasDuplicates.insertAdjacentElement('afterbegin', emoji);
-      performerInfo.insertAdjacentElement('afterbegin', hasDuplicates);
+      hasDuplicates.prepend(emoji);
+      performerInfo.prepend(hasDuplicates);
       highlightElements.push(hasDuplicates);
     }
 
@@ -1930,8 +1930,8 @@ async function inject() {
       const emoji = document.createElement('span');
       emoji.classList.add('mr-1');
       emoji.innerText = '♊';
-      duplicateOf.insertAdjacentElement('afterbegin', emoji);
-      performerInfo.insertAdjacentElement('afterbegin', duplicateOf);
+      duplicateOf.prepend(emoji);
+      performerInfo.prepend(duplicateOf);
       highlightElements.push(duplicateOf);
     }
 
