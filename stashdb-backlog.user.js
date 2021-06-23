@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.17
+// @version     1.19.18
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1593,6 +1593,40 @@ async function inject() {
 
     sceneFormRow.appendChild(pendingChangesContainer);
 
+    /**
+     * @param {string} text
+     * @returns {HTMLSpanElement}
+     */
+    const createSelectAllSpan = (text) => {
+      const span = document.createElement('span');
+      span.innerText = text;
+      span.style.userSelect = 'all';
+      return span;
+    };
+
+    /**
+     * @param {HTMLElement} field
+     * @param {string} fieldName
+     * @param {string} value
+     */
+    const settableField = (field, fieldName, value) => {
+      /** @type {HTMLInputElement} */
+      const fieldEl = sceneFormCol.querySelector(`*[name="${fieldName}"]`);
+      if (!fieldEl) {
+        console.error(`form field with name="${fieldName}" not found`);
+        return;
+      }
+      const set = document.createElement('a');
+      set.innerText = 'set field';
+      setStyles(set, { marginLeft: '.5rem', color: 'var(--yellow)', cursor: 'pointer' });
+      set.addEventListener('click', () => {
+        fieldEl.value = value;
+        fieldEl.dispatchEvent(new Event('input'));
+      });
+      field.innerText += ':';
+      field.append(set);
+    };
+
     const keySortOrder = [
       'title', 'date', 'duration',
       'performers', 'studio', 'url',
@@ -1609,12 +1643,27 @@ async function inject() {
       const dd = document.createElement('dd');
       pendingChanges.appendChild(dd);
 
-      // title
-      // date
+      if (field === 'title') {
+        const title = found[field];
+        dd.innerText = title;
+        dd.style.userSelect = 'all';
+        settableField(dt, field, title);
+        return;
+      }
+
+      if (field === 'date') {
+        const date = found[field];
+        dd.innerText = date;
+        dd.style.userSelect = 'all';
+        settableField(dt, field, date);
+        return;
+      }
 
       if (field === 'duration') {
-        dd.innerText = found[field];
+        const duration = found[field];
+        dd.innerText = duration;
         dd.style.userSelect = 'all';
+        settableField(dt, field, duration);
         return;
       }
 
@@ -1634,24 +1683,38 @@ async function inject() {
 
             const disambiguation = entry.disambiguation ? ` (${entry.disambiguation})` : '';
             let name = entry.name + disambiguation;
-            if (entry.appearance) name += ` (as ${entry.appearance})`;
+            const appearance = entry.appearance ? ` (as ${entry.appearance})` : '';
 
             const info = document.createElement('span');
             info.style.flex = '1';
 
             if (!entry.id) {
-              info.innerText = `<${entry.status}> ${name}`;
-            } else {
+              info.innerText = `<${entry.status}> ${name + appearance}`;
+            } else if (action === 'update') {
               const a = makeLink(`/performers/${entry.id}`, name);
+              a.target = '_blank';
+              a.style.color = 'var(--teal)';
+              /** @type {Array<HTMLElement | string>} */
+              const nodes = [
+                a,
+                document.createElement('br'),
+                `from "${entry.old_appearance || ''}"`,
+                document.createElement('br'),
+                'to "', createSelectAllSpan(entry.appearance || ''), '"',
+              ];
+              if (entry.status) {
+                nodes.unshift(`<${entry.status}> `);
+              }
+              info.append(...nodes);
+            } else {
+              const a = makeLink(`/performers/${entry.id}`, name + appearance);
               a.target = '_blank';
               a.style.color = 'var(--teal)';
               info.appendChild(a);
               if (action === 'append') {
-                a.insertAdjacentHTML('afterend', `<br><span style="user-select: all">${entry.id}</span>`);
-              }
-              if (action === 'update' && entry.old_appearance) {
-                const previous = `${entry.name} (as ${entry.old_appearance}) \u{22D9} `;
-                a.insertAdjacentText('beforebegin', previous);
+                const uuid = createSelectAllSpan(entry.id);
+                uuid.style.fontSize = '.9rem';
+                info.append(document.createElement('br'), uuid);
               }
               if (entry.status) {
                 a.insertAdjacentText('beforebegin', `<${entry.status}> `);
@@ -1671,23 +1734,33 @@ async function inject() {
         const a = makeLink(`/studios/${studioId}`, studioName);
         a.target = '_blank';
         a.style.color = 'var(--teal)';
-        dd.appendChild(a);
-        a.insertAdjacentHTML('afterend', `<br><span style="user-select: all">${studioId}</span>`);
+        dd.append(a, document.createElement('br'), createSelectAllSpan(studioId));
         return;
       }
 
       if (field === 'url') {
-        dd.appendChild(makeLink(found[field]));
+        const url = found[field];
+        dd.appendChild(makeLink(url));
+        settableField(dt, 'studioURL', url);
         return;
       }
 
       if (field === 'details') {
-        dd.innerText = found[field];
-        dd.style.whiteSpace = 'pre-line';
+        const details = found[field];
+        dd.innerText = details;
+        setStyles(dd, { whiteSpace: 'pre-line', userSelect: 'all' });
+        settableField(dt, field, details);
         return;
       }
 
-      // director
+      if (field === 'director') {
+        const director = found[field];
+        dd.innerText = director;
+        dd.style.userSelect = 'all';
+        settableField(dt, field, director);
+        return;
+      }
+
       // tags
 
       if (field === 'image') {
@@ -1710,14 +1783,14 @@ async function inject() {
         found[field].forEach((fp, index) => {
           if (index > 0) dd.insertAdjacentHTML('beforeend', '<br>');
           const fpElement = document.createElement('span');
-          fpElement.innerText = `${fp.algorithm.toUpperCase()} ${fp.hash}`;
+          const fpHash = createSelectAllSpan(fp.hash);
+          fpHash.style.marginLeft = '.5rem';
+          fpElement.append(fp.algorithm.toUpperCase(), fpHash);
           if (fp.correct_scene_id) {
             const correctSceneLink = makeLink(`/scenes/${fp.correct_scene_id}`, 'correct scene');
             correctSceneLink.target = '_blank';
             correctSceneLink.style.color = 'var(--teal)';
-            const correctSceneId = `<span style="user-select: all">${fp.correct_scene_id}</span>`;
-            const correctSceneHTML = ` \u{22D9} ${correctSceneLink.outerHTML}: ${correctSceneId}`;
-            fpElement.insertAdjacentHTML('beforeend', correctSceneHTML);
+            fpElement.append(' \u{22D9} ', correctSceneLink, ': ', createSelectAllSpan(fp.correct_scene_id));
           }
           dd.appendChild(fpElement);
         });
