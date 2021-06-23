@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.18
+// @version     1.19.19
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1686,7 +1686,7 @@ async function inject() {
             const appearance = entry.appearance ? ` (as ${entry.appearance})` : '';
 
             const info = document.createElement('span');
-            info.style.flex = '1';
+            setStyles(info, { flex: '1', whiteSpace: 'pre-wrap' });
 
             if (!entry.id) {
               info.innerText = `<${entry.status}> ${name + appearance}`;
