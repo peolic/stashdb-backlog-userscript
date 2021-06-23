@@ -1065,7 +1065,7 @@ async function inject() {
       const dateNode = Array.from(studio_date.childNodes).slice(-1)[0];
       const separator = studio_date.querySelector('span.mx-1');
 
-      const alreadyCorrectDate = found.date === dateNode.nodeValue.trim();
+      const alreadyCorrectDate = found.date === dateNode.nodeValue;
 
       // convert date text node to element
       const dateElement = document.createElement('span');
