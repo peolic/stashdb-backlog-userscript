@@ -1231,8 +1231,8 @@ async function inject() {
 
         const { status, appearance, name, disambiguation } = entry;
         const namePart = c(name, !!appearance);
-        const parts = /** @type {Array<HTMLElement | Text>} */ ([]);
-        if (status) parts.push(document.createTextNode(`[${entry.status}] `));
+        const parts = /** @type {Array<HTMLElement | string>} */ ([]);
+        if (status) parts.push(`[${entry.status}] `);
         if (appearance) parts.push(c(appearance));
         parts.push(namePart);
         if (disambiguation) {
@@ -1801,7 +1801,7 @@ async function inject() {
         'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ/edit#gid=1067038397',
         'Performers To Split Up'
       );
-      toSplit.append(document.createTextNode('This performer is listed on '), a, document.createTextNode('.'));
+      toSplit.append('This performer is listed on ', a, '.');
       const emoji = document.createElement('span');
       emoji.classList.add('mr-1');
       emoji.innerText = '🔀';
