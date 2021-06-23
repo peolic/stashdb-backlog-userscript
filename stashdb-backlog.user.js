@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.16
+// @version     1.19.17
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1269,7 +1269,7 @@ async function inject() {
       existingPerformers.forEach((performer) => {
         const { uuid, fullName } = parsePerformerAppearance(performer);
         const toRemove = remove.find((e) => e.id ? e.id === uuid : formatName(e) === fullName);
-        const toAppend = append.find((e) => e.id === uuid);
+        const toAppend = append.find((e) => e.id ? e.id === uuid : formatName(e) === fullName);
         const toUpdate = update.find((e) => e.id === uuid);
 
         if (toRemove) {
@@ -1305,6 +1305,10 @@ async function inject() {
           if (fullName === entryFullName) {
             highlight(performer, 'warning');
             performer.title = makeAlreadyCorrectTitle('added');
+            if (!toAppend.id) {
+              performer.title += '\n[missing ID - matched by name]';
+              performer.style.color = 'var(--yellow)';
+            }
           } else {
             highlight(performer, 'primary');
             performer.title = `<already added>\nbut needs an update to\n${entryFullName}`;
