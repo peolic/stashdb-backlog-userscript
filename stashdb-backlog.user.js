@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.19
+// @version     1.19.20
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -19,6 +19,8 @@
 /// <reference path="typings.d.ts" />
 
 const dev = false;
+
+const eventPrefix = 'stashdb_backlog';
 
 async function inject() {
   const BASE_URL =
@@ -155,7 +157,7 @@ async function inject() {
 
   let dispatchEnabled = true;
 
-  window.addEventListener('locationchange', () => {
+  window.addEventListener(`${eventPrefix}_locationchange`, () => {
     if (dispatchEnabled) {
       console.debug('[backlog] location change detected, executing');
       dispatcher();
@@ -1541,7 +1543,7 @@ async function inject() {
         if (notFound) fpInfo.appendChild(makeElement('Missing reported fingerprints:', `${notFound} ⚠`));
         document.querySelector('nav[role="tablist"]').insertAdjacentElement('beforebegin', fpInfo);
         // Hook to remove it
-        window.addEventListener('locationchange', () => fpInfo.remove(), { once: true });
+        window.addEventListener(`${eventPrefix}_locationchange`, () => fpInfo.remove(), { once: true });
       }
     }
 
@@ -1574,7 +1576,7 @@ async function inject() {
     const StashDBContent = /** @type {HTMLDivElement} */ (document.querySelector('.StashDBContent'));
     StashDBContent.style.maxWidth = '1600px';
     // Hook to the global style
-    window.addEventListener('locationchange', () => {
+    window.addEventListener(`${eventPrefix}_locationchange`, () => {
       StashDBContent.style.maxWidth = '';
       if (StashDBContent.getAttribute('style') === '') StashDBContent.removeAttribute('style');
     }, { once: true });
@@ -2066,9 +2068,9 @@ async function inject() {
 (function() {
   const { pushState, replaceState } = history;
 
-  const eventPushState = new Event('pushstate');
-  const eventReplaceState = new Event('replacestate');
-  const eventLocationChange = new Event('locationchange');
+  const eventPushState = new Event(`${eventPrefix}_pushstate`);
+  const eventReplaceState = new Event(`${eventPrefix}_replacestate`);
+  const eventLocationChange = new Event(`${eventPrefix}_locationchange`);
 
   history.pushState = function() {
     pushState.apply(history, /** @type {*} */ (arguments));
