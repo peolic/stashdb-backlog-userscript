@@ -1030,7 +1030,7 @@ async function inject() {
         const newTitle = document.createElement('span');
         newTitle.classList.add('bg-primary', 'p-1');
         newTitle.innerText = found.title;
-        title.insertAdjacentElement('beforeend', newTitle);
+        title.append(newTitle);
       }
     }
 
@@ -1407,7 +1407,7 @@ async function inject() {
         director.innerHTML = `${escapeHTML('<MISSING>')} Director: <b>${found.director}</b>`;
         director.title = '<MISSING> Director';
         director.classList.add('ml-3', 'bg-danger', 'p-1', 'my-auto');
-        document.querySelector('.scene-info > .card-footer').insertAdjacentElement('beforeend', director);
+        document.querySelector('.scene-info > .card-footer').append(director);
       } else {
         const currentDirector = director.innerText.match(/^Director: (.+)$/)[1];
         if (found.director === currentDirector) {
@@ -1907,7 +1907,7 @@ async function inject() {
         a.target = '_blank';
         a.classList.add('font-weight-normal');
         setStyles(a, { color: 'var(--teal)', marginLeft: '1.75rem' });
-        hasDuplicates.insertAdjacentElement('beforeend', a);
+        hasDuplicates.append(a);
 
         if (isMarkedForSplit(dupId)) a.insertAdjacentText('afterend', ' 🔀 needs to be split up');
       });
@@ -1927,7 +1927,7 @@ async function inject() {
       a.target = '_blank';
       a.classList.add('font-weight-normal');
       a.style.color = 'var(--teal)';
-      duplicateOf.insertAdjacentElement('beforeend', a);
+      duplicateOf.append(a);
       if (isMarkedForSplit(foundData.duplicate_of)) a.insertAdjacentText('afterend', ' 🔀 needs to be split up');
       const emoji = document.createElement('span');
       emoji.classList.add('mr-1');
