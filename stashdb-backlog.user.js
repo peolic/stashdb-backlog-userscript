@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.20
+// @version     1.19.21
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -957,7 +957,7 @@ async function inject() {
 
     if (isDev()) {
       /** @type {HTMLDivElement} */
-      const sceneButtons = (document.querySelector('.scene-info > .card-header > .float-right'));
+      const sceneButtons = (sceneInfo.querySelector(':scope > .card-header > .float-right'));
       const buttonRefetch = createFetchButton(found, sceneButtons);
       if (buttonRefetch) sceneButtons.appendChild(buttonRefetch);
     }
@@ -971,6 +971,13 @@ async function inject() {
     const sceneHeader = /** @type {HTMLDivElement} */ (sceneInfo.querySelector(':scope > .card-header'));
     sceneHeader.style.borderTop = '1rem solid var(--warning)';
     sceneHeader.title = 'pending changes (backlog)';
+
+    const sceneFooter = /** @type {HTMLDivElement} */ (sceneInfo.querySelector(':scope > .card-footer'));
+    if (found.performers || found.duration || found.director) {
+      for (const el of sceneFooter.querySelectorAll(':scope > *')) {
+        el.classList.add('my-auto');
+      }
+    }
 
     const makeAlreadyCorrectTitle = (/** @type {string} */ status='correct', /** @type {string} */ field='') =>
       `<already ${status}>${field ? ` ${field}`: ''}\nshould mark the entry on the backlog sheet as completed`;
@@ -1183,10 +1190,6 @@ async function inject() {
       }
     }
 
-    if (found.performers || found.duration || found.director) {
-      document.querySelector('.scene-info .scene-performers').classList.add('my-auto');
-    }
-
     if (found.performers) {
       const remove = Array.from(found.performers.remove); // shallow clone
       const append = Array.from(found.performers.append); // shallow clone
@@ -1262,11 +1265,9 @@ async function inject() {
         e.classList.add('d-inline-block');
       };
 
-      const scenePerformers = document.querySelector('.scene-info .scene-performers');
-      const existingPerformers = (
-        /** @type {HTMLAnchorElement[]} */
-        (Array.from(scenePerformers.querySelectorAll(':scope > a.scene-performer')))
-      );
+      const scenePerformers = sceneFooter.querySelector('.scene-performers');
+      /** @type {NodeListOf<HTMLAnchorElement>} */
+      const existingPerformers = (scenePerformers.querySelectorAll(':scope > a.scene-performer'));
 
       existingPerformers.forEach((performer) => {
         const { uuid, fullName } = parsePerformerAppearance(performer);
@@ -1376,7 +1377,7 @@ async function inject() {
 
     if (found.duration) {
       /** @type {HTMLDivElement | null} */
-      let duration = (document.querySelector('.scene-info > .card-footer > div[title $= " seconds"]'));
+      let duration = (sceneFooter.querySelector(':scope > div[title $= " seconds"]'));
       const foundDuration = Number(found.duration);
       const formattedDuration = formatDuration(foundDuration);
       if (!duration) {
@@ -1384,15 +1385,15 @@ async function inject() {
         duration.innerHTML = `${escapeHTML('<MISSING>')} Duration: <b>${formattedDuration}</b>`;
         duration.classList.add('bg-danger', 'p-1', 'my-auto');
         duration.title = `Duration is missing; ${foundDuration} seconds`;
-        document.querySelector('.scene-info .scene-performers').insertAdjacentElement('afterend', duration);
+        sceneFooter.querySelector('.scene-performers').insertAdjacentElement('afterend', duration);
       } else {
         const currentDuration = duration.title.match(/(\d+)/)[1];
         if (found.duration === currentDuration) {
-          duration.classList.add('bg-warning', 'p-1', 'my-auto');
+          duration.classList.add('bg-warning', 'p-1');
           duration.prepend('<already correct> ');
           duration.title = `${makeAlreadyCorrectTitle('correct')}; ${foundDuration} seconds`;
         } else {
-          duration.classList.add('bg-primary', 'p-1', 'my-auto');
+          duration.classList.add('bg-primary', 'p-1');
           duration.append(` \u{22D9} ${formattedDuration}`);
           duration.title = `<pending> Duration: ${formattedDuration}; ${foundDuration} seconds`;
         }
@@ -1401,21 +1402,21 @@ async function inject() {
 
     if (found.director) {
       /** @type {HTMLDivElement | null} */
-      let director = (document.querySelector('.scene-info > .card-footer > div:last-of-type'));
+      let director = (sceneFooter.querySelector(':scope > div:last-of-type'));
       if (!director || !/^Director:/.test(director.innerText)) {
         director = document.createElement('div');
         director.innerHTML = `${escapeHTML('<MISSING>')} Director: <b>${found.director}</b>`;
         director.title = '<MISSING> Director';
         director.classList.add('ml-3', 'bg-danger', 'p-1', 'my-auto');
-        document.querySelector('.scene-info > .card-footer').append(director);
+        sceneFooter.append(director);
       } else {
         const currentDirector = director.innerText.match(/^Director: (.+)$/)[1];
         if (found.director === currentDirector) {
-          director.classList.add('bg-warning', 'p-1', 'my-auto');
+          director.classList.add('bg-warning', 'p-1');
           director.prepend('<already correct> ');
           director.title = makeAlreadyCorrectTitle('correct');
         } else {
-          director.classList.add('bg-primary', 'p-1', 'my-auto');
+          director.classList.add('bg-primary', 'p-1');
           director.append(` \u{22D9} ${found.director}`);
           director.title = `<pending> Director\n${found.director}`;
         }
