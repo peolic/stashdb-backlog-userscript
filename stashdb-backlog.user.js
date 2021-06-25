@@ -1393,7 +1393,7 @@ async function inject() {
           duration.title = `${makeAlreadyCorrectTitle('correct')}; ${foundDuration} seconds`;
         } else {
           duration.classList.add('bg-primary', 'p-1', 'my-auto');
-          duration.insertAdjacentText('beforeend', ` \u{22D9} ${formattedDuration}`);
+          duration.append(` \u{22D9} ${formattedDuration}`);
           duration.title = `<pending> Duration: ${formattedDuration}; ${foundDuration} seconds`;
         }
       }
@@ -1416,7 +1416,7 @@ async function inject() {
           director.title = makeAlreadyCorrectTitle('correct');
         } else {
           director.classList.add('bg-primary', 'p-1', 'my-auto');
-          director.insertAdjacentText('beforeend', ` \u{22D9} ${found.director}`);
+          director.append(` \u{22D9} ${found.director}`);
           director.title = `<pending> Director\n${found.director}`;
         }
       }
