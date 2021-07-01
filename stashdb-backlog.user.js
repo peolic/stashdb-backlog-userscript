@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.22
+// @version     1.19.23
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -169,19 +169,6 @@ async function inject() {
   setTimeout(dispatcher, 0);
 
   // =====
-
-  /**
-   * @param {string} unsafe
-   * @returns {string}
-   */
-  function escapeHTML(unsafe) {
-    return unsafe
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
 
   /**
    * @template {HTMLElement} E
@@ -1054,7 +1041,7 @@ async function inject() {
         colorClass = 'bg-primary';
         currentColorClass = 'bg-danger';
         title = `<pending> Studio\n${studioName ? `${studioName} (${studioId})` : studioId}`;
-        newStudio.innerHTML = `<a href="/studios/${studioId}">${escapeHTML(studioName)}</a> \u{22D8}`;
+        newStudio.append(makeLink(`/studios/${studioId}`, studioName), ' \u{22D8}');
       } else {
         colorClass = 'bg-warning';
         currentColorClass = 'bg-warning';
@@ -1381,8 +1368,10 @@ async function inject() {
       const foundDuration = Number(found.duration);
       const formattedDuration = formatDuration(foundDuration);
       if (!duration) {
+        const newDuration = document.createElement('b');
+        newDuration.innerText = formattedDuration;
         duration = document.createElement('div');
-        duration.innerHTML = `${escapeHTML('<MISSING>')} Duration: <b>${formattedDuration}</b>`;
+        duration.append('<MISSING>', ' Duration: ', newDuration);
         duration.classList.add('bg-danger', 'p-1', 'my-auto');
         duration.title = `Duration is missing; ${foundDuration} seconds`;
         sceneFooter.querySelector('.scene-performers').insertAdjacentElement('afterend', duration);
@@ -1404,8 +1393,10 @@ async function inject() {
       /** @type {HTMLDivElement | null} */
       let director = (sceneFooter.querySelector(':scope > div:last-of-type'));
       if (!director || !/^Director:/.test(director.innerText)) {
+        const newDirector = document.createElement('b');
+        newDirector.innerText = found.director;
         director = document.createElement('div');
-        director.innerHTML = `${escapeHTML('<MISSING>')} Director: <b>${found.director}</b>`;
+        director.append('<MISSING>', ' Director: ', newDirector);
         director.title = '<MISSING> Director';
         director.classList.add('ml-3', 'bg-danger', 'p-1', 'my-auto');
         sceneFooter.append(director);
@@ -1448,7 +1439,7 @@ async function inject() {
 
         const newDetails = document.createElement('div');
         newDetails.classList.add('bg-primary', 'p-1');
-        newDetails.innerHTML = escapeHTML(found.details);
+        newDetails.textContent = found.details;
         compareDiv.appendChild(newDetails);
       }
     }
