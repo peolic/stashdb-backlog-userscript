@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.23
+// @version     1.19.24
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -112,6 +112,8 @@ async function inject() {
 
     await elementReadyIn('.StashDBContent > .LoadingIndicator', 100);
 
+    setUpStatusDiv();
+
     const { object, ident, action } = loc;
 
     if (object === 'scenes') {
@@ -168,6 +170,40 @@ async function inject() {
 
   setTimeout(dispatcher, 0);
 
+  async function setUpStatusDiv() {
+    if (document.querySelector('div#backlogStatus')) return;
+    const statusDiv = document.createElement('div');
+    statusDiv.id = 'backlogStatus';
+    statusDiv.classList.add('mr-auto', 'd-none');
+    const navLeft = await elementReadyIn('nav > :first-child', 1000);
+    navLeft.insertAdjacentElement('afterend', statusDiv);
+
+    new MutationObserver(() => {
+      statusDiv.classList.toggle('d-none', !statusDiv.innerText);
+    }).observe(statusDiv, { childList: true, subtree: true });
+  }
+
+  /**
+   * @param {string} text
+   * @param {number} [resetAfter] in milliseconds
+   */
+   async function setStatus(text, resetAfter) {
+    /** @type {HTMLDivElement} */
+    const statusDiv = (document.querySelector('div#backlogStatus'));
+    statusDiv.innerText = text;
+    const id = Number(statusDiv.dataset.reset);
+    if (id) {
+      clearTimeout(id);
+      statusDiv.dataset.reset = '';
+    }
+    if (resetAfter) {
+      const id = setTimeout(() => {
+        statusDiv.innerText = '';
+        statusDiv.dataset.reset = '';
+      }, resetAfter);
+      statusDiv.dataset.reset = String(id);
+    }
+  }
   // =====
 
   /**
@@ -305,7 +341,7 @@ async function inject() {
 
     } catch (error) {
       console.error('[backlog] api fetch error', error);
-      return null;
+      throw error;
     }
   }
 
@@ -489,6 +525,7 @@ async function inject() {
     try {
       if (!dev && !forceFetch && shouldFetchIndex) {
         // Only fetch if there really was an update
+        setStatus(`[backlog] checking for updates`);
         const lastUpdated = await getDataIndexLastUpdatedDate();
         if (lastUpdated) {
           shouldFetchIndex = shouldFetch(storedDataIndex, lastUpdated);
@@ -503,18 +540,23 @@ async function inject() {
             await Cache.setDataIndex(storedDataIndex);
           }
         }
+        setStatus('');
       }
     } catch (error) {
+      setStatus(`[backlog] error:\n${error}`);
       console.error('[backlog] error trying to determine lastest data index update', error);
-      shouldFetchIndex = shouldFetch(storedDataIndex, 1);
+      shouldFetchIndex = shouldFetch(storedDataIndex, 2);
     }
 
     if (forceFetch || shouldFetchIndex) {
+      setStatus(`[backlog] updating...`);
       const data = await fetchJSON(`${BASE_URL}/index.json`);
       if (data === null || 'error' in data) {
+        setStatus(`[backlog] error`);
         console.error('[backlog] index error', data);
         return null;
       }
+      setStatus('');
       const dataIndex = /** @type {DataIndex} */ (data);
 
       await applyDataIndexMigrations(dataIndex);
@@ -625,7 +667,7 @@ async function inject() {
    */
   async function getDataFor(object, uuid, index) {
     if (index === undefined) index = await getOrFetchDataIndex();
-    if (!index) throw new Error("[backlog] failed to get index");
+    if (!index) throw new Error('[backlog] failed to get index');
 
     const haystack = index[object];
     if (haystack[uuid] === undefined) {
@@ -648,7 +690,12 @@ async function inject() {
     }
 
     if (shouldFetch(objectCache[uuid], contentHash)) {
-      return await _fetchObjectData(object, uuid, storedData, index);
+      setStatus(`[backlog] updating ${object.slice(0, -1)} data...`);
+      try {
+        return await _fetchObjectData(object, uuid, storedData, index);
+      } finally {
+        setStatus('');
+      }
     }
 
     console.debug(`[backlog] <${object} ${uuid}> using stored data`);
@@ -670,10 +717,8 @@ async function inject() {
   async function backlogRefetch(global = globalThis) {
     const { object, ident: uuid } = parsePath();
 
-    const storedData = await Cache.getStoredData();
-
     const index = await getOrFetchDataIndex(true);
-    if (!index) throw new Error("[backlog] failed to get index");
+    if (!index) throw new Error('[backlog] failed to get index');
 
     if (!object) return false;
 
@@ -682,6 +727,7 @@ async function inject() {
       return false;
     }
 
+    const storedData = await Cache.getStoredData();
     const data = await _fetchObjectData(object, uuid, storedData, index);
     if (data === null) {
       global.console.warn(`[backlog] <${object} ${uuid}> failed to refetch`);
@@ -1100,6 +1146,8 @@ async function inject() {
       const newImageBlob = getImageBlob(found.image);
 
       if (img.getAttribute('src')) {
+        setStatus(`[backlog] fetching/comparing images...`);
+
         imageReady(img).then(async () => {
           const newImage = await compareImages(img, newImageBlob);
           imgContainer.classList.add('p-2');
@@ -1107,6 +1155,7 @@ async function inject() {
           if (newImage === true) {
             imgContainer.style.backgroundColor = 'var(--pink)';
             imgContainer.title = `${makeAlreadyCorrectTitle('added')}\n\n${found.image}`;
+            setStatus('');
             return;
           }
 
@@ -1124,6 +1173,7 @@ async function inject() {
             imgNewLink.style.flex = '50%';
 
             imgContainer.appendChild(imgNewLink);
+            setStatus(`[backlog] error fetching/comparing images:\n${newImage}`);
             return;
           }
 
@@ -1150,10 +1200,13 @@ async function inject() {
           newImageContainer.append(imgRes, imgNewLink);
 
           imgContainer.appendChild(newImageContainer);
+          setStatus('');
         });
 
       } else {
         // missing image
+        setStatus(`[backlog] fetching new image...`);
+
         imgContainer.classList.add('bg-danger', 'p-2');
         imgContainer.style.transition = 'min-height 1s ease';
         imgContainer.title = `<MISSING>\n${found.image}`;
@@ -1161,16 +1214,19 @@ async function inject() {
         const imgLink = imgContainer.appendChild(makeLink(found.image, ''));
         imgLink.appendChild(img);
 
-        const onFailure = () => {
+        /** @param {any} reason */
+        const onFailure = (reason) => {
           setStyles(imgContainer, { minHeight: '0', textAlign: 'center', fontSize: '1.2em', fontWeight: '600' });
           imgLink.prepend(found.image);
           img.classList.add('d-none');
+          setStatus(`[backlog] error fetching new image:\n${reason}`);
         };
         newImageBlob.then(
           (blob) => {
             const imgRes = makeImageResolution(img, 'right');
             imgContainer.prepend(imgRes);
             img.src = URL.createObjectURL(blob);
+            setStatus('');
           },
           onFailure
         );
