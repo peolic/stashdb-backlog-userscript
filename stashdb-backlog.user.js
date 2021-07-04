@@ -584,7 +584,7 @@ async function inject() {
         let oldValue = thisIndex[thisId];
         if (typeof oldValue === 'string') {
           log();
-          thisIndex[thisId] = oldValue = [''].concat(...oldValue.split(/,/g));
+          thisIndex[thisId] = oldValue = ['', ...oldValue.split(/,/g)];
         }
       }
     }
@@ -644,10 +644,11 @@ async function inject() {
 
     // add to data index if not present
     if (haystack[uuid] === undefined) {
-      haystack[uuid] = [''].concat(
-        Object.keys(data)
-          .filter((k) => !['contentHash', 'lastUpdated', 'comments'].includes(k))
-      );
+      haystack[uuid] = [
+        '',
+        ...Object.keys(data)
+          .filter((k) => !['contentHash', 'lastUpdated', 'comments'].includes(k)),
+      ];
     }
     await Cache.setDataIndex(index);
     console.debug('[backlog] stored data index updated');

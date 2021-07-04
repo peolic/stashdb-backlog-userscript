@@ -1,12 +1,12 @@
 type AnyObject =
-    | 'scenes'
-    | 'performers'
-    | 'studios'
-    | 'tags'
-    | 'categories'
-    | 'edits'
-    | 'users'
-    | 'search'
+    | "scenes"
+    | "performers"
+    | "studios"
+    | "tags"
+    | "categories"
+    | "edits"
+    | "users"
+    | "search"
 
 interface LocationData {
     object: AnyObject | null;
@@ -26,14 +26,25 @@ interface BaseCache {
     lastChecked?: string;
 }
 
+type DataIndexItem = [
+    contentHash: string,
+    ...keys: string[],
+]
+
 interface DataIndex extends Omit<BaseCache, "contentHash"> {
-    scenes: { [uuid: string]: string[]; };
-    performers: { [uuid: string]: string[]; };
+    scenes: { [uuid: string]: DataIndexItem };
+    performers: { [uuid: string]: DataIndexItem };
 }
 
 type MutationDataIndex = {
     scenes: { [uuid: string]: string };
     performers: { [uuid: string]: string };
+}
+
+type SceneFingerprint = {
+    algorithm: string;
+    hash: string;
+    correct_scene_id: string | null;
 }
 
 interface SceneDataObject extends Omit<BaseCache, "lastChecked"> {
@@ -45,17 +56,13 @@ interface SceneDataObject extends Omit<BaseCache, "lastChecked"> {
         append: PerformerEntry[];
         update?: PerformerEntry[];
     };
-    studio?: [string, string];
+    studio?: [id: string, name: string];
     url?: string;
     details?: string;
     director?: string;
     // tags?: string[];
     image?: string;
-    fingerprints?: Array<{
-        algorithm: string;
-        hash: string;
-        correct_scene_id: string | null;
-    }>;
+    fingerprints?: SceneFingerprint[];
     comments?: string[];
 }
 
@@ -69,7 +76,7 @@ interface DataCache {
     performers: { [uuid: string]: PerformerDataObject };
 }
 
-type SupportedObject = keyof Omit<DataIndex, keyof BaseCache> & keyof DataCache
+type SupportedObject = Exclude<keyof DataIndex, keyof BaseCache> | keyof DataCache;
 
 type DataObject = DataCache[SupportedObject][string]
 
