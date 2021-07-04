@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.24
+// @version     1.19.25
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1921,11 +1921,23 @@ async function inject() {
       const toSplit = document.createElement('div');
       toSplit.classList.add('mb-1', 'p-1', 'font-weight-bold');
       toSplit.style.transition = 'background-color .5s';
-      const a = makeLink(
-        'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ/edit#gid=1067038397',
-        'Performers To Split Up'
-      );
-      toSplit.append('This performer is listed on ', a, '.');
+      const googlePrefix = 'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ';
+      const googleSheetId = '1067038397';
+      const _quickViewQS =
+        new URLSearchParams({
+          gid: googleSheetId,
+          tqx: 'out:html',
+          tq: (
+            `select A, B, E, F, G, H, I, J, K, L, M, N, O, P`
+            + ` where D = "${performerId}" `
+            + `label A "Done", F "Notes"`
+          ),
+        }).toString();
+      const quickViewLink = makeLink(`${googlePrefix}/gviz/tq?${_quickViewQS}`, 'quick view');
+      quickViewLink.style.color = 'var(--teal)';
+      const sheetLink = makeLink(`${googlePrefix}/edit#gid=${googleSheetId}`, 'Performers To Split Up');
+      sheetLink.style.color = 'var(--orange)';
+      toSplit.append('This performer is listed on ', sheetLink, '. (', quickViewLink, ')');
       const emoji = document.createElement('span');
       emoji.classList.add('mr-1');
       emoji.innerText = '🔀';
