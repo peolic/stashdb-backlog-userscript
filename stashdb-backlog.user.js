@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.25
+// @version     1.19.26
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -312,10 +312,10 @@ async function inject() {
     }
 
     if (typeof diff === 'number') {
-      const { lastUpdated } = storedObject;
+      const { lastUpdated, lastChecked } = storedObject;
       if (!lastUpdated) return true;
-      const cacheInvalidation = (new Date(lastUpdated).getTime()) + 1000 * 60 * 60 * diff;
-      return new Date().getTime() >= cacheInvalidation;
+      const timestamp = new Date(lastChecked || lastUpdated).getTime();
+      return new Date().getTime() >= (timestamp + 1000 * 60 * 60 * diff);
     }
 
     return false;
@@ -534,11 +534,9 @@ async function inject() {
             + ` - updating: ${shouldFetchIndex}`
           );
 
-          if (!shouldFetchIndex) {
-            // Use this as a "last checked" timestamp as to not spam GitHub API
-            storedDataIndex.lastUpdated = new Date().toISOString();
-            await Cache.setDataIndex(storedDataIndex);
-          }
+          // Store the last-checked timestamp as to not spam GitHub API
+          storedDataIndex.lastChecked = new Date().toISOString();
+          await Cache.setDataIndex(storedDataIndex);
         }
         setStatus('');
       }
@@ -562,7 +560,7 @@ async function inject() {
       await applyDataIndexMigrations(dataIndex);
 
       const action = storedDataIndex.lastUpdated ? 'updated' : 'fetched';
-      dataIndex.lastUpdated = new Date().toISOString();
+      dataIndex.lastUpdated = dataIndex.lastChecked = new Date().toISOString();
       await Cache.setDataIndex(dataIndex);
       console.debug(`[backlog] index ${action}`);
       return dataIndex;

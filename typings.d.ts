@@ -23,9 +23,10 @@ interface FetchError {
 interface BaseCache {
     contentHash?: string;
     lastUpdated?: string;
+    lastChecked?: string;
 }
 
-interface DataIndex extends Pick<BaseCache, 'lastUpdated'> {
+interface DataIndex extends Omit<BaseCache, "contentHash"> {
     scenes: { [uuid: string]: string[]; };
     performers: { [uuid: string]: string[]; };
 }
@@ -35,7 +36,7 @@ type MutationDataIndex = {
     performers: { [uuid: string]: string };
 }
 
-interface SceneDataObject extends BaseCache {
+interface SceneDataObject extends Omit<BaseCache, "lastChecked"> {
     title?: string;
     date?: string;
     duration?: string;
@@ -58,7 +59,7 @@ interface SceneDataObject extends BaseCache {
     comments?: string[];
 }
 
-interface PerformerDataObject extends BaseCache {
+interface PerformerDataObject extends Omit<BaseCache, "lastChecked"> {
     duplicates?: string[];
     duplicate_of: string;
 }
