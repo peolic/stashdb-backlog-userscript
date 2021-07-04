@@ -959,6 +959,7 @@ async function inject() {
       button.textContent = result ? '✔' : '❌';
       setStyles(button, { backgroundColor: result ? 'yellow' : 'var(--gray-dark)', fontWeight: '800' });
       if (result) {
+        setStatus('[backlog] reloading page...');
         setTimeout(() => {
           window.location.reload();
         }, 500);
