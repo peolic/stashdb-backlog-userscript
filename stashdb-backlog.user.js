@@ -21,6 +21,7 @@
 const dev = false;
 
 const eventPrefix = 'stashdb_backlog';
+const devUsername = 'peolic';
 
 async function inject() {
   const BASE_URL =
@@ -69,14 +70,12 @@ async function inject() {
     return result;
   };
 
-  const getUser = () => {
+  const getUser = async () => {
     /** @type {HTMLAnchorElement} */
-    const profile = (document.querySelector('a[href^="/users/"]'));
+    const profile = (await elementReadyIn('#root nav a[href^="/users/"]', 1000));
     if (!profile) return null;
     return profile.innerText;
   };
-
-  const isDev = () => getUser() === 'peolic';
 
   const wait = (/** @type {number} */ ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -104,6 +103,8 @@ async function inject() {
     return Promise.race(promises);
   };
 
+  let isDev = false;
+
   async function dispatcher() {
     const loc = parsePath();
     if (!loc) {
@@ -111,6 +112,8 @@ async function inject() {
     }
 
     await elementReadyIn('.StashDBContent > .LoadingIndicator', 100);
+
+    isDev = await getUser() === devUsername;
 
     setUpStatusDiv();
 
@@ -709,7 +712,7 @@ async function inject() {
     global.console.info('[backlog] stored data cleared');
   }
   //@ts-expect-error
-  unsafeWindow.backlogClearCache = exportFunction(() => isDev() && backlogClearCache(unsafeWindow), unsafeWindow);
+  unsafeWindow.backlogClearCache = exportFunction(() => isDev && backlogClearCache(unsafeWindow), unsafeWindow);
 
   // ===
 
@@ -736,7 +739,7 @@ async function inject() {
     return true;
   }
   //@ts-expect-error
-  unsafeWindow.backlogRefetch = exportFunction(() => isDev() && backlogRefetch(unsafeWindow), unsafeWindow);
+  unsafeWindow.backlogRefetch = exportFunction(() => isDev && backlogRefetch(unsafeWindow), unsafeWindow);
 
   // ===
 
@@ -987,7 +990,7 @@ async function inject() {
 
     const found = await getDataFor('scenes', sceneId);
 
-    if (isDev()) {
+    if (isDev) {
       /** @type {HTMLDivElement} */
       const sceneButtons = (sceneInfo.querySelector(':scope > .card-header > .float-right'));
       const buttonRefetch = createFetchButton(found, sceneButtons);
