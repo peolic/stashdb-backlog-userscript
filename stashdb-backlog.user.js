@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.26
+// @version     1.19.27
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -24,6 +24,7 @@ const eventPrefix = 'stashdb_backlog';
 const devUsername = 'peolic';
 
 async function inject() {
+  const backlogSpreadsheet = 'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ';
   const BASE_URL =
     dev
       ? 'http://localhost:8000'
@@ -883,6 +884,16 @@ async function inject() {
   }
 
   /**
+   * @param {string} sheetId
+   * @param {string} query
+   * @returns {string}
+   */
+  function backlogQuickViewURL(sheetId, query) {
+    const search = new URLSearchParams({ gid: sheetId, tqx: 'out:html', tq: query }).toString();
+    return `${backlogSpreadsheet}/gviz/tq?${search}`;
+  }
+
+  /**
    * @template T
    * @param {T} obj
    * @param {string[]} keySortOrder
@@ -1578,6 +1589,23 @@ async function inject() {
         const fpInfo = document.createElement('div');
         fpInfo.classList.add('float-right', 'my-2', 'd-flex', 'flex-column');
 
+        const backlogSheetId = '357846927'; // Fingerprints
+        const quickViewLink = makeLink(
+          backlogQuickViewURL(
+            backlogSheetId,
+            `select B,G,H,I,J,K where F="${sceneId}" label B "Done", H "Hash", I "✨Correct Scene ID"`,
+          ),
+          'quick view',
+        );
+        quickViewLink.style.color = 'var(--teal)';
+        const sheetLink = makeLink(`${backlogSpreadsheet}/edit#gid=${backlogSheetId}`, 'Fingerprints backlog sheet');
+        sheetLink.style.color = 'var(--red)';
+
+        const backlogInfo = document.createElement('span');
+        backlogInfo.classList.add('text-right');
+        backlogInfo.append(sheetLink, ' (', quickViewLink, ')');
+        fpInfo.append(backlogInfo);
+
         const makeElement = (/** @type {string[]} */ ...content) => {
           const span = document.createElement('span');
           span.classList.add('d-flex', 'justify-content-between');
@@ -1924,21 +1952,17 @@ async function inject() {
       const toSplit = document.createElement('div');
       toSplit.classList.add('mb-1', 'p-1', 'font-weight-bold');
       toSplit.style.transition = 'background-color .5s';
-      const googlePrefix = 'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ';
-      const googleSheetId = '1067038397';
-      const _quickViewQS =
-        new URLSearchParams({
-          gid: googleSheetId,
-          tqx: 'out:html',
-          tq: (
-            `select A, B, E, F, G, H, I, J, K, L, M, N, O, P`
-            + ` where D = "${performerId}" `
-            + `label A "Done", F "Notes"`
-          ),
-        }).toString();
-      const quickViewLink = makeLink(`${googlePrefix}/gviz/tq?${_quickViewQS}`, 'quick view');
+
+      const backlogSheetId = '1067038397'; // Performers To Split Up
+      const quickViewLink = makeLink(
+        backlogQuickViewURL(
+          backlogSheetId,
+          `select A,B,E,F,G,H,I,J,K,L,M,N,O,P where D="${performerId}" label A "Done", F "Notes"`,
+        ),
+        'quick view',
+      );
       quickViewLink.style.color = 'var(--teal)';
-      const sheetLink = makeLink(`${googlePrefix}/edit#gid=${googleSheetId}`, 'Performers To Split Up');
+      const sheetLink = makeLink(`${backlogSpreadsheet}/edit#gid=${backlogSheetId}`, 'Performers To Split Up');
       sheetLink.style.color = 'var(--orange)';
       toSplit.append('This performer is listed on ', sheetLink, '. (', quickViewLink, ')');
       const emoji = document.createElement('span');
