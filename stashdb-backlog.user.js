@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.28
+// @version     1.19.29
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -10,6 +10,7 @@
 // @grant       GM.getValue
 // @grant       GM.deleteValue
 // @grant       GM.xmlHttpRequest
+// @grant       GM.registerMenuCommand
 // @homepageURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7
 // @downloadURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL   https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
@@ -117,6 +118,7 @@ async function inject() {
     isDev = await getUser() === devUsername;
 
     setUpStatusDiv();
+    setUpMenu();
 
     const { object, ident, action } = loc;
 
@@ -199,6 +201,19 @@ async function inject() {
       statusDiv.dataset.reset = String(id);
     }
   }
+
+  async function _setUpMenu() {
+    if (!isDev) return;
+    //@ts-expect-error
+    GM.registerMenuCommand('Refresh', async () => {
+      const index = await getOrFetchDataIndex(true);
+      if (index) setStatus('[backlog] index updated', 2500);
+      else setStatus('[backlog] failed to get index');
+    });
+  }
+
+  const setUpMenu = once(_setUpMenu);
+
   // =====
 
   /**
