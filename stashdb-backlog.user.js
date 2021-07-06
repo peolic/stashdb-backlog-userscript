@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.19.27
+// @version     1.19.28
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -934,6 +934,29 @@ async function inject() {
     );
     const svg = div.getElementsByTagName('svg')[0];
     if (fixStyle) setStyles(svg, svgStyleFix);
+    return svg;
+  };
+
+  /**
+   * @param {Partial<CSSStyleDeclaration>} style
+   * @returns {SVGSVGElement}
+   */
+  const performersIcon = (style) => {
+    const div = document.createElement('div');
+    div.innerHTML = (
+      '<svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="users" role="img"'
+      + ' class="svg-inline--fa fa-users fa-w-20 fa-icon " xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512">'
+        + '<path fill="currentColor" d="M96 224c35.3 0 64-28.7 64-64s-28.7-64-64-64-64 28.7-64 64 28.7 64 64 64zm448'
+        + ' 0c35.3 0 64-28.7 64-64s-28.7-64-64-64-64 28.7-64 64 28.7 64 64 64zm32 32h-64c-17.6 0-33.5 7.1-45.1 18.6'
+        + ' 40.3 22.1 68.9 62 75.1 109.4h66c17.7 0 32-14.3 32-32v-32c0-35.3-28.7-64-64-64zm-256 0c61.9 0 112-50.1'
+        + ' 112-112S381.9 32 320 32 208 82.1 208 144s50.1 112 112 112zm76.8 32h-8.3c-20.8 10-43.9 16-68.5 16s-47.6-6'
+        + '-68.5-16h-8.3C179.6 288 128 339.6 128 403.2V432c0 26.5 21.5 48 48 48h288c26.5 0 48-21.5 48-48v-28.8c0-63.6'
+        + '-51.6-115.2-115.2-115.2zm-223.7-13.4C161.5 263.1 145.6 256 128 256H64c-35.3 0-64 28.7-64 64v32c0 17.7 14.3'
+        + ' 32 32 32h65.9c6.3-47.4 34.9-87.3 75.2-109.4z"></path>'
+      + '</svg>'
+    );
+    const svg = div.getElementsByTagName('svg')[0];
+    if (style) setStyles(svg, style);
     return svg;
   };
 
@@ -2067,6 +2090,8 @@ async function inject() {
         const changes = found.slice(1);
         card.style.outline = getHighlightStyle('scenes', changes);
         sceneCard.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
+
+        if (isDev) sceneCardHighlightChanges(card, changes);
       });
     };
 
@@ -2140,14 +2165,126 @@ async function inject() {
         card.style.outline = getHighlightStyle(object, changes);
         if (object === 'scenes') {
           cardLink.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
+          if (isDev) sceneCardHighlightChanges(card, changes);
         } else if (object === 'performers') {
           cardLink.title = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
         }
       }
     });
   }
-}
 
+  /**
+   * Field-specific scene card highlighting
+   * @param {HTMLDivElement} card
+   * @param {string[]} changes
+   */
+   function sceneCardHighlightChanges(card, changes) {
+    /** @type {HTMLDivElement | HTMLAnchorElement} */
+    const parent = (card.parentElement);
+    const isSearchCard = parent.classList.contains('SearchPage-scene');
+
+    if (changes.includes('image')) {
+      const imageColor = 'var(--primary)';
+      /** @type {HTMLImageElement} */
+      const img = card.querySelector(
+        !isSearchCard
+          ? '.SceneCard-image > img'
+          : ':scope > img.SearchPage-scene-image'
+      );
+      if (img.getAttribute('src')) {
+        if (!isSearchCard) {
+          const marker = document.createElement('div');
+          marker.style.borderTop = `0.4em solid ${imageColor}`;
+          const footer = /** @type {HTMLDivElement} */ (card.querySelector('.card-footer'));
+          card.insertBefore(marker, footer);
+        } else {
+          img.style.outline = `0.4em solid ${imageColor}`;
+        }
+      } else {
+        img.style.backgroundColor = imageColor;
+        if (isSearchCard) img.style.visibility = 'unset';
+      }
+    }
+
+    const color = 'var(--yellow)';
+
+    if (changes.includes('title')) {
+      if (!isSearchCard) {
+        /** @type {HTMLHeadingElement} */
+        const title = card.querySelector('.SceneCard-title');
+        if (title.textContent) {
+          title.style.color = color;
+        } else {
+          setStyles(title, { backgroundColor: color, height: '1.2rem' });
+        }
+      } else {
+        /** @type {HTMLHeadingElement} */
+        const titleEl = card.querySelector('h5');
+        /** @type {Text} */
+        const titleNode = (titleEl.childNodes[0]);
+        const title = document.createElement('span');
+        title.append(titleNode);
+        titleEl.prepend(title);
+        if (title.textContent) {
+          title.style.color = color;
+        } else {
+          setStyles(title, { backgroundColor: color, display: 'inline-block', height: '1.5rem', width: '70%' });
+        }
+      }
+    }
+
+    if (changes.includes('duration')) {
+      /** @type {HTMLSpanElement | HTMLElement} */
+      const duration = card.querySelector(
+        !isSearchCard
+          ? '.SceneCard-title + span'
+          : 'h5 > small'
+      );
+      if (duration.textContent) {
+        duration.style.color = color;
+      } else {
+        duration.textContent = '??:??';
+        duration.style.color = color;
+        duration.classList.remove('text-muted');
+      }
+    }
+
+    if (changes.includes('studio')) {
+      const studio =
+        !isSearchCard
+          ? /** @type {HTMLAnchorElement} */ (card.querySelector('.SceneCard-studio-name'))
+          : card.querySelector('div > svg[data-icon="video"]').parentElement;
+      studio.style.color = color;
+    }
+
+    if (changes.includes('date')) {
+      const date =
+        !isSearchCard
+          ? card.querySelector('strong')
+          : card.querySelector('div > svg[data-icon="calendar"]').parentElement;
+      date.style.color = color;
+    }
+
+    if (changes.includes('performers')) {
+      if (!isSearchCard) {
+        card.querySelector('a.SceneCard-image')
+          .append(
+            performersIcon({
+              color: 'var(--yellow)',
+              fontSize: '2em',
+              position: 'absolute',
+              left: '4px',
+              bottom: '72px',
+              filter: 'drop-shadow(3px 3px 2px rgba(0, 0, 0, .7))',
+            })
+          );
+      } else {
+        const performers = card.querySelector('div > svg[data-icon="users"]').parentElement;
+        performers.style.color = color;
+      }
+    }
+  }
+}
 
 // Based on: https://dirask.com/posts/JavaScript-on-location-changed-event-on-url-changed-event-DKeyZj
 (function() {
