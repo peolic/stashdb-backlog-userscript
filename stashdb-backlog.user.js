@@ -161,16 +161,7 @@ async function inject() {
     console.debug(`[backlog] nothing to do for ${object}/${identAction}.`);
   }
 
-  let dispatchEnabled = true;
-
-  window.addEventListener(`${eventPrefix}_locationchange`, () => {
-    if (dispatchEnabled) {
-      console.debug('[backlog] location change detected, executing');
-      dispatcher();
-    } else {
-      console.debug('[backlog] location change detected, dispatch disabled');
-    }
-  });
+  window.addEventListener(`${eventPrefix}_locationchange`, dispatcher);
 
   setTimeout(dispatcher, 0);
 
