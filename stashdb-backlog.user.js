@@ -173,7 +173,7 @@ async function inject() {
     statusDiv.id = 'backlogStatus';
     statusDiv.classList.add('mr-auto', 'd-none');
     const navLeft = await elementReadyIn('nav > :first-child', 1000);
-    navLeft.insertAdjacentElement('afterend', statusDiv);
+    navLeft.after(statusDiv);
 
     new MutationObserver(() => {
       statusDiv.classList.toggle('d-none', !statusDiv.innerText);
@@ -1075,7 +1075,7 @@ async function inject() {
       comments.classList.add('bg-info');
 
       found.comments.forEach((comment, index) => {
-        if (index > 0) comments.insertAdjacentHTML('beforeend', '<br>');
+        if (index > 0) comments.append(document.createElement('br'));
         const commentElement = /^https?:/.test(comment) ? makeLink(comment) : document.createElement('span');
         commentElement.innerText = comment;
         comments.appendChild(commentElement);
@@ -1120,7 +1120,7 @@ async function inject() {
         const arrow = document.createElement('span');
         arrow.classList.add('mx-2');
         arrow.innerText = '\u{22D9}';
-        titleSpan.insertAdjacentElement('afterend', arrow);
+        titleSpan.after(arrow);
 
         const newTitle = document.createElement('span');
         newTitle.classList.add('bg-primary', 'p-1');
@@ -1154,7 +1154,7 @@ async function inject() {
       newStudio.title = title;
       studioElement.title = title;
       studioElement.classList.add(currentColorClass, 'p-1');
-      studioElement.insertAdjacentElement('beforebegin', newStudio);
+      studioElement.before(newStudio);
     }
 
     if (found.date) {
@@ -1167,7 +1167,7 @@ async function inject() {
       // convert date text node to element
       const dateElement = document.createElement('span');
       dateElement.append(dateNode);
-      separator.insertAdjacentElement('afterend', dateElement);
+      separator.after(dateElement);
 
       const newDate = document.createElement('span');
       let title, colorClass, currentColorClass;
@@ -1187,7 +1187,7 @@ async function inject() {
       newDate.title = title;
       dateElement.title = title;
       dateElement.classList.add(currentColorClass, 'p-1');
-      dateElement.insertAdjacentElement('afterend', newDate);
+      dateElement.after(newDate);
     }
 
     if (found.image) {
@@ -1484,7 +1484,7 @@ async function inject() {
         duration.append('<MISSING>', ' Duration: ', newDuration);
         duration.classList.add('bg-danger', 'p-1', 'my-auto');
         duration.title = `Duration is missing; ${foundDuration} seconds`;
-        sceneFooter.querySelector('.scene-performers').insertAdjacentElement('afterend', duration);
+        sceneFooter.querySelector('.scene-performers').after(duration);
       } else {
         const currentDuration = duration.title.match(/(\d+)/)[1];
         if (found.duration === currentDuration) {
@@ -1539,7 +1539,7 @@ async function inject() {
         const compareDiv = document.createElement('div');
         compareDiv.classList.add('d-flex', 'flex-column');
         compareDiv.title = '<pending> Description';
-        desc.insertAdjacentElement('beforebegin', compareDiv);
+        desc.before(compareDiv);
         desc.classList.add('bg-danger', 'p-1');
         compareDiv.appendChild(desc);
 
@@ -1568,7 +1568,7 @@ async function inject() {
       } else {
         const compareSpan = document.createElement('span');
         compareSpan.title = '<pending> Studio URL';
-        studioUrl.insertAdjacentElement('beforebegin', compareSpan);
+        studioUrl.before(compareSpan);
         studioUrl.classList.add('bg-danger', 'p-1');
         compareSpan.appendChild(studioUrl);
 
@@ -1618,8 +1618,8 @@ async function inject() {
         const { row } = cfp;
         row.classList.add('bg-warning');
         if (fp.correct_scene_id) {
-          const html = ` | <a href="/scenes/${fp.correct_scene_id}"><b>correct scene</b></a>`;
-          row.children[headers.submissions].insertAdjacentHTML('beforeend', html);
+          const correct = makeLink(`/scenes/${fp.correct_scene_id}`, 'correct scene', { fontWeight: 'bolder' });
+          row.children[headers.submissions].append(' | ', correct);
         }
         return true;
       }).length;
@@ -1663,7 +1663,7 @@ async function inject() {
 
         if (matches) fpInfo.appendChild(makeElement('Reported incorrect fingerprints:', `${matches} ℹ`));
         if (notFound) fpInfo.appendChild(makeElement('Missing reported fingerprints:', `${notFound} ⚠`));
-        document.querySelector('nav[role="tablist"]').insertAdjacentElement('beforebegin', fpInfo);
+        document.querySelector('nav[role="tablist"]').before(fpInfo);
         // Hook to remove it
         window.addEventListener(`${eventPrefix}_locationchange`, () => fpInfo.remove(), { once: true });
       }
@@ -1839,7 +1839,7 @@ async function inject() {
                 info.append(document.createElement('br'), uuid);
               }
               if (entry.status) {
-                a.insertAdjacentText('beforebegin', `<${entry.status}> `);
+                a.before(`<${entry.status}> `);
               }
             }
             li.appendChild(info);
@@ -1901,7 +1901,7 @@ async function inject() {
 
       if (field === 'fingerprints') {
         found[field].forEach((fp, index) => {
-          if (index > 0) dd.insertAdjacentHTML('beforeend', '<br>');
+          if (index > 0) dd.append(document.createElement('br'));
           const fpElement = document.createElement('span');
           const fpHash = createSelectAllSpan(fp.hash);
           fpHash.style.marginLeft = '.5rem';
@@ -1918,7 +1918,7 @@ async function inject() {
 
       if (field === 'comments') {
         found[field].forEach((comment, index) => {
-          if (index > 0) dd.insertAdjacentHTML('beforeend', '<br>');
+          if (index > 0) dd.append(document.createElement('br'));
           const commentElement =
             /^https?:/.test(comment)
               ? makeLink(comment, null, { color: 'var(--teal)' })
@@ -1930,7 +1930,10 @@ async function inject() {
       }
 
       if (field === 'lastUpdated') {
-        dt.insertAdjacentHTML('beforebegin', '<hr class="mt-4" style="border-top-color: initial;">');
+        const hr = document.createElement('span');
+        hr.classList.add('mt-4');
+        hr.style.borderTopColor = 'initial';
+        dt.before(hr);
         dt.innerText = 'data last fetched at';
         dd.innerText = formatDate(found[field]);
         return;
@@ -2031,13 +2034,13 @@ async function inject() {
       hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
       hasDuplicates.innerHTML = 'This performer has duplicates:';
       foundData.duplicates.forEach((dupId) => {
-        hasDuplicates.insertAdjacentHTML('beforeend', '<br>');
+        hasDuplicates.append(document.createElement('br'));
         const a = makeLink(`/performers/${dupId}`, dupId, { color: 'var(--teal)', marginLeft: '1.75rem' });
         a.target = '_blank';
         a.classList.add('font-weight-normal');
         hasDuplicates.append(a);
 
-        if (isMarkedForSplit(dupId)) a.insertAdjacentText('afterend', ' 🔀 needs to be split up');
+        if (isMarkedForSplit(dupId)) a.after(' 🔀 needs to be split up');
       });
       const emoji = document.createElement('span');
       emoji.classList.add('mr-1');
@@ -2055,7 +2058,7 @@ async function inject() {
       a.target = '_blank';
       a.classList.add('font-weight-normal');
       duplicateOf.append(a);
-      if (isMarkedForSplit(foundData.duplicate_of)) a.insertAdjacentText('afterend', ' 🔀 needs to be split up');
+      if (isMarkedForSplit(foundData.duplicate_of)) a.after(' 🔀 needs to be split up');
       const emoji = document.createElement('span');
       emoji.classList.add('mr-1');
       emoji.innerText = '♊';
