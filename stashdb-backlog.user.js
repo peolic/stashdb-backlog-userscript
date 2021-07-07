@@ -854,11 +854,16 @@ async function inject() {
    * All external links are made with `_blank` target.
    * @param {string} url
    * @param {string | null} [text] if not provided, text is the url itself, null to keep contents as is
+   * @param {Partial<CSSStyleDeclaration>} [style]
    * @param {HTMLAnchorElement} [el] anchor element to use
    * @returns {HTMLAnchorElement}
    */
-  function makeLink(url, text, el) {
+  function makeLink(url, text, style, el) {
     const a = el instanceof HTMLAnchorElement ? el : document.createElement('a');
+
+    if (style) {
+      setStyles(a, style);
+    }
 
     if (text !== null) {
       a.innerText = text === undefined ? url : text;
@@ -1442,7 +1447,7 @@ async function inject() {
             pa.title += ' (missing performer ID)';
           }
           if (entry.status_url) {
-            makeLink(entry.status_url, null, pa);
+            makeLink(entry.status_url, null, null, pa);
           }
         }
         scenePerformers.appendChild(pa);
@@ -1631,10 +1636,13 @@ async function inject() {
             `select B,G,H,I,J,K where F="${sceneId}" label B "Done", H "Hash", I "✨Correct Scene ID"`,
           ),
           'quick view',
+          { color: 'var(--teal)' },
         );
-        quickViewLink.style.color = 'var(--teal)';
-        const sheetLink = makeLink(`${backlogSpreadsheet}/edit#gid=${backlogSheetId}`, 'Fingerprints backlog sheet');
-        sheetLink.style.color = 'var(--red)';
+        const sheetLink = makeLink(
+          `${backlogSpreadsheet}/edit#gid=${backlogSheetId}`,
+          'Fingerprints backlog sheet',
+          { color: 'var(--red)' },
+        );
 
         const backlogInfo = document.createElement('span');
         backlogInfo.classList.add('text-right');
@@ -1807,9 +1815,8 @@ async function inject() {
             if (!entry.id) {
               info.innerText = `<${entry.status}> ${name + appearance}`;
             } else if (action === 'update') {
-              const a = makeLink(`/performers/${entry.id}`, name);
+              const a = makeLink(`/performers/${entry.id}`, name, { color: 'var(--teal)' });
               a.target = '_blank';
-              a.style.color = 'var(--teal)';
               /** @type {Array<HTMLElement | string>} */
               const nodes = [
                 a,
@@ -1823,9 +1830,8 @@ async function inject() {
               }
               info.append(...nodes);
             } else {
-              const a = makeLink(`/performers/${entry.id}`, name + appearance);
+              const a = makeLink(`/performers/${entry.id}`, name + appearance, { color: 'var(--teal)' });
               a.target = '_blank';
-              a.style.color = 'var(--teal)';
               info.appendChild(a);
               if (action === 'append') {
                 const uuid = createSelectAllSpan(entry.id);
@@ -1847,9 +1853,8 @@ async function inject() {
 
       if (field === 'studio') {
         const [studioId, studioName] = found[field];
-        const a = makeLink(`/studios/${studioId}`, studioName);
+        const a = makeLink(`/studios/${studioId}`, studioName, { color: 'var(--teal)' });
         a.target = '_blank';
-        a.style.color = 'var(--teal)';
         dd.append(a, document.createElement('br'), createSelectAllSpan(studioId));
         return;
       }
@@ -1881,8 +1886,7 @@ async function inject() {
 
       if (field === 'image') {
         const image = found[field];
-        const imgLink = makeLink(image, '');
-        imgLink.style.color = 'var(--teal)';
+        const imgLink = makeLink(image, '', { color: 'var(--teal)' });
         dd.appendChild(imgLink);
         const onSuccess = (/** @type {Blob} **/ blob) => {
           const img = document.createElement('img');
@@ -1903,10 +1907,9 @@ async function inject() {
           fpHash.style.marginLeft = '.5rem';
           fpElement.append(fp.algorithm.toUpperCase(), fpHash);
           if (fp.correct_scene_id) {
-            const correctSceneLink = makeLink(`/scenes/${fp.correct_scene_id}`, 'correct scene');
-            correctSceneLink.target = '_blank';
-            correctSceneLink.style.color = 'var(--teal)';
-            fpElement.append(' \u{22D9} ', correctSceneLink, ': ', createSelectAllSpan(fp.correct_scene_id));
+            const correct = makeLink(`/scenes/${fp.correct_scene_id}`, 'correct scene', { color: 'var(--teal)' });
+            correct.target = '_blank';
+            fpElement.append(' \u{22D9} ', correct, ': ', createSelectAllSpan(fp.correct_scene_id));
           }
           dd.appendChild(fpElement);
         });
@@ -1916,10 +1919,10 @@ async function inject() {
       if (field === 'comments') {
         found[field].forEach((comment, index) => {
           if (index > 0) dd.insertAdjacentHTML('beforeend', '<br>');
-          const commentElement = /^https?:/.test(comment) ? makeLink(comment) : document.createElement('span');
-          if (commentElement instanceof HTMLAnchorElement) {
-            commentElement.style.color = 'var(--teal)';
-          }
+          const commentElement =
+            /^https?:/.test(comment)
+              ? makeLink(comment, null, { color: 'var(--teal)' })
+              : document.createElement('span');
           commentElement.innerText = comment;
           dd.appendChild(commentElement);
         });
@@ -1995,10 +1998,13 @@ async function inject() {
           `select A,B,E,F,G,H,I,J,K,L,M,N,O,P where D="${performerId}" label A "Done", F "Notes"`,
         ),
         'quick view',
+        { color: 'var(--teal)' },
       );
-      quickViewLink.style.color = 'var(--teal)';
-      const sheetLink = makeLink(`${backlogSpreadsheet}/edit#gid=${backlogSheetId}`, 'Performers To Split Up');
-      sheetLink.style.color = 'var(--orange)';
+      const sheetLink = makeLink(
+        `${backlogSpreadsheet}/edit#gid=${backlogSheetId}`,
+        'Performers To Split Up',
+        { color: 'var(--orange)' },
+      );
       toSplit.append('This performer is listed on ', sheetLink, '. (', quickViewLink, ')');
       const emoji = document.createElement('span');
       emoji.classList.add('mr-1');
@@ -2026,10 +2032,9 @@ async function inject() {
       hasDuplicates.innerHTML = 'This performer has duplicates:';
       foundData.duplicates.forEach((dupId) => {
         hasDuplicates.insertAdjacentHTML('beforeend', '<br>');
-        const a = makeLink(`/performers/${dupId}`, dupId);
+        const a = makeLink(`/performers/${dupId}`, dupId, { color: 'var(--teal)', marginLeft: '1.75rem' });
         a.target = '_blank';
         a.classList.add('font-weight-normal');
-        setStyles(a, { color: 'var(--teal)', marginLeft: '1.75rem' });
         hasDuplicates.append(a);
 
         if (isMarkedForSplit(dupId)) a.insertAdjacentText('afterend', ' 🔀 needs to be split up');
@@ -2046,10 +2051,9 @@ async function inject() {
       const duplicateOf = document.createElement('div');
       duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
       duplicateOf.innerText = 'This performer is a duplicate of: ';
-      const a = makeLink(`/performers/${foundData.duplicate_of}`, foundData.duplicate_of);
+      const a = makeLink(`/performers/${foundData.duplicate_of}`, foundData.duplicate_of, { color: 'var(--teal)' });
       a.target = '_blank';
       a.classList.add('font-weight-normal');
-      a.style.color = 'var(--teal)';
       duplicateOf.append(a);
       if (isMarkedForSplit(foundData.duplicate_of)) a.insertAdjacentText('afterend', ' 🔀 needs to be split up');
       const emoji = document.createElement('span');
