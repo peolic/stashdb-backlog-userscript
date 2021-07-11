@@ -25,6 +25,7 @@ const eventPrefix = 'stashdb_backlog';
 const devUsername = 'peolic';
 
 async function inject() {
+  const ignoredContentKeys = ['contentHash', 'lastUpdated', 'comments'];
   const backlogSpreadsheet = 'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ';
   const BASE_URL =
     dev
@@ -656,8 +657,7 @@ async function inject() {
     if (haystack[uuid] === undefined) {
       haystack[uuid] = [
         '',
-        ...Object.keys(data)
-          .filter((k) => !['contentHash', 'lastUpdated', 'comments'].includes(k)),
+        ...Object.keys(data).filter((k) => !ignoredContentKeys.includes(k)),
       ];
     }
     await Cache.setDataIndex(index);
