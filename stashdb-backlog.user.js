@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.20.0
+// @version     1.20.1
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -120,6 +120,7 @@ async function inject() {
 
     setUpStatusDiv();
     setUpMenu();
+    setUpInfo();
 
     const { object, ident, action } = loc;
 
@@ -201,6 +202,60 @@ async function inject() {
       }, resetAfter);
       statusDiv.dataset.reset = String(id);
     }
+  }
+
+  async function setUpInfo() {
+    if (!isDev) return;
+
+    let info = /** @type {HTMLDivElement} */ (document.querySelector('#root nav > .backlog-info > div'));
+    if (!info) {
+      const infoContainer = document.createElement('div');
+      infoContainer.classList.add('backlog-info');
+      infoContainer.style.position = 'relative';
+
+      const icon = document.createElement('span');
+      icon.innerText = '📃';
+      icon.title = 'Backlog Info';
+      setStyles(icon, {
+        cursor: 'pointer',
+        position: 'absolute',
+        left: '2px',
+        top: '-12px',
+      });
+
+      info = document.createElement('div');
+      setStyles(info, {
+        position: 'absolute',
+        width: '300px',
+        top: '32px',
+        right: '-20px',
+        textAlign: 'center',
+        border: '.25rem solid #ccc',
+        padding: '0.3rem',
+        display: 'none',
+      });
+
+      icon.addEventListener('click', () => {
+        info.style.display = info.style.display === 'none' ? '' : 'none';
+      });
+
+      infoContainer.append(icon, info);
+
+      const target = document.querySelector('#root nav');
+      target.appendChild(infoContainer);
+    }
+
+    const index = await Cache.getStoredDataIndex();
+    if (!index.lastUpdated) {
+      info.innerText = `backlog index last updated:\n?`;
+      return;
+    }
+
+    const { lastUpdated } = index;
+    const diff = new Date().getTime() - new Date(lastUpdated).getTime();
+    const seconds = Number((diff / 1000).toFixed(0));
+    const ago = seconds ? `${formatDuration(seconds)} ago` : 'now';
+    info.innerText = `backlog index last updated:\n${ago} (${formatDate(lastUpdated)})`;
   }
 
   async function _setUpMenu() {
@@ -574,6 +629,7 @@ async function inject() {
       dataIndex.lastUpdated = dataIndex.lastChecked = new Date().toISOString();
       await Cache.setDataIndex(dataIndex);
       console.debug(`[backlog] index ${action}`);
+      setUpInfo();
       return dataIndex;
     } else {
       console.debug('[backlog] using stored index');
