@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.20.1
+// @version     1.20.2
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -232,6 +232,8 @@ async function inject() {
         textAlign: 'center',
         border: '.25rem solid #ccc',
         padding: '0.3rem',
+        zIndex: '100',
+        backgroundColor: 'var(--gray-dark)',
         display: 'none',
       });
 
@@ -1140,37 +1142,48 @@ async function inject() {
       sceneHeader.appendChild(comments);
     }
 
-    if (found.duplicates) {
-      const hasDuplicates = document.createElement('div');
-      hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
-      hasDuplicates.innerHTML = 'This scene has duplicates:';
-      found.duplicates.forEach((dupId) => {
-        hasDuplicates.append(document.createElement('br'));
-        const a = makeLink(`/scenes/${dupId}`, dupId, { color: 'var(--teal)', marginLeft: '1.75rem' });
+    if (found.duplicates || found.duplicate_of) {
+      let container = document.querySelector('.StashDBContent > div.backlog');
+      if (!container) {
+        container = document.createElement('div');
+        container.classList.add('backlog');
+        sceneInfo.before(container);
+        // Hook to remove it
+        window.addEventListener(`${eventPrefix}_locationchange`, () => container.remove(), { once: true });
+      }
+
+      if (found.duplicates) {
+        const hasDuplicates = document.createElement('div');
+        hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
+        hasDuplicates.innerHTML = 'This scene has duplicates:';
+        found.duplicates.forEach((dupId) => {
+          hasDuplicates.append(document.createElement('br'));
+          const a = makeLink(`/scenes/${dupId}`, dupId, { color: 'var(--teal)', marginLeft: '1.75rem' });
+          a.target = '_blank';
+          a.classList.add('font-weight-normal');
+          hasDuplicates.append(a);
+        });
+        const emoji = document.createElement('span');
+        emoji.classList.add('mr-1');
+        emoji.innerText = '♊';
+        hasDuplicates.prepend(emoji);
+        container.prepend(hasDuplicates);
+      }
+
+      if (found.duplicate_of) {
+        const duplicateOf = document.createElement('div');
+        duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
+        duplicateOf.innerText = 'This scene is a duplicate of: ';
+        const a = makeLink(`/scenes/${found.duplicate_of}`, found.duplicate_of, { color: 'var(--teal)' });
         a.target = '_blank';
         a.classList.add('font-weight-normal');
-        hasDuplicates.append(a);
-      });
-      const emoji = document.createElement('span');
-      emoji.classList.add('mr-1');
-      emoji.innerText = '♊';
-      hasDuplicates.prepend(emoji);
-      sceneInfo.before(hasDuplicates);
-    }
-
-    if (found.duplicate_of) {
-      const duplicateOf = document.createElement('div');
-      duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
-      duplicateOf.innerText = 'This scene is a duplicate of: ';
-      const a = makeLink(`/scenes/${found.duplicate_of}`, found.duplicate_of, { color: 'var(--teal)' });
-      a.target = '_blank';
-      a.classList.add('font-weight-normal');
-      duplicateOf.append(a);
-      const emoji = document.createElement('span');
-      emoji.classList.add('mr-1');
-      emoji.innerText = '♊';
-      duplicateOf.prepend(emoji);
-      sceneInfo.before(duplicateOf);
+        duplicateOf.append(a);
+        const emoji = document.createElement('span');
+        emoji.classList.add('mr-1');
+        emoji.innerText = '♊';
+        duplicateOf.prepend(emoji);
+        container.prepend(duplicateOf);
+      }
     }
 
     if (found.title) {
@@ -2183,7 +2196,7 @@ async function inject() {
     const style = '0.4rem solid';
     if (changes.length === 1) {
       if (changes[0] === 'duplicate_of' || changes[0] === 'duplicates') {
-        return `${style} #886ce4`;
+        return `${style} var(--indigo)`;
       }
       if (changes[0] === 'fingerprints') {
         return `${style} var(--cyan)`;
