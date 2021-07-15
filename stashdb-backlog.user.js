@@ -177,6 +177,8 @@ async function inject() {
     const navLeft = await elementReadyIn('nav > :first-child', 1000);
     navLeft.after(statusDiv);
 
+    window.addEventListener(`${eventPrefix}_locationchange`, () => setStatus(''));
+
     new MutationObserver(() => {
       statusDiv.classList.toggle('d-none', !statusDiv.innerText);
     }).observe(statusDiv, { childList: true, subtree: true });
