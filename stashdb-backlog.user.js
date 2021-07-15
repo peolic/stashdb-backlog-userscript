@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.20.2
+// @version     1.20.3
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -871,8 +871,17 @@ async function inject() {
    */
   async function imageReady(img) {
     if (img.complete && img.naturalHeight !== 0) return;
-    return new Promise((resolve) => {
-      img.addEventListener('load', () => resolve(), { once: true });
+    return new Promise((resolve, reject) => {
+      const onLoad = () => {
+        img.removeEventListener('error', onError);
+        resolve();
+      }
+      const onError = (/** @type {ErrorEvent} */ event) => {
+        img.removeEventListener('load', onLoad);
+        reject(event.message || 'unknown');
+      }
+      img.addEventListener('load', onLoad, { once: true });
+      img.addEventListener('error', onError, { once: true });
     });
   }
 
@@ -901,9 +910,10 @@ async function inject() {
     imgRes.classList.add('position-absolute', `m${position.charAt(0)}-2`, 'px-2', 'font-weight-bold');
     setStyles(imgRes, { [position]: '0', backgroundColor: '#2fb59c', transition: 'opacity .2s ease' });
 
-    imageReady(img).then(() => {
-      imgRes.innerText = `${img.naturalWidth} x ${img.naturalHeight}`;
-    });
+    imageReady(img).then(
+      () => imgRes.innerText = `${img.naturalWidth} x ${img.naturalHeight}`,
+      () => imgRes.innerText = `??? x ???`,
+    );
 
     img.addEventListener('mouseover', () => imgRes.style.opacity = '0');
     img.addEventListener('mouseout', () => imgRes.style.opacity = '');
@@ -1307,7 +1317,7 @@ async function inject() {
       if (img.getAttribute('src')) {
         setStatus(`[backlog] fetching/comparing images...`);
 
-        imageReady(img).then(async () => {
+        const onCurrentImageReady = async () => {
           const newImage = await compareImages(img, newImageBlob);
           imgContainer.classList.add('p-2');
 
@@ -1360,7 +1370,37 @@ async function inject() {
 
           imgContainer.appendChild(newImageContainer);
           setStatus('');
-        });
+        };
+
+        /** @param {any} reason */
+        const onCurrentImageFailed = async (reason) => {
+          imgContainer.style.backgroundColor = 'var(--purple)';
+
+          imgContainer.classList.add('p-2', 'd-flex');
+          imgContainer.title = `error loading current image\n<pending>\n${found.image}`;
+
+          const imgNewLink = makeLink(found.image, '');
+
+          const imgNew = document.createElement('img');
+          imgNew.src = URL.createObjectURL(await newImageBlob);
+          setStyles(imgNew, { width: '100%', height: 'auto' });
+
+          imgNewLink.appendChild(imgNew);
+
+          const newImageContainer = document.createElement('div');
+          newImageContainer.style.flex = 'auto';
+          const imgRes = makeImageResolution(imgNew, 'right');
+          newImageContainer.append(imgRes, imgNewLink);
+
+          imgContainer.appendChild(newImageContainer);
+
+          setStatus(`[backlog] error loading current image:\n${reason}`);
+        };
+
+        imageReady(img).then(
+          onCurrentImageReady,
+          onCurrentImageFailed,
+        );
 
       } else {
         // missing image
