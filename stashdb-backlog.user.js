@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.20.3
+// @version     1.20.4
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1458,8 +1458,14 @@ async function inject() {
             nameParts.push(dsmbg.textContent);
           }
         }
+        let status;
+        const statusMatch = nameParts[0].match(/^\[([a-z]+?)\] .+$/i);
+        if (statusMatch) {
+          status = statusMatch[1];
+          nameParts[0] = nameParts[0].slice(status.length + 3);
+        }
         const fullName = nameParts.join(' ');
-        return ({ uuid, fullName });
+        return { uuid, fullName, first: nameParts[0], status };
       };
 
       const formatName = (/** @type {PerformerEntry} */ entry) => {
@@ -1507,8 +1513,8 @@ async function inject() {
       };
 
       const scenePerformers = sceneFooter.querySelector('.scene-performers');
-      /** @type {NodeListOf<HTMLAnchorElement>} */
-      const existingPerformers = (scenePerformers.querySelectorAll(':scope > a.scene-performer'));
+      /** @type {HTMLAnchorElement[]} */
+      const existingPerformers = Array.from(scenePerformers.querySelectorAll(':scope > a.scene-performer'));
 
       existingPerformers.forEach((performer) => {
         const { uuid, fullName } = parsePerformerAppearance(performer);
@@ -1518,6 +1524,7 @@ async function inject() {
 
         if (toRemove) {
           highlight(performer, 'danger');
+          performer.classList.add('backlog-remove'); // Useful for new performers below
           if (toRemove.status) {
             performer.children[1].prepend(`[${toRemove.status}] `);
             performer.title = `<pending>\n${toRemove.status}`;
@@ -1594,7 +1601,17 @@ async function inject() {
             makeLink(entry.status_url, null, null, pa);
           }
         }
-        scenePerformers.appendChild(pa);
+
+        // Attempt to insert new performer next to performer-to-remove with the same name
+        const matchedToRemove = existingPerformers.find((p) => (
+          p.classList.contains('backlog-remove')
+          && [entry.appearance, entry.name].includes(parsePerformerAppearance(p).first)
+        ));
+        if (matchedToRemove) {
+          matchedToRemove.after(pa);
+        } else {
+          scenePerformers.appendChild(pa);
+        }
       });
 
       remove.forEach((entry) => {
