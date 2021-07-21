@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.20.4
+// @version     1.20.5
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1028,7 +1028,7 @@ async function inject() {
   };
 
   /**
-   * @param {Partial<CSSStyleDeclaration>} style
+   * @param {Partial<CSSStyleDeclaration>} [style]
    * @returns {SVGSVGElement}
    */
   const performersIcon = (style) => {
@@ -2293,7 +2293,7 @@ async function inject() {
         card.style.outline = getHighlightStyle('scenes', changes);
         sceneCard.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
 
-        if (isDev) sceneCardHighlightChanges(card, changes);
+        sceneCardHighlightChanges(card, changes);
       });
     };
 
@@ -2367,7 +2367,7 @@ async function inject() {
         card.style.outline = getHighlightStyle(object, changes);
         if (object === 'scenes') {
           cardLink.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
-          if (isDev) sceneCardHighlightChanges(card, changes);
+          sceneCardHighlightChanges(card, changes);
         } else if (object === 'performers') {
           cardLink.title = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
         }
@@ -2381,6 +2381,8 @@ async function inject() {
    * @param {string[]} changes
    */
    function sceneCardHighlightChanges(card, changes) {
+    if (!isDev) return;
+
     /** @type {HTMLDivElement | HTMLAnchorElement} */
     const parent = (card.parentElement);
     const isSearchCard = parent.classList.contains('SearchPage-scene');
@@ -2472,7 +2474,7 @@ async function inject() {
         card.querySelector('a.SceneCard-image')
           .append(
             performersIcon({
-              color: 'var(--yellow)',
+              color,
               fontSize: '2em',
               position: 'absolute',
               left: '4px',
@@ -2481,8 +2483,14 @@ async function inject() {
             })
           );
       } else {
-        const performers = card.querySelector('div > svg[data-icon="users"]').parentElement;
+        const icon = card.querySelector('div > svg[data-icon="users"]');
+        const performers = icon ? icon.parentElement : document.createElement('div');
         performers.style.color = color;
+        if (!icon) {
+          performers.innerText = '???';
+          performers.prepend(performersIcon());
+          card.querySelector('h5 + div').append(performers);
+        }
       }
     }
   }
