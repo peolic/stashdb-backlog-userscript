@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.20.5
+// @version     1.20.6
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -207,8 +207,6 @@ async function inject() {
   }
 
   async function setUpInfo() {
-    if (!isDev) return;
-
     let info = /** @type {HTMLDivElement} */ (document.querySelector('#root nav > .backlog-info > div'));
     if (!info) {
       const infoContainer = document.createElement('div');
@@ -256,9 +254,7 @@ async function inject() {
     }
 
     const { lastUpdated } = index;
-    const diff = new Date().getTime() - new Date(lastUpdated).getTime();
-    const seconds = Number((diff / 1000).toFixed(0));
-    const ago = seconds ? `${formatDuration(seconds)} ago` : 'now';
+    const ago = humanRelativeDate(new Date(lastUpdated));
     info.innerText = `backlog index last updated:\n${ago} (${formatDate(lastUpdated)})`;
   }
 
@@ -312,6 +308,39 @@ async function inject() {
     ];
     if (hour) res.unshift(hour.toString());
     return res.join(":");
+  }
+
+  /**
+   * @param {Date} dt
+   * @returns {string}
+   * @see https://github.com/bahamas10/human/blob/a1dd7dab562fabce86e98395bc70ae8426bb188e/human.js
+   */
+  function humanRelativeDate(dt) {
+    let seconds = Math.round((Date.now() - dt.getTime()) / 1000);
+    const suffix = seconds < 0 ? 'from now' : 'ago';
+    seconds = Math.abs(seconds);
+
+    const times = [
+      seconds / 60 / 60 / 24 / 365, // years
+      seconds / 60 / 60 / 24 / 30,  // months
+      seconds / 60 / 60 / 24 / 7,   // weeks
+      seconds / 60 / 60 / 24,       // days
+      seconds / 60 / 60,            // hours
+      seconds / 60,                 // minutes
+      seconds                       // seconds
+    ];
+    const names = ['year', 'month', 'week', 'day', 'hour', 'minute', 'second'];
+
+    for (let i = 0; i < names.length; i++) {
+      const time = Math.floor(times[i]);
+      let name = names[i];
+      if (time > 1)
+        name += 's';
+
+      if (time >= 1)
+        return `${time} ${name} ${suffix}`;
+    }
+    return 'now';
   }
 
   /**
