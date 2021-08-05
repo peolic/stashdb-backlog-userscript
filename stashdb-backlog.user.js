@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.20.6
+// @version     1.20.7
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1632,12 +1632,18 @@ async function inject() {
         }
 
         // Attempt to insert new performer next to performer-to-remove with the same name
-        const matchedToRemove = existingPerformers.find((p) => (
-          p.classList.contains('backlog-remove')
-          && [entry.appearance, entry.name].includes(parsePerformerAppearance(p).first)
-        ));
+        const pendingRemoval = existingPerformers
+          .reduce((pending, el) => {
+            return el.classList.contains('backlog-remove')
+              ? pending.concat({ first: parsePerformerAppearance(el).first, pa: el })
+              : pending;
+          }, /** @type {{ first: string, pa: HTMLAnchorElement }[]} */ ([]));
+        const matchedToRemove = (
+          pendingRemoval.find(({ first }) => [entry.appearance, entry.name].includes(first))
+          || pendingRemoval.find(({ first }) => entry.name.split(/\b/)[0] == first.split(/\b/)[0])
+        );
         if (matchedToRemove) {
-          matchedToRemove.after(pa);
+          matchedToRemove.pa.after(pa);
         } else {
           scenePerformers.appendChild(pa);
         }
