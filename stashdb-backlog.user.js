@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.20.7
+// @version     1.20.8
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -226,7 +226,7 @@ async function inject() {
       info = document.createElement('div');
       setStyles(info, {
         position: 'absolute',
-        width: '300px',
+        width: '280px',
         top: '32px',
         right: '-20px',
         textAlign: 'center',
@@ -247,15 +247,32 @@ async function inject() {
       target.appendChild(infoContainer);
     }
 
+    /**
+     * @param {string} text
+     * @param {...string} cls
+     */
+    const block = (text, ...cls) => {
+      const div = document.createElement('div');
+      if (cls.length > 0) div.classList.add(...cls);
+      div.innerText = text;
+      return div;
+    };
+
+    info.innerHTML = '';
+    info.append(block('backlog index last updated:'));
+
     const index = await Cache.getStoredDataIndex();
     if (!index.lastUpdated) {
-      info.innerText = `backlog index last updated:\n?`;
+      info.append(block('?', 'd-inline-block'));
       return;
     }
 
     const { lastUpdated } = index;
     const ago = humanRelativeDate(new Date(lastUpdated));
-    info.innerText = `backlog index last updated:\n${ago} (${formatDate(lastUpdated)})`;
+    info.append(
+      block(ago, 'd-inline-block', 'mr-1'),
+      block(`(${formatDate(lastUpdated)})`, 'd-inline-block'),
+    );
   }
 
   async function _setUpMenu() {
