@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.20.8
+// @version     1.20.9
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1553,9 +1553,10 @@ async function inject() {
         return pa;
       };
 
-      const highlight = (/** @type {HTMLElement} */ e, /** @type {string} */ v) => {
-        setStyles(e, { border: `6px solid var(--${v})`, borderRadius: '6px', padding: '.1rem .25rem' });
-        e.classList.add('d-inline-block');
+      const highlight = (/** @type {HTMLElement} */ el, /** @type {string} */ color) => {
+        color = color.startsWith('--') ? `var(${color})` : color;
+        setStyles(el, { border: `6px solid ${color}`, borderRadius: '6px', padding: '.1rem .25rem' });
+        el.classList.add('d-inline-block');
       };
 
       const scenePerformers = sceneFooter.querySelector('.scene-performers');
@@ -1569,12 +1570,12 @@ async function inject() {
         const toUpdate = update.find((e) => e.id === uuid);
 
         if (toRemove) {
-          highlight(performer, 'danger');
+          highlight(performer, '--danger');
           performer.classList.add('backlog-remove'); // Useful for new performers below
           if (toRemove.status) {
             performer.children[1].prepend(`[${toRemove.status}] `);
             performer.title = `<pending>\n${toRemove.status}`;
-            performer.style.color = 'var(--yellow)';
+            setStyles(performer, { color: 'violet', fontStyle: 'italic' });
             if (toRemove.status == 'edit') {
               performer.title += (
                 ' (performer needs to edited to become \n'
@@ -1600,14 +1601,14 @@ async function inject() {
         if (toAppend) {
           const entryFullName = formatName(toAppend);
           if (fullName === entryFullName) {
-            highlight(performer, 'warning');
+            highlight(performer, '--warning');
             performer.title = makeAlreadyCorrectTitle('added');
             if (!toAppend.id) {
               performer.title += '\n[missing ID - matched by name]';
               performer.style.color = 'var(--yellow)';
             }
           } else {
-            highlight(performer, 'primary');
+            highlight(performer, '--primary');
             performer.title = `<already added>\nbut needs an update to\n${entryFullName}`;
           }
           removeFrom(toAppend, append);
@@ -1616,7 +1617,7 @@ async function inject() {
         if (toUpdate) {
           const entryFullName = formatName(toUpdate);
           if (fullName === entryFullName) {
-            highlight(performer, 'warning');
+            highlight(performer, '--warning');
             performer.title = makeAlreadyCorrectTitle('updated');
           } else {
             const arrow = document.createElement('span');
@@ -1624,7 +1625,7 @@ async function inject() {
             arrow.innerText = '\u{22D9}';
             performer.appendChild(arrow);
             performer.append(...nameElements(toUpdate));
-            highlight(performer, 'primary');
+            highlight(performer, '--primary');
             performer.title = `<pending>\nupdate to\n${entryFullName}`;
           }
           removeFrom(toUpdate, update);
@@ -1633,13 +1634,15 @@ async function inject() {
 
       append.forEach((entry) => {
         const pa = makePerformerAppearance(entry);
-        highlight(pa, 'success');
+        let hColor = '--success';
         pa.title = `<pending>\naddition`;
         if (!entry.id) {
           if (entry.status === 'new') {
             pa.title += ' (performer needs to be created)';
+            hColor = 'turquoise';
           } else if (entry.status == 'c') {
             pa.title += ' (performer created, pending approval)';
+            hColor = 'turquoise';
           } else {
             pa.title += ' (missing performer ID)';
           }
@@ -1647,19 +1650,24 @@ async function inject() {
             makeLink(entry.status_url, null, null, pa);
           }
         }
+        highlight(pa, hColor);
 
         // Attempt to insert new performer next to performer-to-remove with the same name
         const pendingRemoval = existingPerformers
           .reduce((pending, el) => {
-            return el.classList.contains('backlog-remove')
-              ? pending.concat({ first: parsePerformerAppearance(el).first, pa: el })
-              : pending;
-          }, /** @type {{ first: string, pa: HTMLAnchorElement }[]} */ ([]));
+            if (el.classList.contains('backlog-remove')) {
+              const { first, status } = parsePerformerAppearance(el);
+              pending.push({ first, status, pa: el });
+            }
+            return pending;
+          }, /** @type {{ first: string, status?: string, pa: HTMLAnchorElement }[]} */ ([]));
         const matchedToRemove = (
           pendingRemoval.find(({ first }) => [entry.appearance, entry.name].includes(first))
           || pendingRemoval.find(({ first }) => entry.name.split(/\b/)[0] == first.split(/\b/)[0])
         );
         if (matchedToRemove) {
+          if (matchedToRemove.status)
+            pa.style.color = 'violet';
           matchedToRemove.pa.after(pa);
         } else {
           scenePerformers.appendChild(pa);
@@ -1669,7 +1677,7 @@ async function inject() {
       remove.forEach((entry) => {
         console.warn('[backlog] entry to remove not found. already removed?', entry);
         const pa = makePerformerAppearance(entry);
-        highlight(pa, 'warning');
+        highlight(pa, '--warning');
         pa.style.color = 'var(--yellow)';
         pa.title = `performer-to-remove not found. already removed?`;
         scenePerformers.appendChild(pa);
@@ -1678,7 +1686,7 @@ async function inject() {
       update.forEach((entry) => {
         console.warn('[backlog] entry to update not found.', entry);
         const pa = makePerformerAppearance(entry);
-        highlight(pa, 'warning');
+        highlight(pa, '--warning');
         pa.style.color = 'var(--yellow)';
         pa.title = `performer-to-update is missing.`;
         scenePerformers.appendChild(pa);
