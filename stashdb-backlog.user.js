@@ -2432,7 +2432,7 @@ async function inject() {
    * @param {HTMLDivElement} card
    * @param {string[]} changes
    */
-   function sceneCardHighlightChanges(card, changes) {
+  function sceneCardHighlightChanges(card, changes) {
     if (!isDev) return;
 
     /** @type {HTMLDivElement | HTMLAnchorElement} */
