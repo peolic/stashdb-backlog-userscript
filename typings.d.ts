@@ -49,7 +49,7 @@ type SceneFingerprint = {
 
 interface SceneDataObject extends Omit<BaseCache, "lastChecked"> {
     duplicates?: string[];
-    duplicate_of: string;
+    duplicate_of?: string;
     title?: string;
     date?: string;
     duration?: string;
@@ -70,7 +70,7 @@ interface SceneDataObject extends Omit<BaseCache, "lastChecked"> {
 
 interface PerformerDataObject extends Omit<BaseCache, "lastChecked"> {
     duplicates?: string[];
-    duplicate_of: string;
+    duplicate_of?: string;
 }
 
 interface DataCache {
