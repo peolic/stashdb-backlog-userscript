@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.20.9
+// @version     1.21.0
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2203,11 +2203,6 @@ async function inject() {
 
     highlightSceneCards('performers', index);
 
-    const found = index.performers[performerId];
-    if (!found) return;
-
-    const info = found.slice(1);
-
     /** @type {HTMLElement[]} */
     const highlightElements = [];
 
@@ -2223,6 +2218,72 @@ async function inject() {
         highlightElements.forEach((el) => el.style.backgroundColor = '');
       });
     }
+
+    // Performer scene changes based on cached data (could be out-of-date)
+    await (async function () {
+      const { scenes: storedScenes } = await Cache.getStoredData();
+      /** @typedef {[sceneId: string, entry: PerformerEntry]} performerScene */
+      /** @type {{ append: performerScene[], remove: performerScene[] }} */
+      const performerScenes = { append: [], remove: [] };
+      for (const [sceneId, scene] of Object.entries(storedScenes)) {
+        if (!scene.performers) continue;
+        const { append, remove } = scene.performers;
+        const appendEntry = append.find(({ id }) => id === performerId);
+        if (appendEntry) {
+          performerScenes.append.push([sceneId, appendEntry]);
+        }
+        const removeEntry = remove.find(({ id }) => id === performerId);
+        if (removeEntry) {
+          performerScenes.remove.push([sceneId, removeEntry]);
+        }
+      }
+
+      if (performerScenes.append.length === 0 && performerScenes.remove.length === 0) return;
+
+      const sceneChanges = document.createElement('div');
+      sceneChanges.classList.add('mb-1', 'p-1', 'font-weight-bold');
+      sceneChanges.innerHTML = 'This performer has pending scene changes: (info may be outdated)';
+      for (const [actionStr, scenes] of Object.entries(performerScenes)) {
+        if (scenes.length === 0) continue;
+        const action = /** @type {'append' | 'remove'} */ (actionStr);
+        const details = document.createElement('details');
+        details.style.marginLeft = '1.5rem';
+        const summary = document.createElement('summary');
+        setStyles(summary, { color: 'tan', width: 'max-content' });
+        let prefix = {
+          append: '\u{FF0B}',
+          remove: '\u{FF0D}',
+        };
+        summary.innerText = `${prefix[action]} ${scenes.length} scene${scenes.length === 1 ? '' : 's'}`;
+        details.append(summary);
+        const sceneLinks = document.createElement('div');
+        setStyles(sceneLinks, { marginLeft: '1.3rem', fontWeight: 'normal' });
+        scenes.forEach(([sceneId, entry], idx) => {
+          if (idx > 0) sceneLinks.append(document.createElement('br'));
+          const a = makeLink(`/scenes/${sceneId}`, sceneId, {
+            color: 'var(--teal)',
+            fontFamily: 'monospace',
+            fontSize: '16px',
+          });
+          a.target = '_blank';
+          sceneLinks.append(a);
+          if (action === 'append') sceneLinks.append(` (as ${entry.appearance || entry.name})`);
+        });
+        details.append(sceneLinks);
+        sceneChanges.append(details);
+      }
+      const emoji = document.createElement('span');
+      emoji.classList.add('mr-1');
+      emoji.innerText = '🎥';
+      sceneChanges.prepend(emoji);
+      performerInfo.prepend(sceneChanges);
+      highlightElements.push(sceneChanges);
+    })();
+
+    const found = index.performers[performerId];
+    if (!found) return;
+
+    const info = found.slice(1);
 
     if (info.includes('split')) {
       const toSplit = document.createElement('div');
