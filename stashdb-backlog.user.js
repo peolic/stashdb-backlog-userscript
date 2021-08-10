@@ -273,6 +273,21 @@ async function inject() {
       block(ago, 'd-inline-block', 'mr-1'),
       block(`(${formatDate(lastUpdated)})`, 'd-inline-block'),
     );
+
+    const storedData = await Cache.getStoredData();
+
+    const cachedScenes = Object.keys(storedData.scenes).length;
+    const totalScenes = Object.keys(index.scenes).length;
+
+    const cachedPerformers = Object.keys(storedData.performers).length
+    const totalPerformers = Object.values(index.performers).filter(([hash]) => !!hash).length;
+
+    info.append(
+      block('cached scenes:', 'd-inline-block', 'mr-1'),
+      block(`${cachedScenes} / ${totalScenes}`, 'd-inline-block'),
+      block('cached performers:', 'd-inline-block', 'mr-1'),
+      block(`${cachedPerformers} / ${totalPerformers}`, 'd-inline-block'),
+    );
   }
 
   async function _setUpMenu() {
