@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.21.0
+// @version     1.21.1
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2249,7 +2249,8 @@ async function inject() {
         }
         const removeEntry = remove.find(({ id }) => id === performerId);
         if (removeEntry) {
-          performerScenes.remove.push([sceneId, removeEntry]);
+          const targetEntry = append.find(({ appearance, name }) => appearance ? appearance === removeEntry.name : name === removeEntry.name);
+          performerScenes.remove.push([sceneId, targetEntry || null]);
         }
       }
 
@@ -2283,6 +2284,13 @@ async function inject() {
           a.target = '_blank';
           sceneLinks.append(a);
           if (action === 'append') sceneLinks.append(` (as ${entry.appearance || entry.name})`);
+          if (action === 'remove' && entry) {
+            const pName = entry.name + (entry.disambiguation ? ` (${entry.disambiguation})` : '');
+            const pLink = entry.id
+              ? makeLink(`/performers/${entry.id}`, pName, { color: 'var(--teal)' })
+              : pName;
+            sceneLinks.append(' (target: ', pLink, ')');
+          }
         });
         details.append(sceneLinks);
         sceneChanges.append(details);
