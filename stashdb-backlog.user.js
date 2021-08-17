@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.21.1
+// @version     1.21.2
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2256,9 +2256,20 @@ async function inject() {
 
       if (performerScenes.append.length === 0 && performerScenes.remove.length === 0) return;
 
+      const pName = {
+        /** @param {PerformerEntry} entry */
+        append: ({ appearance, name }) => appearance || name,
+        /** @param {PerformerEntry} entry */
+        remove: ({ name, disambiguation }) => name + (disambiguation ? ` (${disambiguation})` : ''),
+      };
+      const actionPrefix = {
+        append: '\u{FF0B}', // ＋
+        remove: '\u{FF0D}', // －
+      };
+
       const sceneChanges = document.createElement('div');
       sceneChanges.classList.add('mb-1', 'p-1', 'font-weight-bold');
-      sceneChanges.innerHTML = 'This performer has pending scene changes: (info may be outdated)';
+      sceneChanges.innerHTML = 'This performer has pending scene changes: (info may be outdated or incomplete)';
       for (const [actionStr, scenes] of Object.entries(performerScenes)) {
         if (scenes.length === 0) continue;
         const action = /** @type {'append' | 'remove'} */ (actionStr);
@@ -2266,32 +2277,29 @@ async function inject() {
         details.style.marginLeft = '1.5rem';
         const summary = document.createElement('summary');
         setStyles(summary, { color: 'tan', width: 'max-content' });
-        let prefix = {
-          append: '\u{FF0B}',
-          remove: '\u{FF0D}',
-        };
-        summary.innerText = `${prefix[action]} ${scenes.length} scene${scenes.length === 1 ? '' : 's'}`;
+        summary.innerText = `${actionPrefix[action]} ${scenes.length} scene${scenes.length === 1 ? '' : 's'}`;
         details.append(summary);
         const sceneLinks = document.createElement('div');
         setStyles(sceneLinks, { marginLeft: '1.3rem', fontWeight: 'normal' });
-        scenes.forEach(([sceneId, entry], idx) => {
-          if (idx > 0) sceneLinks.append(document.createElement('br'));
-          const a = makeLink(`/scenes/${sceneId}`, sceneId, {
-            color: 'var(--teal)',
-            fontFamily: 'monospace',
-            fontSize: '16px',
+        scenes
+          .sort(([, a], [, b]) => pName[action](a).localeCompare(pName[action](b)))
+          .forEach(([sceneId, entry], idx) => {
+            if (idx > 0) sceneLinks.append(document.createElement('br'));
+            const a = makeLink(`/scenes/${sceneId}`, sceneId, {
+              color: 'var(--teal)',
+              fontFamily: 'monospace',
+              fontSize: '16px',
+            });
+            a.target = '_blank';
+            sceneLinks.append(a);
+            if (action === 'append') sceneLinks.append(` (as ${pName[action](entry)})`);
+            if (action === 'remove' && entry) {
+              const pLink = entry.id
+                ? makeLink(`/performers/${entry.id}`, pName[action](entry), { color: 'var(--teal)' })
+                : pName[action](entry);
+              sceneLinks.append(' (target: ', pLink, ')');
+            }
           });
-          a.target = '_blank';
-          sceneLinks.append(a);
-          if (action === 'append') sceneLinks.append(` (as ${entry.appearance || entry.name})`);
-          if (action === 'remove' && entry) {
-            const pName = entry.name + (entry.disambiguation ? ` (${entry.disambiguation})` : '');
-            const pLink = entry.id
-              ? makeLink(`/performers/${entry.id}`, pName, { color: 'var(--teal)' })
-              : pName;
-            sceneLinks.append(' (target: ', pLink, ')');
-          }
-        });
         details.append(sceneLinks);
         sceneChanges.append(details);
       }
