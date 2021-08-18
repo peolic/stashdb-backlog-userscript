@@ -296,6 +296,56 @@ async function inject() {
       block('cached performers:', 'd-inline-block', 'mr-1'),
       block(`${cachedPerformers} / ${totalPerformers}`, 'd-inline-block'),
     );
+
+    if (isDev) {
+      const button = document.createElement('span');
+      button.innerText = 'Uncached/Outdated objects';
+      setStyles(button, { display: 'inline-block', color: 'aqua', fontWeight: '700', cursor: 'pointer', });
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        button.remove();
+        getUncachedOutdatedObjects(info, index, storedData);
+        return false;
+      })
+      info.append(button);
+      return;
+    }
+  }
+
+  /**
+   * @param {HTMLDivElement} info
+   * @param {DataIndex} index
+   * @param {DataCache} storedData
+   */
+  function getUncachedOutdatedObjects(info, index, storedData) {
+    let anyUncachedOrOutdated = false;
+    /** @type {SupportedObject[]} */
+    (['scenes', 'performers']).forEach((obj) => {
+      const uncached = Object.entries(index[obj])
+        .filter(([objId, [hash]]) => !!hash && (!Object.keys(storedData[obj]).includes(objId) || storedData[obj][objId].contentHash !== hash))
+        .map(([objId, [hash]]) => {
+          const outdated = storedData[obj][objId] && storedData[obj][objId].contentHash !== hash;
+          const a = makeLink(`/${obj}/${objId}`, `${obj.slice(0, -1)}`, {
+            display: 'inline-block',
+            margin: '0 .2rem',
+            color: outdated ? 'var(--orange)' : 'var(--teal)',
+          });
+          a.target = '_blank';
+          return a;
+        });
+      if (uncached.length === 0) return;
+      const hr = document.createElement('hr');
+      hr.style.borderTopColor = '#fff';
+      info.append(hr, ...uncached);
+      anyUncachedOrOutdated = true;
+    });
+
+    if (anyUncachedOrOutdated) {
+      /** @type {HTMLSpanElement} */
+      const icon = info.parentElement.querySelector(':scope > span[title]');
+      icon.innerText = '📙';
+    }
   }
 
   async function _setUpMenu() {
