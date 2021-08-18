@@ -206,7 +206,7 @@ async function inject() {
     }
   }
 
-  async function setUpInfo() {
+  function setUpInfo() {
     let info = /** @type {HTMLDivElement} */ (document.querySelector('#root nav > .backlog-info > div'));
     if (!info) {
       const infoContainer = document.createElement('div');
@@ -237,8 +237,13 @@ async function inject() {
         display: 'none',
       });
 
-      icon.addEventListener('click', () => {
-        info.style.display = info.style.display === 'none' ? '' : 'none';
+      icon.addEventListener('click', async () => {
+        if (info.style.display === 'none') {
+          await updateInfo();
+          info.style.display = '';
+        } else {
+          info.style.display = 'none';
+        }
       });
 
       infoContainer.append(icon, info);
@@ -246,6 +251,10 @@ async function inject() {
       const target = document.querySelector('#root nav');
       target.appendChild(infoContainer);
     }
+  }
+
+  async function updateInfo() {
+    const info = /** @type {HTMLDivElement} */ (document.querySelector('#root nav > .backlog-info > div'));
 
     /**
      * @param {string} text
@@ -264,22 +273,21 @@ async function inject() {
     const index = await Cache.getStoredDataIndex();
     if (!index.lastUpdated) {
       info.append(block('?', 'd-inline-block'));
-      return;
+    } else {
+      const { lastUpdated } = index;
+      const ago = humanRelativeDate(new Date(lastUpdated));
+      info.append(
+        block(ago, 'd-inline-block', 'mr-1'),
+        block(`(${formatDate(lastUpdated)})`, 'd-inline-block'),
+      );
     }
-
-    const { lastUpdated } = index;
-    const ago = humanRelativeDate(new Date(lastUpdated));
-    info.append(
-      block(ago, 'd-inline-block', 'mr-1'),
-      block(`(${formatDate(lastUpdated)})`, 'd-inline-block'),
-    );
 
     const storedData = await Cache.getStoredData();
 
     const cachedScenes = Object.keys(storedData.scenes).length;
     const totalScenes = Object.keys(index.scenes).length;
 
-    const cachedPerformers = Object.keys(storedData.performers).length
+    const cachedPerformers = Object.keys(storedData.performers).length;
     const totalPerformers = Object.values(index.performers).filter(([hash]) => !!hash).length;
 
     info.append(
@@ -694,7 +702,7 @@ async function inject() {
       dataIndex.lastUpdated = dataIndex.lastChecked = new Date().toISOString();
       await Cache.setDataIndex(dataIndex);
       console.debug(`[backlog] index ${action}`);
-      setUpInfo();
+      updateInfo();
       return dataIndex;
     } else {
       console.debug('[backlog] using stored index');
@@ -756,6 +764,7 @@ async function inject() {
         ].filter(Boolean).join(' and ');
         console.debug(`[backlog] <${object} ${uuid}> removed from ${from}, no longer valid`);
       }
+      updateInfo();
       return null;
     } else if (data === null || 'error' in data) {
       console.error(`[backlog] <${object} ${uuid}> data error`, data);
@@ -783,7 +792,7 @@ async function inject() {
     }
     await Cache.setDataIndex(index);
     console.debug('[backlog] stored data index updated');
-
+    updateInfo();
     return dataObject;
   };
 
