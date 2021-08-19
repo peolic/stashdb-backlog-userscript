@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.21.2
+// @version     1.21.3
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2088,6 +2088,19 @@ async function inject() {
                 nodes.unshift(`<${entry.status}> `);
               }
               info.append(...nodes);
+
+              /** @type {HTMLInputElement} */
+              const fieldEl = sceneFormCol.querySelector(`input[placeholder="${entry.name}"]`);
+              if (fieldEl) {
+                const set = document.createElement('a');
+                set.innerText = 'set alias';
+                setStyles(set, { marginLeft: '.5rem', color: 'var(--yellow)', cursor: 'pointer', fontWeight: '700' });
+                set.addEventListener('click', () => {
+                  fieldEl.value = entry.appearance || '';
+                  fieldEl.dispatchEvent(new Event('input'));
+                });
+                a.after(set);
+              }
             } else {
               const a = makeLink(`/performers/${entry.id}`, name + appearance, { color: 'var(--teal)' });
               a.target = '_blank';
@@ -2258,8 +2271,11 @@ async function inject() {
         }
         const removeEntry = remove.find(({ id }) => id === performerId);
         if (removeEntry) {
-          const targetEntry = append.find(({ appearance, name }) => appearance ? appearance === removeEntry.name : name === removeEntry.name);
-          performerScenes.remove.push([sceneId, targetEntry || null]);
+          const targetEntry = append.find(({ appearance, name }) => {
+            if (appearance) return [appearance, name].includes(removeEntry.name);
+            return name.split(/\b/)[0] === removeEntry.name.split(/\b/)[0];
+          });
+          performerScenes.remove.push([sceneId, targetEntry]);
         }
       }
 
@@ -2267,9 +2283,17 @@ async function inject() {
 
       const pName = {
         /** @param {PerformerEntry} entry */
-        append: ({ appearance, name }) => appearance || name,
+        append: (entry) => {
+          if (!entry) return null;
+          const { appearance, name } = entry;
+          return appearance || name;
+        },
         /** @param {PerformerEntry} entry */
-        remove: ({ name, disambiguation }) => name + (disambiguation ? ` (${disambiguation})` : ''),
+        remove: (entry) => {
+          if (!entry) return null;
+          const { name, disambiguation } = entry;
+          return name + (disambiguation ? ` (${disambiguation})` : '');
+        },
       };
       const actionPrefix = {
         append: '\u{FF0B}', // ＋
