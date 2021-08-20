@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.21.3
+// @version     1.21.4
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1759,10 +1759,15 @@ async function inject() {
 
       update.forEach((entry) => {
         console.warn('[backlog] entry to update not found.', entry);
-        const pa = makePerformerAppearance(entry);
+        const expectedEntry = { ...entry, appearance: entry.old_appearance };
+        const pa = makePerformerAppearance(expectedEntry);
         highlight(pa, '--warning');
         pa.style.color = 'var(--yellow)';
-        pa.title = `performer-to-update is missing.`;
+        pa.title = `performer-to-update is missing: ${formatName(expectedEntry)}.`;
+        const arrow = document.createElement('span');
+        arrow.classList.add('mx-1');
+        arrow.innerText = '\u{22D9}';
+        pa.append(arrow, ...nameElements(entry));
         scenePerformers.appendChild(pa);
       });
     }
