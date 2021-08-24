@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.21.4
+// @version     1.21.5
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1368,15 +1368,21 @@ async function inject() {
       const studioElement = studio_date.querySelector('a');
 
       const [studioId, studioName] = found.studio;
-      const alreadyCorrectStudioId = studioId === parsePath(studioElement.href).ident;
+      const alreadyCorrectStudioId = studioId && studioId === parsePath(studioElement.href).ident;
 
       const newStudio = document.createElement('span');
       let title, colorClass, currentColorClass;
       if (!alreadyCorrectStudioId) {
-        colorClass = 'bg-primary';
         currentColorClass = 'bg-danger';
-        title = `<pending> Studio\n${studioName ? `${studioName} (${studioId})` : studioId}`;
-        newStudio.append(makeLink(`/studios/${studioId}`, studioName), ' \u{22D8}');
+        if (studioId) {
+          colorClass = 'bg-primary';
+          title = `<pending> Studio\n${studioName ? `${studioName} (${studioId})` : studioId}`;
+          newStudio.append(makeLink(`/studios/${studioId}`, studioName), ' \u{22D8}');
+        } else {
+          colorClass = 'bg-success';
+          title = `<pending> Studio (new / unknown ID)\n${studioName || '?'}`;
+          newStudio.append(studioName, ' \u{22D8}');
+        }
       } else {
         colorClass = 'bg-warning';
         currentColorClass = 'bg-warning';
