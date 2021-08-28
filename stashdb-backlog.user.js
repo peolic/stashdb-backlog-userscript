@@ -446,6 +446,31 @@ async function inject() {
   }
 
   /**
+   * @param {string} url
+   * @param {XMLHttpRequestResponseType} responseType
+   */
+  async function request(url, responseType) {
+    const response = await new Promise((resolve, reject) => {
+      //@ts-expect-error
+      GM.xmlHttpRequest({
+        method: 'GET',
+        url,
+        responseType,
+        anonymous: true,
+        timeout: 10000,
+        onload: resolve,
+        onerror: reject,
+      });
+    });
+
+    const ok = response.status >= 200 && response.status <= 299;
+    if (!ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText} GET ${url}`);
+    }
+    return response.response;
+  }
+
+  /**
    * @template {BaseCache} T
    * @param {string} url
    * @returns {Promise<Omit<T, keyof BaseCache> | FetchError | null>}
@@ -948,28 +973,8 @@ async function inject() {
    * @param {string} url
    * @returns {Promise<Blob>}
    */
-   async function getImageBlob(url) {
-    const response = await new Promise((resolve, reject) => {
-      const details = {
-        method: 'GET',
-        url,
-        responseType: 'blob',
-        anonymous: true,
-        timeout: 10000,
-        onload: resolve,
-        onerror: reject,
-      };
-      //@ts-expect-error
-      GM.xmlHttpRequest(details);
-    });
-
-    const ok = response.status >= 200 && response.status <= 299;
-    if (!ok) {
-      throw new Error(`HTTP ${response.status} ${response.statusText} GET ${url}`);
-    }
-
-    /** @type {Blob} */
-    return (response.response);
+  function getImageBlob(url) {
+    return request(url, 'blob');
   }
 
   /**
