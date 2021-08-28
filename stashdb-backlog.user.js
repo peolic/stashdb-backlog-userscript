@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.21.5
+// @version     1.21.6
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -352,14 +352,14 @@ async function inject() {
     if (!isDev) return;
 
     //@ts-expect-error
-    GM.registerMenuCommand('Refresh index', async () => {
+    GM.registerMenuCommand('🔄 Refresh index', async () => {
       const index = await getOrFetchDataIndex(true);
       if (index) setStatus('[backlog] index updated', 2500);
       else setStatus('[backlog] failed to get index');
     });
 
     //@ts-expect-error
-    GM.registerMenuCommand('Download cache', async () => {
+    GM.registerMenuCommand('📥 Download cache', async () => {
       const base = 'https://github.com/peolic/stashdb_backlog_data/releases/download/cache';
       setStatus(`[backlog] getting cache...`);
 
@@ -380,7 +380,7 @@ async function inject() {
     });
 
     //@ts-expect-error
-    GM.registerMenuCommand('Force refetch', async () => {
+    GM.registerMenuCommand('⭕ Force refetch', async () => {
       const result = await backlogRefetch();
       if (!result) {
         setStatus('[backlog] failed to fetch object');
