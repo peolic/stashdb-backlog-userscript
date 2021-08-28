@@ -378,6 +378,19 @@ async function inject() {
       await updateInfo();
       setStatus('[backlog] cache downloaded', 2500);
     });
+
+    //@ts-expect-error
+    GM.registerMenuCommand('Force refetch', async () => {
+      const result = await backlogRefetch();
+      if (!result) {
+        setStatus('[backlog] failed to fetch object');
+        return;
+      }
+      setStatus('[backlog] reloading page...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    });
   }
 
   const setUpMenu = once(_setUpMenu);
@@ -939,18 +952,6 @@ async function inject() {
     return objectCache[uuid];
   }
 
-  // ===
-
-  async function backlogClearCache(global = globalThis) {
-    await Cache.clearDataIndex();
-    await Cache.clearData();
-    global.console.info('[backlog] stored data cleared');
-  }
-  //@ts-expect-error
-  unsafeWindow.backlogClearCache = exportFunction(() => isDev && backlogClearCache(unsafeWindow), unsafeWindow);
-
-  // ===
-
   async function backlogRefetch(global = globalThis) {
     const { object, ident: uuid } = parsePath();
 
@@ -973,23 +974,6 @@ async function inject() {
 
     return true;
   }
-  //@ts-expect-error
-  unsafeWindow.backlogRefetch = exportFunction(() => isDev && backlogRefetch(unsafeWindow), unsafeWindow);
-
-  // ===
-
-  async function backlogCacheReport(global = globalThis) {
-    const index = await Cache.getStoredDataIndex();
-    global.console.info('index', index);
-    const data = await Cache.getStoredData();
-    global.console.info('scenes', data.performers);
-    global.console.info('performers', data.performers);
-    return { index, ...data };
-  }
-  //@ts-expect-error
-  unsafeWindow.backlogCacheReport = exportFunction(() => backlogCacheReport(unsafeWindow), unsafeWindow);
-
-  // =====
 
   /**
    * @param {string} url
