@@ -350,11 +350,33 @@ async function inject() {
 
   async function _setUpMenu() {
     if (!isDev) return;
+
     //@ts-expect-error
-    GM.registerMenuCommand('Refresh', async () => {
+    GM.registerMenuCommand('Refresh index', async () => {
       const index = await getOrFetchDataIndex(true);
       if (index) setStatus('[backlog] index updated', 2500);
       else setStatus('[backlog] failed to get index');
+    });
+
+    //@ts-expect-error
+    GM.registerMenuCommand('Download cache', async () => {
+      const base = 'https://github.com/peolic/stashdb_backlog_data/releases/download/cache';
+      setStatus(`[backlog] getting cache...`);
+
+      /** @type {MutationDataCache} */
+      const legacyCache = (await request(`${base}/stashdb_backlog.json`, 'json'));
+      const dataCache = await applyDataCacheMigrations(legacyCache);
+      await Cache.setData(dataCache);
+
+      await wait(100);
+
+      /** @type {DataIndex} */
+      const indexCache = (await request(`${base}/stashdb_backlog_index.json`, 'json'));
+      indexCache.lastChecked = new Date().toISOString();
+      await Cache.setDataIndex(indexCache);
+
+      await updateInfo();
+      setStatus('[backlog] cache downloaded', 2500);
     });
   }
 
