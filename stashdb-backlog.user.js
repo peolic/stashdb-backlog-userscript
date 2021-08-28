@@ -188,7 +188,7 @@ async function inject() {
    * @param {string} text
    * @param {number} [resetAfter] in milliseconds
    */
-   async function setStatus(text, resetAfter) {
+  async function setStatus(text, resetAfter) {
     /** @type {HTMLDivElement} */
     const statusDiv = (document.querySelector('div#backlogStatus'));
     statusDiv.innerText = text;
@@ -677,18 +677,19 @@ async function inject() {
       else throw new Error(`migration failed: invalid object`);
     }
 
-    let seen = Object.keys(dataCache);
-    const log = (/** @type {string} */ object) => {
+    /** @type {SupportedObject[]} */
+    let seen = [];
+    const log = (/** @type {SupportedObject} */ object) => {
       if (!seen.includes(object)) {
         console.debug(`[backlog] data-cache migration: convert from '${object}/uuid' key format`);
-        seen.splice(seen.indexOf(object), 1);
+        seen.push(object);
       }
     };
 
     for (const cacheKey of oldKeys) {
       const [oldObject, uuid] = /** @type {['scene' | 'performer', string]} */ (cacheKey.split('/'));
-      log(oldObject);
       const object = /** @type {SupportedObject} */ (`${oldObject}s`);
+      log(object);
       if (!(object in dataCache)) {
         throw new Error(`migration failed: ${object} missing from new data cache object`);
       }
