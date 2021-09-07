@@ -1898,27 +1898,22 @@ async function inject() {
     if (!found) return;
     console.debug('[backlog] found', found);
 
-    const StashDBContent = /** @type {HTMLDivElement} */ (document.querySelector('.StashDBContent'));
-    StashDBContent.style.maxWidth = '1600px';
-    // Hook to the global style
-    window.addEventListener(locationChanged, () => {
-      StashDBContent.style.maxWidth = '';
-      if (StashDBContent.getAttribute('style') === '') StashDBContent.removeAttribute('style');
-    }, { once: true });
+    const sceneForm = /** @type {HTMLFormElement} */ (document.querySelector('.SceneForm'));
+    const sceneFormTabs = /** @type {HTMLDivElement[]} */ (Array.from(sceneForm.querySelector(':scope > .tab-content').children));
 
-    const sceneFormRow = /** @type {HTMLDivElement} */ (document.querySelector('.SceneForm > .row'));
-    const sceneFormCol = /** @type {HTMLDivElement} */ (sceneFormRow.querySelector(':scope > div:first-child'));
-    sceneFormCol.classList.replace('col-10', 'col-9');
+    sceneFormTabs.find(tab => tab.id.endsWith('-images')).style.maxWidth = '75%';
+    sceneFormTabs.find(tab => tab.id.endsWith('-fingerprints')).style.maxWidth = '75%';
 
     const pendingChangesContainer = document.createElement('div');
-    pendingChangesContainer.classList.add('col-3', 'PendingChanges');
+    pendingChangesContainer.classList.add('PendingChanges');
+    setStyles(pendingChangesContainer, { position: 'absolute', top: '6rem', right: '1vw', width: '24vw' });
     const pendingChangesTitle = document.createElement('h3');
     pendingChangesTitle.innerText = 'Backlogged Changes';
     pendingChangesContainer.appendChild(pendingChangesTitle);
     const pendingChanges = document.createElement('dl');
     pendingChangesContainer.appendChild(pendingChanges);
 
-    sceneFormRow.appendChild(pendingChangesContainer);
+    sceneForm.append(pendingChangesContainer);
 
     /**
      * @param {string} text
@@ -1931,14 +1926,30 @@ async function inject() {
       return span;
     };
 
+    /** @param {HTMLElement | string} fieldOrText */
+    const getTabButton = (fieldOrText) => {
+      /** @type {HTMLButtonElement[]} */
+      const buttons = (Array.from(sceneForm.querySelectorAll('ul.nav button.nav-link')));
+
+      if (typeof fieldOrText === 'string') {
+        return buttons.find((btn) => btn.textContent.trim() === fieldOrText);
+      }
+
+      const index = sceneFormTabs.indexOf(fieldOrText.closest('.SceneForm > .tab-content > *'));
+      const button = buttons[index];
+      if (!button) throw new Error('tab button not found');
+      return button;
+    };
+
     /**
      * @param {HTMLElement} field
      * @param {string} fieldName
      * @param {string} value
+     * @param {boolean} [activeTab=false]
      */
-    const settableField = (field, fieldName, value) => {
+    const settableField = (field, fieldName, value, activeTab) => {
       /** @type {HTMLInputElement | HTMLTextAreaElement} */
-      const fieldEl = sceneFormCol.querySelector(`*[name="${fieldName}"]`);
+      const fieldEl = sceneForm.querySelector(`*[name="${fieldName}"]`);
       if (!fieldEl) {
         console.error(`form field with name="${fieldName}" not found`);
         return;
@@ -1948,6 +1959,7 @@ async function inject() {
       setStyles(set, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer' });
       set.addEventListener('click', () => {
         setNativeValue(fieldEl, value);
+        if (activeTab) getTabButton(fieldEl).click();
       });
       field.innerText += ':';
       field.append(set);
@@ -1985,9 +1997,9 @@ async function inject() {
 
       if (field === 'duration') {
         const duration = found[field];
-        dd.innerText = duration;
-        dd.style.userSelect = 'all';
-        settableField(dt, field, duration);
+        const formattedDuration = formatDuration(parseInt(duration));
+        dd.innerText = `${formattedDuration} (${duration})`;
+        settableField(dt, field, formattedDuration);
         return;
       }
 
@@ -2049,7 +2061,7 @@ async function inject() {
               info.append(...nodes);
 
               /** @type {HTMLInputElement} */
-              const fieldEl = sceneFormCol.querySelector(`input[placeholder="${entry.name}"]`);
+              const fieldEl = sceneForm.querySelector(`input[placeholder="${entry.name}"]`);
               if (fieldEl) {
                 const set = document.createElement('a');
                 set.innerText = 'set alias';
@@ -2060,16 +2072,24 @@ async function inject() {
                 a.after(set);
               }
             } else {
-              const a = makeLink(`/performers/${entry.id}`, name + appearance, { color: 'var(--bs-teal)' });
+              const a = makeLink(`/performers/${entry.id}`, name, { color: 'var(--bs-teal)' });
               a.target = '_blank';
               info.appendChild(a);
+
+              if (entry.status) {
+                a.before(`<${entry.status}> `);
+              }
+
+              if (entry.appearance) {
+                const appearanceSpan = createSelectAllSpan(entry.appearance);
+                appearanceSpan.classList.add('fw-bold');
+                info.append(' (as ', appearanceSpan, ')');
+              }
+
               if (action === 'append') {
                 const uuid = createSelectAllSpan(entry.id);
                 uuid.style.fontSize = '.9rem';
                 info.append(document.createElement('br'), uuid);
-              }
-              if (entry.status) {
-                a.before(`<${entry.status}> `);
               }
             }
 
@@ -2088,9 +2108,34 @@ async function inject() {
 
       if (field === 'studio') {
         const [studioId, studioName] = found[field];
-        const a = makeLink(`/studios/${studioId}`, studioName, { color: 'var(--bs-teal)' });
-        a.target = '_blank';
-        dd.append(a, document.createElement('br'), createSelectAllSpan(studioId));
+
+        if (studioId) {
+          const a = makeLink(`/studios/${studioId}`, studioName, { color: 'var(--bs-teal)' });
+          a.target = '_blank';
+          dd.append(a, document.createElement('br'), createSelectAllSpan(studioId));
+        } else {
+          dd.append(createSelectAllSpan(studioName), document.createElement('br'), '(missing ID)');
+        }
+
+        const studioSelect = /** @type {HTMLDivElement} */ (sceneForm.querySelector('.StudioSelect'));
+        const fieldEl = /** @type {HTMLInputElement} */ (studioSelect.querySelector('input'));
+        const set = document.createElement('a');
+        set.innerText = 'set field';
+        setStyles(set, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer' });
+        set.addEventListener('click', async () => {
+          setNativeValue(fieldEl, studioId ? studioId : `"${studioName}"`);
+          await Promise.race([
+            elementReady('.react-select__option', studioSelect),
+            elementReady('.react-select__menu-notice--no-options', studioSelect),
+            wait(2000),
+          ]);
+          /** @type {HTMLDivElement[]} */
+          const results = (Array.from(studioSelect.querySelectorAll('.react-select__option')));
+          if (results.length === 1) results[0].click();
+          else getTabButton(fieldEl).click();
+        });
+        dt.innerText += ':';
+        dt.append(set);
         return;
       }
 
@@ -2104,7 +2149,12 @@ async function inject() {
       if (field === 'details') {
         const details = found[field];
         dd.innerText = details;
-        setStyles(dd, { whiteSpace: 'pre-line', userSelect: 'all' });
+        setStyles(dd, {
+          whiteSpace: 'pre-line',
+          userSelect: 'all',
+          maxHeight: '20vh',
+          overflow: 'auto',
+        });
         settableField(dt, field, details);
         return;
       }
@@ -2121,13 +2171,47 @@ async function inject() {
 
       if (field === 'image') {
         const image = found[field];
+        const imgContainer = document.createElement('div');
         const imgLink = makeLink(image, '', { color: 'var(--bs-teal)' });
-        dd.appendChild(imgLink);
+        imgContainer.appendChild(imgLink);
+        dd.appendChild(imgContainer);
         const onSuccess = (/** @type {Blob} **/ blob) => {
           const img = document.createElement('img');
           setStyles(img, { maxHeight: '200px', border: '2px solid var(--bs-teal)' });
           img.src = URL.createObjectURL(blob);
           imgLink.prepend(img);
+
+          const imgRes = makeImageResolution(img, null);
+          setStyles(imgRes, { margin: '2px' });
+          imgContainer.prepend(imgRes);
+
+          const set = document.createElement('a');
+          set.innerText = 'set field';
+          setStyles(set, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer' });
+          set.addEventListener('click', () => {
+            const imagesTab = getTabButton('Images');
+            /** @type {HTMLInputElement} */
+            const fieldEl = (sceneForm.querySelector('.EditImages input[type="file"]'));
+            if (!fieldEl) {
+              imagesTab.click();
+              return alert('max images reached');
+            }
+
+            const filename = image.slice(image.lastIndexOf('/') + 1);
+            const file = new File([blob], filename, {
+              type: blob.type,
+              lastModified: new Date().getTime(),
+            });
+            const container = new DataTransfer();
+            container.items.add(file);
+
+            imagesTab.click();
+
+            fieldEl.files = container.files;
+            fieldEl.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+          dt.innerText += ':';
+          dt.append(set);
         };
         const onFailure = () => imgLink.innerText = image;
         getImageBlob(image).then(onSuccess, onFailure);
@@ -2152,15 +2236,37 @@ async function inject() {
       }
 
       if (field === 'comments') {
-        found[field].forEach((comment, index) => {
+        const comments = found[field];
+        setStyles(dd, { maxHeight: '20vh', overflow: 'auto' });
+
+        /** @param {string} comment */
+        const prefixToName = (comment) => {
+          if (comment.startsWith('https://www.freeones.com/forums/threads/performer-guide-netvideogirls-com.101884/'))
+            return 'Freeones NVG Performer Guide';
+          return null;
+        };
+
+        comments.forEach((comment, index) => {
           if (index > 0) dd.append(document.createElement('br'));
           const commentElement =
             /^https?:/.test(comment)
               ? makeLink(comment, null, { color: 'var(--bs-teal)' })
               : document.createElement('span');
-          commentElement.innerText = comment;
+          commentElement.innerText = prefixToName(comment) || comment;
           dd.appendChild(commentElement);
         });
+
+        const editNote = comments
+          .map((comment) => {
+            const prefixName = prefixToName(comment);
+            return prefixName
+              ? `[${prefixName}](${comment}):`
+              : comment;
+          })
+          .join('\n');
+
+        settableField(dt, 'note', editNote, true);
+
         return;
       }
 
