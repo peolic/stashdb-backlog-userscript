@@ -1068,6 +1068,8 @@ async function inject() {
       }
     }
 
+    const sceneDesc = /** @type {HTMLDivElement} */ (document.querySelector('.scene-description'));
+
     const makeAlreadyCorrectTitle = (/** @type {string} */ status='correct', /** @type {string} */ field='') =>
       `<already ${status}>${field ? ` ${field}`: ''}\nshould mark the entry on the backlog sheet as completed`;
 
@@ -1170,33 +1172,33 @@ async function inject() {
       const title = (document.querySelector('.scene-info h3'));
       const currentTitle = title.innerText;
       if (!currentTitle) {
-        title.classList.add('bg-danger', 'p-1');
-        title.innerText = found.title;
-        title.title = '<MISSING> Title';
+        const titleSpan = document.createElement('span');
+        titleSpan.classList.add('bg-success', 'p-1');
+        titleSpan.innerText = found.title;
+        titleSpan.title = '<MISSING> Title';
+        title.prepend(titleSpan);
 
         const status = document.createElement('span');
-        status.classList.add('me-2');
+        status.classList.add('me-2', 'bg-success', 'p-1');
         status.style.fontSize = '1.25rem';
         status.innerText = '<MISSING> \u{22D9}';
         title.prepend(status);
       } else if (currentTitle === found.title) {
-        title.classList.add('bg-warning', 'p-1');
-        title.title = makeAlreadyCorrectTitle('correct', 'Title');
+        const titleSpan = title.querySelector('span');
+        titleSpan.classList.add('bg-warning', 'p-1');
+        titleSpan.title = makeAlreadyCorrectTitle('correct', 'Title');
 
         const status = document.createElement('span');
-        status.classList.add('me-2');
+        status.classList.add('me-2', 'bg-warning', 'p-1');
         status.style.fontSize = '1.25rem';
         status.innerText = '<already correct> \u{22D9}';
         title.prepend(status);
       } else {
         title.title = `<pending> Title`;
         title.style.fontSize = '1.25rem';
-        // convert title text node to element
-        const titleSpan = document.createElement('span');
-        titleSpan.append(title.childNodes[0]);
+        const titleSpan = title.querySelector('span');
         titleSpan.classList.add('bg-danger', 'p-1');
         titleSpan.style.fontSize = '1rem';
-        title.prepend(titleSpan);
 
         const arrow = document.createElement('span');
         arrow.classList.add('mx-2');
@@ -1666,7 +1668,7 @@ async function inject() {
         newDuration.innerText = formattedDuration;
         duration = document.createElement('div');
         duration.append('<MISSING>', ' Duration: ', newDuration);
-        duration.classList.add('bg-danger', 'p-1', 'my-auto');
+        duration.classList.add('bg-success', 'p-1', 'my-auto');
         duration.title = `Duration is missing; ${foundDuration} seconds`;
         sceneFooter.querySelector('.scene-performers').after(duration);
       } else {
@@ -1716,8 +1718,8 @@ async function inject() {
       if (markerDataset.backlogInjected) return;
 
       /** @type {HTMLDivElement} */
-      const desc = (document.querySelector('.scene-description > h4 + div'));
-      const currentDetails = desc.innerText;
+      const desc = (sceneDesc.querySelector(':scope > h4 + div'));
+      const currentDetails = desc.textContent;
       if (!currentDetails) {
         desc.classList.add('bg-success', 'p-1');
         desc.innerText = found.details;
@@ -1749,12 +1751,20 @@ async function inject() {
       if (markerDataset.backlogInjected) return;
 
       /** @type {HTMLAnchorElement} */
-      const studioUrl = (document.querySelector('.scene-description > div:last-of-type > a'));
-      const currentURL = studioUrl.innerText || studioUrl.getAttribute('href');
-      if (!currentURL) {
-        studioUrl.classList.add('bg-success', 'p-1');
-        studioUrl.innerText = found.url;
-        studioUrl.title = `<MISSING> Studio URL`;
+      const studioUrl = (sceneDesc.querySelector(':scope > div:last-of-type > a'));
+      const currentURL = studioUrl?.getAttribute('href');
+      if (!studioUrl) {
+        const missing = sceneDesc.appendChild(document.createElement('div'));
+        const missingLabel = missing.appendChild(document.createElement('b'));
+        missingLabel.classList.add('me-2');
+        missingLabel.innerText = 'Studio URL:';
+        const studioURL = missing.appendChild(document.createElement('a'));
+        studioURL.target = '_blank';
+        studioURL.rel = 'noopener noreferrer';
+        studioURL.classList.add('bg-success', 'p-1');
+        studioURL.innerText = found.url;
+        studioURL.href = found.url;
+        studioURL.title = `<MISSING> Studio URL`;
       } else if (currentURL === found.url) {
         studioUrl.classList.add('bg-warning', 'p-1');
         studioUrl.title = makeAlreadyCorrectTitle('correct', 'Studio URL');
