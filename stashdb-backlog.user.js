@@ -1028,7 +1028,7 @@ async function inject() {
       const newDataURI = await blobAsDataURI(await newImage);
       return dataURI === newDataURI;
     } catch (error) {
-      return error;
+      return /** @type {Error} **/ (error);
     }
   }
 
