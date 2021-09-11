@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.21.6
+// @version     1.21.7
 // @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1389,7 +1389,7 @@ async function inject() {
         if (studioId) {
           colorClass = 'bg-primary';
           title = `<pending> Studio\n${studioName ? `${studioName} (${studioId})` : studioId}`;
-          newStudio.append(makeLink(`/studios/${studioId}`, studioName), ' \u{22D8}');
+          newStudio.append(makeLink(`/studios/${studioId}`, studioName ? studioName : `[${studioId}]`), ' \u{22D8}');
         } else {
           colorClass = 'bg-success';
           title = `<pending> Studio (new / unknown ID)\n${studioName || '?'}`;
