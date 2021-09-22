@@ -935,6 +935,30 @@ button.nav-link.backlog-flash {
     return `${backlogSpreadsheet}/gviz/tq?${search}`;
   }
 
+  const parseFingerprintTableRows = (/** @type {HTMLTableRowElement[]} */ rows) => {
+    const headers =
+      /** @type {HTMLTableCellElement[]} */
+      (Array.from(rows[0].children))
+        .reduce((r, cell, cellIndex) => {
+          if (cell.innerText === 'Algorithm') r.algorithm = cellIndex;
+          else if (cell.innerText === 'Hash') r.hash = cellIndex;
+          else if (cell.innerText === 'Duration') r.duration = cellIndex;
+          else if (cell.innerText === 'Submissions') r.submissions = cellIndex;
+          return r;
+        }, /** @type {FingerprintsColumnIndices} */ ({}));
+    const fingerprints = rows.slice(1).map((row) => {
+      const cells = /** @type {HTMLTableCellElement[]} */ (Array.from(row.children));
+      return {
+        row,
+        algorithm: cells[headers.algorithm].innerText,
+        hash: cells[headers.hash].innerText,
+        duration: cells[headers.duration].innerText,
+        submissions: cells[headers.submissions].innerText,
+      };
+    });
+    return { headers, fingerprints };
+  };
+
   /**
    * @param {PerformerEntry} [entry]
    * @returns {HTMLElement[]}
@@ -1813,26 +1837,7 @@ button.nav-link.backlog-flash {
       // Parse current
       /** @type {HTMLTableRowElement[]} */
       const fingerprintsTableRows = (Array.from(document.querySelectorAll('.scene-fingerprints > table tr')));
-      const headers =
-        /** @type {HTMLTableCellElement[]} */
-        (Array.from(fingerprintsTableRows[0].children))
-          .reduce((r, cell, cellIndex) => {
-            if (cell.innerText === 'Algorithm') r.algorithm = cellIndex;
-            else if (cell.innerText === 'Hash') r.hash = cellIndex;
-            else if (cell.innerText === 'Duration') r.duration = cellIndex;
-            else if (cell.innerText === 'Submissions') r.submissions = cellIndex;
-            return r;
-          }, /** @type {FingerprintsColumnIndices} */ ({}));
-      const currentFingerprints = fingerprintsTableRows.slice(1).map((row) => {
-        const cells = /** @type {HTMLTableCellElement[]} */ (Array.from(row.children));
-        return {
-          row,
-          algorithm: cells[headers.algorithm].innerText,
-          hash: cells[headers.hash].innerText,
-          duration: cells[headers.duration].innerText,
-          submissions: cells[headers.submissions].innerText,
-        };
-      });
+      const { headers, fingerprints: currentFingerprints } = parseFingerprintTableRows(fingerprintsTableRows);
 
       // Compare
       const matches = found.fingerprints.filter((fp) => {
@@ -1886,9 +1891,9 @@ button.nav-link.backlog-flash {
           return span;
         };
 
-        if (matches) fpInfo.appendChild(makeElement('Reported incorrect fingerprints:', `${matches} ℹ`));
+        if (matches) fpInfo.appendChild(makeElement('Reported incorrect fingerprints:', `${matches} \u{2139}`));
         if (notFound) fpInfo.appendChild(makeElement('Missing reported fingerprints:', `${notFound} ⚠`));
-        document.querySelector('nav[role="tablist"]').before(fpInfo);
+        sceneInfo.parentElement.querySelector('ul.nav[role="tablist"]').before(fpInfo);
         removeHook(fpInfo, 'scenes', sceneId);
       }
     })();
@@ -1921,7 +1926,6 @@ button.nav-link.backlog-flash {
     const sceneFormTabs = /** @type {HTMLDivElement[]} */ (Array.from(sceneForm.querySelector(':scope > .tab-content').children));
 
     sceneFormTabs.find(tab => tab.id.endsWith('-images')).style.maxWidth = '75%';
-    sceneFormTabs.find(tab => tab.id.endsWith('-fingerprints')).style.maxWidth = '75%';
 
     const pendingChangesContainer = document.createElement('div');
     pendingChangesContainer.classList.add('PendingChanges');
@@ -2429,17 +2433,54 @@ button.nav-link.backlog-flash {
       }
 
       if (field === 'fingerprints') {
+        const fingerprintsTab = sceneFormTabs.find(tab => tab.id.endsWith('-fingerprints'));
+        // Fingerprint editing removed from Scene Edit Form
+        if (!fingerprintsTab) {
+          dd.append(`${found[field].length} reported submissions`);
+          return;
+        }
+
+        /** @type {HTMLTableRowElement[]} */
+        const fingerprintsTableRows = (Array.from(fingerprintsTab.querySelectorAll('table tr')));
+        const { fingerprints: currentFingerprints } = parseFingerprintTableRows(fingerprintsTableRows);
+
         found[field].forEach((fp, index) => {
           if (index > 0) dd.append(document.createElement('br'));
           const fpElement = document.createElement('span');
           const fpHash = createSelectAllSpan(fp.hash);
           fpHash.style.marginLeft = '.5rem';
           fpElement.append(fp.algorithm.toUpperCase(), fpHash);
+
+          const remove = document.createElement('a');
+          remove.innerText = 'remove';
+          setStyles(remove, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer' });
+          fpElement.appendChild(remove);
+          remove.addEventListener('click', () => {
+            const row = currentFingerprints
+              .find((cfp) => cfp.algorithm === fp.algorithm.toUpperCase() && cfp.hash === fp.hash)
+              ?.row;
+            if (row) {
+              /** @type {HTMLButtonElement} */
+              (row.querySelector('.remove-item')).click();
+            }
+            fpElement.style.textDecoration = 'line-through';
+            remove.remove();
+          });
+
           if (fp.correct_scene_id) {
             const correct = makeLink(`/scenes/${fp.correct_scene_id}`, 'correct scene', { color: 'var(--bs-teal)' });
             correct.target = '_blank';
-            fpElement.append(' \u{22D9} ', correct, ': ', createSelectAllSpan(fp.correct_scene_id));
+            const uuid = createSelectAllSpan(fp.correct_scene_id);
+            uuid.style.fontSize = '.9rem';
+            fpElement.append(document.createElement('br'), '\u{22D9} ', correct, ': ', uuid);
           }
+
+          const cfp = currentFingerprints
+            .find(({ algorithm, hash }) => algorithm === fp.algorithm.toUpperCase() && hash === fp.hash);
+          if (cfp) {
+            cfp.row.classList.add(fp.correct_scene_id ? 'bg-warning' : 'bg-danger');
+          }
+
           dd.appendChild(fpElement);
         });
         return;
