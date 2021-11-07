@@ -22,7 +22,7 @@
 const dev = false;
 
 const eventPrefix = 'stashdb_backlog';
-const devUsername = 'peolic';
+const devUsernames = ['peolic', 'root'];
 
 async function inject() {
   const ignoredContentKeys = ['contentHash', 'lastUpdated', 'comments'];
@@ -116,7 +116,7 @@ async function inject() {
 
     await elementReadyIn('.StashDBContent > .LoadingIndicator', 100);
 
-    isDev = await getUser() === devUsername;
+    isDev = devUsernames.includes(await getUser());
 
     setUpStatusDiv();
     setUpMenu();
