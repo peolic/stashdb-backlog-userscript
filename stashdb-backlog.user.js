@@ -126,7 +126,10 @@ async function inject() {
       throw new Error('[backlog] Failed to parse location!');
     }
 
-    await elementReadyIn('.StashDBContent > .LoadingIndicator', 100);
+    await Promise.all([
+      elementReadyIn('#root > *'),
+      elementReadyIn('.StashDBContent > .LoadingIndicator', 100),
+    ]);
 
     if (document.querySelector('.LoginPrompt')) return;
 
@@ -216,7 +219,7 @@ async function inject() {
     if (document.querySelector('div#backlogStatus')) return;
     const statusDiv = document.createElement('div');
     statusDiv.id = 'backlogStatus';
-    statusDiv.classList.add('mr-auto', 'd-none');
+    statusDiv.classList.add('me-auto', 'd-none');
     const navLeft = await elementReadyIn('nav > :first-child', 1000);
     navLeft.after(statusDiv);
 
@@ -309,7 +312,7 @@ async function inject() {
         border: '.25rem solid #cccccc',
         padding: '0.3rem',
         zIndex: '100',
-        backgroundColor: 'var(--gray-dark)',
+        backgroundColor: 'var(--bs-gray-dark)',
         display: 'none',
       });
 
@@ -353,12 +356,12 @@ async function inject() {
       const { lastUpdated } = storedData;
       const ago = humanRelativeDate(new Date(lastUpdated));
       info.append(
-        block(ago, 'd-inline-block', 'mr-1'),
+        block(ago, 'd-inline-block', 'me-1'),
         block(`(${formatDate(lastUpdated)})`, 'd-inline-block'),
       );
 
       const hr = document.createElement('hr');
-      hr.style.borderTopColor = '#cccccc';
+      hr.style.backgroundColor = '#cccccc';
 
       //@ts-expect-error
       const usVersion = GM.info.script.version;
@@ -790,15 +793,14 @@ async function inject() {
 
   /**
    * @param {HTMLImageElement} img
-   * @param {'left' | 'right'} position
-   * @param {boolean} [margin]
+   * @param {'start' | 'end' | null} position
    * @returns {HTMLDivElement}
    */
-  function makeImageResolution(img, position, margin=true) {
+  function makeImageResolution(img, position) {
     const imgRes = document.createElement('div');
-    const positionClasses = margin ? [`m${position.charAt(0)}-2`] : [];
-    imgRes.classList.add('position-absolute', ...positionClasses, 'px-2', 'font-weight-bold');
-    setStyles(imgRes, { [position]: '0', backgroundColor: '#00689b', transition: 'opacity .2s ease' });
+    const positionClasses = position === null ? [] : [`${position}-0`, `m${position.charAt(0)}-2`];
+    imgRes.classList.add('position-absolute', ...positionClasses, 'px-2', 'fw-bold');
+    setStyles(imgRes, { backgroundColor: '#00689b', transition: 'opacity .2s ease' });
 
     imageReady(img).then(
       () => imgRes.innerText = `${img.naturalWidth} x ${img.naturalHeight}`,
@@ -925,7 +927,7 @@ async function inject() {
       links.map((url, cite) => {
         const sup = document.createElement('sup');
         const link = sup.appendChild(
-          makeLink(url, `[${cite + 1}]`, { color: 'var(--teal)' })
+          makeLink(url, `[${cite + 1}]`, { color: 'var(--bs-teal)' })
         );
         link.title = url;
         return sup;
@@ -1044,7 +1046,7 @@ async function inject() {
     console.debug('[backlog] found', found);
 
     const sceneHeader = /** @type {HTMLDivElement} */ (sceneInfo.querySelector(':scope > .card-header'));
-    sceneHeader.style.borderTop = '1rem solid var(--warning)';
+    sceneHeader.style.borderTop = '1rem solid var(--bs-warning)';
     sceneHeader.title = 'pending changes (backlog)';
 
     const sceneFooter = /** @type {HTMLDivElement} */ (sceneInfo.querySelector(':scope > .card-footer'));
@@ -1062,7 +1064,7 @@ async function inject() {
       if (markerDataset.backlogInjected) return;
 
       const comments = document.createElement('div');
-      setStyles(comments, { padding: '0 .25rem', backgroundColor: 'var(--info)' });
+      setStyles(comments, { padding: '0 .25rem', backgroundColor: '#17a2b8' /* Bootstrap4 info color */ });
 
       found.comments.forEach((comment, index) => {
         if (index > 0) comments.append(document.createElement('br'));
@@ -1088,7 +1090,7 @@ async function inject() {
       removeHook(backlogDiv, 'scenes', sceneId);
 
       /** @type {HTMLDivElement} */
-      const actionsContainer = (sceneHeader.querySelector(':scope > .float-right'));
+      const actionsContainer = (sceneHeader.querySelector(':scope > .float-end'));
       if (actionsContainer) {
         actionsContainer.addEventListener('mouseover', () => {
           backlogDiv.style.backgroundColor = '#8c2020';
@@ -1105,7 +1107,7 @@ async function inject() {
 
       const hasDuplicates = document.createElement('div');
       hasDuplicates.dataset.backlog = 'duplicates';
-      hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
+      hasDuplicates.classList.add('mb-1', 'p-1', 'fw-bold');
 
       const label = document.createElement('span');
       label.innerText = 'This scene has duplicates:';
@@ -1113,13 +1115,13 @@ async function inject() {
 
       found.duplicates.forEach((dupId) => {
         hasDuplicates.append(document.createElement('br'));
-        const a = makeLink(`/scenes/${dupId}`, dupId, { color: 'var(--teal)', marginLeft: '1.75rem' });
+        const a = makeLink(`/scenes/${dupId}`, dupId, { color: 'var(--bs-teal)', marginLeft: '1.75rem' });
         a.target = '_blank';
-        a.classList.add('font-weight-normal');
+        a.classList.add('fw-normal');
         hasDuplicates.append(a);
       });
       const emoji = document.createElement('span');
-      emoji.classList.add('mr-1');
+      emoji.classList.add('me-1');
       emoji.innerText = '♊';
       hasDuplicates.prepend(emoji);
       backlogDiv.append(hasDuplicates);
@@ -1131,18 +1133,18 @@ async function inject() {
 
       const duplicateOf = document.createElement('div');
       duplicateOf.dataset.backlog = 'duplicate-of';
-      duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
+      duplicateOf.classList.add('mb-1', 'p-1', 'fw-bold');
 
       const label = document.createElement('span');
       label.innerText = 'This scene is a duplicate of: ';
       duplicateOf.appendChild(label);
 
-      const a = makeLink(`/scenes/${found.duplicate_of}`, found.duplicate_of, { color: 'var(--teal)' });
+      const a = makeLink(`/scenes/${found.duplicate_of}`, found.duplicate_of, { color: 'var(--bs-teal)' });
       a.target = '_blank';
-      a.classList.add('font-weight-normal');
+      a.classList.add('fw-normal');
       duplicateOf.append(a);
       const emoji = document.createElement('span');
-      emoji.classList.add('mr-1');
+      emoji.classList.add('me-1');
       emoji.innerText = '♊';
       duplicateOf.prepend(emoji);
       backlogDiv.append(duplicateOf);
@@ -1161,7 +1163,7 @@ async function inject() {
         title.title = '<MISSING> Title';
 
         const status = document.createElement('span');
-        status.classList.add('mr-2');
+        status.classList.add('me-2');
         status.style.fontSize = '1.25rem';
         status.innerText = '<MISSING> \u{22D9}';
         title.prepend(status);
@@ -1170,7 +1172,7 @@ async function inject() {
         title.title = makeAlreadyCorrectTitle('correct', 'Title');
 
         const status = document.createElement('span');
-        status.classList.add('mr-2');
+        status.classList.add('me-2');
         status.style.fontSize = '1.25rem';
         status.innerText = '<already correct> \u{22D9}';
         title.prepend(status);
@@ -1290,7 +1292,7 @@ async function inject() {
           imgContainer.classList.add('p-2');
 
           if (newImage === true) {
-            imgContainer.style.backgroundColor = 'var(--warning)';
+            imgContainer.style.backgroundColor = 'var(--bs-warning)';
             imgContainer.title = `${makeAlreadyCorrectTitle('added')}\n\n${found.image}`;
             setStatus('');
             return;
@@ -1302,7 +1304,7 @@ async function inject() {
           const imgNewLink = makeLink(found.image, '');
 
           if (newImage instanceof Error) {
-            imgContainer.style.backgroundColor = 'var(--purple)';
+            imgContainer.style.backgroundColor = 'var(--bs-purple)';
             imgContainer.title = 'error comparing image';
             console.error('[backlog] error comparing image', newImage);
             imgNewLink.innerText = found.image;
@@ -1316,24 +1318,24 @@ async function inject() {
 
           const currentImageContainer = document.createElement('div');
           setStyles(currentImageContainer, { alignSelf: 'center', flex: '50%' });
-          setStyles(img, { width: '100%', border: '.5em solid var(--danger)' });
-          const cImgRes = makeImageResolution(img, 'left', false);
-          cImgRes.classList.add('ml-3', 'mt-2');
+          setStyles(img, { width: '100%', border: '.5em solid var(--bs-danger)' });
+          const cImgRes = makeImageResolution(img, null);
+          cImgRes.classList.add('start-0', 'ms-3', 'mt-2');
           currentImageContainer.append(cImgRes, img);
 
           imgContainer.appendChild(currentImageContainer);
 
           const imgNew = document.createElement('img');
           imgNew.src = URL.createObjectURL(await newImageBlob);
-          setStyles(imgNew, { width: '100%', height: 'auto', border: '.5em solid var(--success)' });
+          setStyles(imgNew, { width: '100%', height: 'auto', border: '.5em solid var(--bs-success)' });
 
           imgNewLink.appendChild(imgNew);
 
           const newImageContainer = document.createElement('div');
           const isCurrentVertical = img.naturalHeight > img.naturalWidth;
           setStyles(newImageContainer, { alignSelf: 'center', flex: isCurrentVertical ? 'auto' : '50%' });
-          const imgRes = makeImageResolution(imgNew, 'right', false);
-          imgRes.classList.add('mr-3', 'mt-2');
+          const imgRes = makeImageResolution(imgNew, null);
+          imgRes.classList.add('end-0', 'me-3', 'mt-2');
           newImageContainer.append(imgRes, imgNewLink);
 
           imgContainer.appendChild(newImageContainer);
@@ -1342,7 +1344,7 @@ async function inject() {
 
         /** @param {any} reason */
         const onCurrentImageFailed = async (reason) => {
-          imgContainer.style.backgroundColor = 'var(--purple)';
+          imgContainer.style.backgroundColor = 'var(--bs-purple)';
 
           imgContainer.classList.add('p-2', 'd-flex');
           imgContainer.title = `error loading current image\n<pending>\n${found.image}`;
@@ -1357,7 +1359,7 @@ async function inject() {
 
           const newImageContainer = document.createElement('div');
           newImageContainer.style.flex = 'auto';
-          const imgRes = makeImageResolution(imgNew, 'right');
+          const imgRes = makeImageResolution(imgNew, 'end');
           newImageContainer.append(imgRes, imgNewLink);
 
           imgContainer.appendChild(newImageContainer);
@@ -1390,7 +1392,7 @@ async function inject() {
         };
         newImageBlob.then(
           (blob) => {
-            const imgRes = makeImageResolution(img, 'right');
+            const imgRes = makeImageResolution(img, 'end');
             imgContainer.prepend(imgRes);
             img.src = URL.createObjectURL(blob);
             setStatus('');
@@ -1456,7 +1458,7 @@ async function inject() {
       const nameElements = (/** @type {PerformerEntry} */ entry) => {
         const c = (/** @type {string} */ text, small=false) => {
           const el = document.createElement(small ? 'small' : 'span');
-          if (small) el.classList.add('ml-1', 'text-small', 'text-muted');
+          if (small) el.classList.add('ms-1', 'text-small', 'text-muted');
           el.innerText = small ? `(${text})` : text;
           return el;
         };
@@ -1504,7 +1506,7 @@ async function inject() {
         const toUpdate = update.find((e) => e.id === uuid);
 
         if (toRemove) {
-          highlight(performer, '--danger');
+          highlight(performer, '--bs-danger');
           performer.classList.add('backlog-remove'); // Useful for new performers below
           if (toRemove.status) {
             performer.children[1].prepend(...paStatus(toRemove.status));
@@ -1523,7 +1525,7 @@ async function inject() {
             }
           } else {
             /** @type {NodeListOf<HTMLElement>} */
-            (performer.querySelectorAll('span, small')).forEach((el) => el.style.textDecoration = 'line-through');
+            (performer.querySelectorAll('span, small')).forEach((el) => el.classList.add('text-decoration-line-through'));
             performer.title = `<pending>\nremoval`;
           }
           if (!toRemove.id) {
@@ -1538,14 +1540,14 @@ async function inject() {
         if (toAppend) {
           const entryFullName = formatName(toAppend);
           if (fullName === entryFullName) {
-            highlight(performer, '--warning');
+            highlight(performer, '--bs-warning');
             performer.title = makeAlreadyCorrectTitle('added');
             if (!toAppend.id) {
               performer.title += '\n[missing ID - matched by name]';
-              performer.style.color = 'var(--yellow)';
+              performer.style.color = 'var(--bs-yellow)';
             }
           } else {
-            highlight(performer, '--primary');
+            highlight(performer, '--bs-primary');
             performer.title = `<already added>\nbut needs an update to\n${entryFullName}`;
           }
           removeFrom(toAppend, append);
@@ -1554,7 +1556,7 @@ async function inject() {
         if (toUpdate) {
           const entryFullName = formatName(toUpdate);
           if (fullName === entryFullName) {
-            highlight(performer, '--warning');
+            highlight(performer, '--bs-warning');
             performer.title = makeAlreadyCorrectTitle('updated');
           } else {
             const arrow = document.createElement('span');
@@ -1562,7 +1564,7 @@ async function inject() {
             arrow.innerText = '\u{22D9}';
             performer.appendChild(arrow);
             performer.append(...nameElements(toUpdate));
-            highlight(performer, '--primary');
+            highlight(performer, '--bs-primary');
             performer.title = `<pending>\nupdate to\n${entryFullName}`;
           }
           removeFrom(toUpdate, update);
@@ -1571,7 +1573,7 @@ async function inject() {
 
       append.forEach((entry) => {
         const pa = makePerformerAppearance(entry);
-        let hColor = '--success';
+        let hColor = '--bs-success';
         pa.title = `<pending>\naddition`;
         if (!entry.id) {
           if (entry.status === 'new') {
@@ -1618,8 +1620,8 @@ async function inject() {
       remove.forEach((entry) => {
         console.warn('[backlog] entry to remove not found. already removed?', entry);
         const pa = makePerformerAppearance(entry);
-        highlight(pa, '--warning');
-        pa.style.color = 'var(--yellow)';
+        highlight(pa, '--bs-warning');
+        pa.style.color = 'var(--bs-yellow)';
         pa.title = `performer-to-remove not found. already removed?`;
         scenePerformers.appendChild(pa);
       });
@@ -1628,8 +1630,8 @@ async function inject() {
         console.warn('[backlog] entry to update not found.', entry);
         const expectedEntry = { ...entry, appearance: entry.old_appearance };
         const pa = makePerformerAppearance(expectedEntry);
-        highlight(pa, '--warning');
-        pa.style.color = 'var(--yellow)';
+        highlight(pa, '--bs-warning');
+        pa.style.color = 'var(--bs-yellow)';
         pa.title = `performer-to-update is missing: ${formatName(expectedEntry)}.`;
         const arrow = document.createElement('span');
         arrow.classList.add('mx-1');
@@ -1681,7 +1683,7 @@ async function inject() {
         director = document.createElement('div');
         director.append('<MISSING>', ' Director: ', newDirector);
         director.title = '<MISSING> Director';
-        director.classList.add('ml-3', 'bg-danger', 'p-1', 'my-auto');
+        director.classList.add('ms-3', 'bg-danger', 'p-1', 'my-auto');
         sceneFooter.append(director);
       } else {
         const currentDirector = director.innerText.match(/^Director: (.+)$/)[1];
@@ -1809,7 +1811,7 @@ async function inject() {
       if (matches || notFound) {
         const fpInfo = document.createElement('div');
         fpInfo.dataset.backlog = 'fingerprints';
-        fpInfo.classList.add('float-right', 'my-2', 'd-flex', 'flex-column');
+        fpInfo.classList.add('float-end', 'my-2', 'd-flex', 'flex-column');
 
         const backlogSheetId = '357846927'; // Fingerprints
         const quickViewLink = makeLink(
@@ -1818,16 +1820,16 @@ async function inject() {
             `select B,G,H,I,J,K where F="${sceneId}" label B "Done", H "Hash", I "✨Correct Scene ID"`,
           ),
           'quick view',
-          { color: 'var(--teal)' },
+          { color: 'var(--bs-teal)' },
         );
         const sheetLink = makeLink(
           `${backlogSpreadsheet}/edit#gid=${backlogSheetId}`,
           'Fingerprints backlog sheet',
-          { color: 'var(--red)' },
+          { color: 'var(--bs-red)' },
         );
 
         const backlogInfo = document.createElement('span');
-        backlogInfo.classList.add('text-right');
+        backlogInfo.classList.add('text-end');
         backlogInfo.append(sheetLink, ' (', quickViewLink, ')');
         fpInfo.append(backlogInfo);
 
@@ -1836,7 +1838,7 @@ async function inject() {
           span.classList.add('d-flex', 'justify-content-between');
           content.forEach((c) => {
             const b = document.createElement('b');
-            b.classList.add('ml-2', 'text-warning');
+            b.classList.add('ms-2', 'text-warning');
             b.innerText = c;
             span.appendChild(b);
           });
@@ -1921,7 +1923,7 @@ async function inject() {
       }
       const set = document.createElement('a');
       set.innerText = 'set field';
-      setStyles(set, { marginLeft: '.5rem', color: 'var(--yellow)', cursor: 'pointer' });
+      setStyles(set, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer' });
       set.addEventListener('click', () => {
         setNativeValue(fieldEl, value);
       });
@@ -1974,7 +1976,7 @@ async function inject() {
 
         values.map((dupId, index) => {
           if (index > 0) dd.append(document.createElement('br'));
-          const a = makeLink(`/scenes/${dupId}`, dupId, { color: 'var(--teal)' });
+          const a = makeLink(`/scenes/${dupId}`, dupId, { color: 'var(--bs-teal)' });
           a.target = '_blank';
           dd.append(a);
         });
@@ -2005,11 +2007,11 @@ async function inject() {
             if (!entry.id) {
               const statusText = `<${entry.status || 'no id'}>`;
               const status = entry.status_url
-                ? makeLink(entry.status_url, statusText, { color: 'var(--teal)' })
+                ? makeLink(entry.status_url, statusText, { color: 'var(--bs-teal)' })
                 : statusText;
               info.append(status, ` ${name + appearance}`);
             } else if (action === 'update') {
-              const a = makeLink(`/performers/${entry.id}`, name, { color: 'var(--teal)' });
+              const a = makeLink(`/performers/${entry.id}`, name, { color: 'var(--bs-teal)' });
               a.target = '_blank';
               /** @type {Array<HTMLElement | string>} */
               const nodes = [
@@ -2029,14 +2031,14 @@ async function inject() {
               if (fieldEl) {
                 const set = document.createElement('a');
                 set.innerText = 'set alias';
-                setStyles(set, { marginLeft: '.5rem', color: 'var(--yellow)', cursor: 'pointer', fontWeight: '700' });
+                setStyles(set, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer', fontWeight: '700' });
                 set.addEventListener('click', () => {
                   setNativeValue(fieldEl, entry.appearance || '');
                 });
                 a.after(set);
               }
             } else {
-              const a = makeLink(`/performers/${entry.id}`, name + appearance, { color: 'var(--teal)' });
+              const a = makeLink(`/performers/${entry.id}`, name + appearance, { color: 'var(--bs-teal)' });
               a.target = '_blank';
               info.appendChild(a);
               if (action === 'append') {
@@ -2064,7 +2066,7 @@ async function inject() {
 
       if (field === 'studio') {
         const [studioId, studioName] = found[field];
-        const a = makeLink(`/studios/${studioId}`, studioName, { color: 'var(--teal)' });
+        const a = makeLink(`/studios/${studioId}`, studioName, { color: 'var(--bs-teal)' });
         a.target = '_blank';
         dd.append(a, document.createElement('br'), createSelectAllSpan(studioId));
         return;
@@ -2097,11 +2099,11 @@ async function inject() {
 
       if (field === 'image') {
         const image = found[field];
-        const imgLink = makeLink(image, '', { color: 'var(--teal)' });
+        const imgLink = makeLink(image, '', { color: 'var(--bs-teal)' });
         dd.appendChild(imgLink);
         const onSuccess = (/** @type {Blob} **/ blob) => {
           const img = document.createElement('img');
-          setStyles(img, { maxHeight: '200px', border: '2px solid var(--teal)' });
+          setStyles(img, { maxHeight: '200px', border: '2px solid var(--bs-teal)' });
           img.src = URL.createObjectURL(blob);
           imgLink.prepend(img);
         };
@@ -2118,7 +2120,7 @@ async function inject() {
           fpHash.style.marginLeft = '.5rem';
           fpElement.append(fp.algorithm.toUpperCase(), fpHash);
           if (fp.correct_scene_id) {
-            const correct = makeLink(`/scenes/${fp.correct_scene_id}`, 'correct scene', { color: 'var(--teal)' });
+            const correct = makeLink(`/scenes/${fp.correct_scene_id}`, 'correct scene', { color: 'var(--bs-teal)' });
             correct.target = '_blank';
             fpElement.append(' \u{22D9} ', correct, ': ', createSelectAllSpan(fp.correct_scene_id));
           }
@@ -2132,7 +2134,7 @@ async function inject() {
           if (index > 0) dd.append(document.createElement('br'));
           const commentElement =
             /^https?:/.test(comment)
-              ? makeLink(comment, null, { color: 'var(--teal)' })
+              ? makeLink(comment, null, { color: 'var(--bs-teal)' })
               : document.createElement('span');
           commentElement.innerText = comment;
           dd.appendChild(commentElement);
@@ -2231,7 +2233,7 @@ async function inject() {
 
         const sceneChanges = document.createElement('div');
         sceneChanges.dataset.backlog = 'scene-changes';
-        sceneChanges.classList.add('mb-1', 'p-1', 'font-weight-bold');
+        sceneChanges.classList.add('mb-1', 'p-1', 'fw-bold');
         sceneChanges.innerText = 'This performer has pending scene changes:';
         for (const [actionStr, scenes] of Object.entries(performerScenes)) {
           if (scenes.length === 0) continue;
@@ -2255,7 +2257,7 @@ async function inject() {
             .forEach(([sceneId, entry], idx) => {
               if (idx > 0) sceneLinks.append(document.createElement('br'));
               const a = makeLink(`/scenes/${sceneId}`, sceneId, {
-                color: 'var(--teal)',
+                color: 'var(--bs-teal)',
                 fontFamily: 'monospace',
                 fontSize: '16px',
               });
@@ -2267,7 +2269,7 @@ async function inject() {
                   sceneLinks.append(' (unknown target)');
                 } else {
                   const pLink = entry.id
-                    ? makeLink(`/performers/${entry.id}`, pName[action](entry), { color: 'var(--teal)' })
+                    ? makeLink(`/performers/${entry.id}`, pName[action](entry), { color: 'var(--bs-teal)' })
                     : pName[action](entry);
                   sceneLinks.append(' (target: ', pLink, ')');
                 }
@@ -2277,7 +2279,7 @@ async function inject() {
           sceneChanges.append(details);
         }
         const emoji = document.createElement('span');
-        emoji.classList.add('mr-1');
+        emoji.classList.add('me-1');
         emoji.innerText = '🎥';
         sceneChanges.prepend(emoji);
         backlogDiv.prepend(sceneChanges);
@@ -2296,7 +2298,7 @@ async function inject() {
 
       const toSplit = document.createElement('div');
       toSplit.dataset.backlog = 'split';
-      toSplit.classList.add('mb-1', 'p-1', 'font-weight-bold');
+      toSplit.classList.add('mb-1', 'p-1', 'fw-bold');
 
       const backlogSheetId = '1067038397'; // Performers To Split Up
       const quickViewLink = makeLink(
@@ -2305,16 +2307,16 @@ async function inject() {
           `select A,B,E,F,G,H,I,J,K,L,M,N,O,P where D="${performerId}" label A "Done", F "Notes"`,
         ),
         'quick view',
-        { color: 'var(--teal)' },
+        { color: 'var(--bs-teal)' },
       );
       const sheetLink = makeLink(
         `${backlogSpreadsheet}/edit#gid=${backlogSheetId}`,
         'Performers To Split Up',
-        { color: 'var(--orange)' },
+        { color: 'var(--bs-orange)' },
       );
       toSplit.append('This performer is listed on ', sheetLink, '. (', quickViewLink, ')');
       const emoji = document.createElement('span');
-      emoji.classList.add('mr-1');
+      emoji.classList.add('me-1');
       emoji.innerText = '🔀';
       toSplit.prepend(emoji);
       backlogDiv.append(toSplit);
@@ -2339,7 +2341,7 @@ async function inject() {
 
       const hasDuplicates = document.createElement('div');
       hasDuplicates.dataset.backlog = 'duplicates';
-      hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
+      hasDuplicates.classList.add('mb-1', 'p-1', 'fw-bold');
 
       const label = document.createElement('span');
       label.innerText = 'This performer has duplicates:';
@@ -2348,8 +2350,8 @@ async function inject() {
       (notes || []).forEach((note) => {
         if (/^https?:/.test(note)) {
           const siteName = (new URL(note)).hostname.split(/\./).slice(-2)[0];
-          const link = makeLink(note, `[${siteName}]`, { color: 'var(--yellow)' });
-          link.classList.add('ml-1');
+          const link = makeLink(note, `[${siteName}]`, { color: 'var(--bs-yellow)' });
+          link.classList.add('ms-1');
           link.title = note;
           hasDuplicates.appendChild(link);
         } else {
@@ -2366,15 +2368,15 @@ async function inject() {
 
       ids.forEach((dupId) => {
         hasDuplicates.append(document.createElement('br'));
-        const a = makeLink(`/performers/${dupId}`, dupId, { color: 'var(--teal)', marginLeft: '1.75rem' });
+        const a = makeLink(`/performers/${dupId}`, dupId, { color: 'var(--bs-teal)', marginLeft: '1.75rem' });
         a.target = '_blank';
-        a.classList.add('font-weight-normal');
+        a.classList.add('fw-normal');
         hasDuplicates.append(a);
 
         if (isMarkedForSplit(dupId)) a.after(' 🔀 needs to be split up');
       });
       const emoji = document.createElement('span');
-      emoji.classList.add('mr-1');
+      emoji.classList.add('me-1');
       emoji.innerText = '♊';
       hasDuplicates.prepend(emoji);
       backlogDiv.append(hasDuplicates);
@@ -2386,19 +2388,19 @@ async function inject() {
 
       const duplicateOf = document.createElement('div');
       duplicateOf.dataset.backlog = 'duplicate-of';
-      duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
+      duplicateOf.classList.add('mb-1', 'p-1', 'fw-bold');
 
       const label = document.createElement('span');
       label.innerText = 'This performer is a duplicate of: ';
       duplicateOf.appendChild(label);
 
-      const a = makeLink(`/performers/${foundData.duplicate_of}`, foundData.duplicate_of, { color: 'var(--teal)' });
+      const a = makeLink(`/performers/${foundData.duplicate_of}`, foundData.duplicate_of, { color: 'var(--bs-teal)' });
       a.target = '_blank';
-      a.classList.add('font-weight-normal');
+      a.classList.add('fw-normal');
       duplicateOf.append(a);
       if (isMarkedForSplit(foundData.duplicate_of)) a.after(' 🔀 needs to be split up');
       const emoji = document.createElement('span');
-      emoji.classList.add('mr-1');
+      emoji.classList.add('me-1');
       emoji.innerText = '♊';
       duplicateOf.prepend(emoji);
       backlogDiv.append(duplicateOf);
@@ -2423,13 +2425,13 @@ async function inject() {
     const style = '0.4rem solid';
     if (changes.length === 1) {
       if (changes[0] === 'duplicate_of' || changes[0] === 'duplicates') {
-        return `${style} var(--indigo)`;
+        return `${style} var(--bs-indigo)`;
       }
       if (changes[0] === 'fingerprints') {
-        return `${style} var(--cyan)`;
+        return `${style} var(--bs-cyan)`;
       }
     }
-    return `${style} var(--yellow)`;
+    return `${style} var(--bs-yellow)`;
   }
 
   /** @param {AnyObject} [object] */
@@ -2561,7 +2563,7 @@ async function inject() {
       );
       const imageSrc = img.getAttribute('src');
       setStyles(img, {
-        color: `var(--${imageSrc ? 'danger' : 'success'})`,
+        color: `var(--bs-${imageSrc ? 'danger' : 'success'})`,
         background: ['left', 'right']
           .map((d) => `linear-gradient(to ${d} top, transparent 47.75%, currentColor 49.5% 50.5%, transparent 52.25%)`)
           .concat(`url('${imageSrc}') no-repeat top / cover`)
@@ -2571,7 +2573,7 @@ async function inject() {
       img.setAttribute('src', 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
     }
 
-    const color = 'var(--yellow)';
+    const color = 'var(--bs-yellow)';
 
     if (changes.includes('title')) {
       if (!isSearchCard) {
@@ -2709,7 +2711,7 @@ async function inject() {
         const changes = dataObjectKeys(found);
 
         setStyles(targetLink, {
-          backgroundColor: 'var(--warning)',
+          backgroundColor: 'var(--bs-warning)',
           padding: '.2rem',
           fontWeight: '700',
           maxWidth: 'max-content',
