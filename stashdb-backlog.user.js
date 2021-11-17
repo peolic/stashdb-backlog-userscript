@@ -11,6 +11,7 @@
 // @grant       GM.deleteValue
 // @grant       GM.xmlHttpRequest
 // @grant       GM.registerMenuCommand
+// @grant       GM.addStyle
 // @homepageURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7
 // @downloadURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
 // @updateURL   https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
@@ -128,7 +129,7 @@ async function inject() {
 
     await Promise.all([
       elementReadyIn('#root > *'),
-      elementReadyIn('.StashDBContent > .LoadingIndicator', 100),
+      elementReadyIn('.MainContent > .LoadingIndicator', 100),
     ]);
 
     if (document.querySelector('.LoginPrompt')) return;
@@ -142,6 +143,7 @@ async function inject() {
       console.log('[backlog] init');
       await updateBacklogData();
       setUpMenu();
+      globalStyle();
     }
 
     const { object, ident, action } = loc;
@@ -152,7 +154,6 @@ async function inject() {
         if (!action) {
           await iScenePage(ident);
           if (window.location.hash === '#edits') {
-            await elementReadyIn('div[id$="-tabpane-edits"] > div:not([class]) > div.card', 1000);
             await iEditCards();
           }
           return;
@@ -178,7 +179,6 @@ async function inject() {
       if (ident && !action) {
         await iPerformerPage(ident);
         if (window.location.hash === '#edits') {
-          await elementReadyIn('div[id$="-tabpane-edits"] > div:not([class]) > div.card', 1000);
           await iEditCards();
         }
         return;
@@ -199,7 +199,7 @@ async function inject() {
 
     // Home page
     if (!object && !ident && !action) {
-      return await highlightSceneCards();
+      return await iHomePage();
     }
 
     const identAction = ident ? `${ident}/${action}` : `${action}`;
@@ -259,6 +259,20 @@ async function inject() {
         fetchData(true);
       });
     }
+  }
+
+  function globalStyle() {
+    //@ts-expect-error
+    GM.addStyle(`
+.performer-backlog:empty,
+.scene-backlog:empty {
+  display: none;
+}
+
+.SceneCard.backlog-highlight .card-footer {
+  padding: .5rem;
+}
+    `);
   }
 
   /**
@@ -1028,9 +1042,7 @@ async function inject() {
    * @param {string} sceneId
    */
   async function iScenePage(sceneId) {
-    await elementReadyIn('.StashDBContent .scene-info', 2000);
-
-    const sceneInfo = /** @type {HTMLDivElement | null} */ (document.querySelector('.scene-info'));
+    const sceneInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.scene-info', 2000));
     if (!sceneInfo) {
       console.error('[backlog] scene info not found');
       return;
@@ -1082,7 +1094,7 @@ async function inject() {
       backlogDiv = document.createElement('div');
       backlogDiv.classList.add('scene-backlog');
       setStyles(backlogDiv, {
-        maxWidth: 'fit-content',
+        maxWidth: 'min-content',
         minWidth: 'calc(50% - 15px)',
         transition: 'background-color .5s',
       });
@@ -2154,7 +2166,7 @@ async function inject() {
    * @param {string} performerId
    */
   async function iPerformerPage(performerId) {
-    const performerInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.performer-info', 1000));
+    const performerInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.PerformerInfo', 1000));
     if (!performerInfo) return;
 
     const storedData = await Cache.getStoredData();
@@ -2166,23 +2178,28 @@ async function inject() {
     let backlogDiv = (document.querySelector('.performer-backlog'));
     if (!backlogDiv) {
       backlogDiv = document.createElement('div');
-      backlogDiv.classList.add('performer-backlog');
+      backlogDiv.classList.add('performer-backlog', 'mb-2');
       setStyles(backlogDiv, {
-        maxWidth: 'fit-content',
+        maxWidth: 'min-content',
         minWidth: 'calc(50% - 15px)',
         transition: 'background-color .5s',
       });
-      performerInfo.prepend(backlogDiv);
+      performerInfo.before(backlogDiv);
       removeHook(backlogDiv, 'performers', performerId);
 
       /** @type {HTMLDivElement} */
-      const header = (performerInfo.querySelector('.card-header'));
-      header.addEventListener('mouseover', () => {
-        backlogDiv.style.backgroundColor = '#8c2020';
-      });
-      header.addEventListener('mouseout', () => {
-        backlogDiv.style.backgroundColor = '';
-      });
+      const actionsContainer = (performerInfo.querySelector('.PerformerInfo-actions .text-end'));
+      if (actionsContainer) {
+        actionsContainer.style.width = 'fit-content';
+        actionsContainer.classList.add('ms-auto');
+
+        actionsContainer.addEventListener('mouseover', () => {
+          backlogDiv.style.backgroundColor = '#8c2020';
+        });
+        actionsContainer.addEventListener('mouseout', () => {
+          backlogDiv.style.backgroundColor = '';
+        });
+      }
     }
 
     // Performer scene changes based on cached data
@@ -2414,6 +2431,18 @@ async function inject() {
     // markerDataset.backlogInjected = 'true';
   } // iPerformerPage
 
+  async function iHomePage() {
+    if (document.querySelector('main > .LoadingIndicator')) {
+      await Promise.all([
+        elementReadyIn(`.HomePage-scenes:nth-of-type(1) .SceneCard`, 2000),
+        elementReadyIn(`.HomePage-scenes:nth-of-type(2) .SceneCard`, 2000),
+      ]);
+    } else {
+      await elementReadyIn(`.HomePage-scenes .SceneCard`, 2000);
+    }
+    return await highlightSceneCards();
+  } // iHomePage
+
   // =====
 
   /**
@@ -2425,7 +2454,7 @@ async function inject() {
     const style = '0.4rem solid';
     if (changes.length === 1) {
       if (changes[0] === 'duplicate_of' || changes[0] === 'duplicates') {
-        return `${style} var(--bs-indigo)`;
+        return `${style} var(--bs-pink)`;
       }
       if (changes[0] === 'fingerprints') {
         return `${style} var(--bs-cyan)`;
@@ -2436,8 +2465,9 @@ async function inject() {
 
   /** @param {AnyObject} [object] */
   async function highlightSceneCards(object) {
-    const selector = '.SceneCard > .card';
-    if (!await elementReadyIn(selector, 2000)) {
+    const selector = '.SceneCard';
+    const isLoading = !!document.querySelector('.LoadingIndicator');
+    if (!await elementReadyIn(selector, isLoading ? 5000 : 2000)) {
       console.debug('[backlog] no scene cards found, skipping');
       return;
     }
@@ -2448,17 +2478,17 @@ async function inject() {
     const highlight = async () => {
       /** @type {HTMLDivElement[]} */
       (Array.from(document.querySelectorAll(selector))).forEach((card) => {
-        const sceneCard = /** @type {HTMLDivElement} */ (card.parentElement);
-        const markerDataset = sceneCard.dataset;
+        const markerDataset = card.dataset;
         if (markerDataset.backlogInjected) return;
         else markerDataset.backlogInjected = 'true';
 
         const sceneId = parsePath(card.querySelector('a').href).ident;
         const found = storedData.scenes[sceneId];
         if (!found) return;
+        card.classList.add('backlog-highlight');
         const changes = dataObjectKeys(found);
         card.style.outline = getHighlightStyle('scenes', changes);
-        sceneCard.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
+        card.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
 
         sceneCardHighlightChanges(card, changes, sceneId);
       });
@@ -2472,6 +2502,7 @@ async function inject() {
       );
       new MutationObserver(async (mutations, observer) => {
         console.debug('[backlog] detected change in performers studios selector, re-highlighting scene cards');
+        await elementReadyIn('.LoadingIndicator', 100);
         if (!await elementReadyIn(selector, 2000)) return;
         await highlight();
       }).observe(studioSelectorValue, { childList: true, subtree: true });
@@ -2578,11 +2609,14 @@ async function inject() {
     if (changes.includes('title')) {
       if (!isSearchCard) {
         /** @type {HTMLHeadingElement} */
-        const title = card.querySelector('.SceneCard-title');
+        const title = card.querySelector('h6');
         if (title.textContent) {
           title.style.color = color;
         } else {
           setStyles(title, { backgroundColor: color, height: '1.2rem' });
+          const duration = /** @type {HTMLSpanElement} */ (title.parentElement.nextElementSibling);
+          if (!duration.innerText && !changes.includes('duration'))
+            duration.style.minWidth = '2rem';
         }
       } else {
         /** @type {HTMLHeadingElement} */
@@ -2603,7 +2637,7 @@ async function inject() {
       /** @type {HTMLSpanElement | HTMLElement} */
       const duration = card.querySelector(
         !isSearchCard
-          ? '.SceneCard-title + span'
+          ? '.card-footer span.text-muted'
           : 'h5 > small'
       );
       if (duration.textContent) {
@@ -2667,7 +2701,7 @@ async function inject() {
   }
 
   async function iEditCards() {
-    const selector = 'div:not([class]) > div.card';
+    const selector = '.EditCard';
     if (!await elementReadyIn(selector, 1000)) return;
 
     const storedData = await Cache.getStoredData();
@@ -2685,9 +2719,9 @@ async function inject() {
       // ModifyEdit
       modify: (body) => makeArray(body.querySelector(':scope > .row:first-child a')),
       // MergeEdit (sources / target)
-      merge: (body) => Array.from(body.querySelectorAll(':scope > .mb-4 .row:nth-child(-n+2) a')),
+      merge: (body) => Array.from(body.querySelectorAll(':scope > .row:first-child .row:nth-child(-n+2) a')),
       // DestroyEdit
-      destroy: (body) => makeArray(body.querySelector('h6 > a')),
+      destroy: (body) => makeArray(body.querySelector(':scope > .row:first-child a')),
     };
 
     const cards = /** @type {HTMLDivElement[]} */ (Array.from(document.querySelectorAll(selector)));
