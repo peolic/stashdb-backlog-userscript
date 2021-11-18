@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.0
+// @version     1.22.1
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -614,9 +614,11 @@ async function inject() {
       indexCache.lastChecked = new Date().toISOString();
       await Cache.setDataIndex(indexCache);
 
+      setStatus('[backlog] data updated', 5000);
       return true;
 
     } catch (error) {
+      setStatus(`[backlog] error:\n${error}`);
       console.error('[backlog] error getting cache', error);
       return false;
     }
@@ -658,10 +660,8 @@ async function inject() {
 
     if (forceFetch || shouldFetchIndex) {
       if (!await fetchBacklogDataNow()) {
-        setStatus(`[backlog] error`);
         return 'ERROR';
       }
-      setStatus('');
       updateInfo();
       return 'UPDATED';
     }
