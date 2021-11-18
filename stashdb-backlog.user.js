@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.21.7
-// @description Highlights backlogged changes to scenes, performers and other objects on StashDB.org
+// @version     1.22.0
+// @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
 // @include     https://stashdb.org/*
@@ -25,12 +25,11 @@ const eventPrefix = 'stashdb_backlog';
 const devUsernames = ['peolic', 'root'];
 
 async function inject() {
-  const ignoredContentKeys = ['contentHash', 'lastUpdated', 'comments'];
   const backlogSpreadsheet = 'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ';
   const BASE_URL =
     dev
       ? 'http://localhost:8000'
-      : 'https://api.github.com/repos/peolic/stashdb_backlog_data/contents';
+      : 'https://github.com/peolic/stashdb_backlog_data/releases/download/cache';
 
   const urlRegex = new RegExp(
     String.raw`(?:/([a-z]+)`
@@ -82,12 +81,6 @@ async function inject() {
 
   const wait = (/** @type {number} */ ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  const once = (/** @type {(() => any) | null} */ fn) => () => {
-    if (!fn) return;
-    fn();
-    fn = null;
-  };
-
   /**
    * @param {AnyObject | null} object
    * @returns {object is SupportedObject}
@@ -108,7 +101,7 @@ async function inject() {
 
   let isDev = false;
 
-  async function dispatcher() {
+  async function dispatcher(init=false) {
     const loc = parsePath();
     if (!loc) {
       throw new Error('[backlog] Failed to parse location!');
@@ -119,8 +112,13 @@ async function inject() {
     isDev = devUsernames.includes(await getUser());
 
     setUpStatusDiv();
-    setUpMenu();
     setUpInfo();
+
+    if (init) {
+      console.log('[backlog] init');
+      await fetchBacklogData();
+      setUpMenu();
+    }
 
     const { object, ident, action } = loc;
 
@@ -165,9 +163,9 @@ async function inject() {
     console.debug(`[backlog] nothing to do for ${object}/${identAction}.`);
   }
 
-  window.addEventListener(`${eventPrefix}_locationchange`, dispatcher);
+  window.addEventListener(`${eventPrefix}_locationchange`, () => dispatcher());
 
-  setTimeout(dispatcher, 0);
+  setTimeout(dispatcher, 0, true);
 
   async function setUpStatusDiv() {
     if (document.querySelector('div#backlogStatus')) return;
@@ -184,6 +182,37 @@ async function inject() {
     }).observe(statusDiv, { childList: true, subtree: true });
   }
 
+  async function setUpMenu() {
+    /** @param {boolean} forceFetch */
+    const fetchData = async (forceFetch) => {
+      const result = await fetchBacklogData(forceFetch);
+      if (result === 'ERROR') {
+        setStatus('[backlog] failed to download cache', 10000);
+        return;
+      }
+      if (result === 'UPDATED') {
+        setStatus('[backlog] cache downloaded, reloading page...');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        setStatus('[backlog] no updates found', 5000);
+      }
+    }
+
+    //@ts-expect-error
+    GM.registerMenuCommand('🔄 Check for updates', () => {
+      fetchData(false);
+    });
+
+    if (isDev) {
+      //@ts-expect-error
+      GM.registerMenuCommand('📥 Download cache', () => {
+        fetchData(true);
+      });
+    }
+  }
+
   /**
    * @param {string} text
    * @param {number} [resetAfter] in milliseconds
@@ -192,6 +221,8 @@ async function inject() {
     /** @type {HTMLDivElement} */
     const statusDiv = (document.querySelector('div#backlogStatus'));
     statusDiv.innerText = text;
+    if (isDev && text)
+      console.debug(text);
     const id = Number(statusDiv.dataset.reset);
     if (id) {
       clearTimeout(id);
@@ -281,119 +312,7 @@ async function inject() {
         block(`(${formatDate(lastUpdated)})`, 'd-inline-block'),
       );
     }
-
-    const storedData = await Cache.getStoredData();
-
-    const cachedScenes = Object.keys(storedData.scenes).length;
-    const totalScenes = Object.keys(index.scenes).length;
-
-    const cachedPerformers = Object.keys(storedData.performers).length;
-    const totalPerformers = Object.values(index.performers).filter(([hash]) => !!hash).length;
-
-    info.append(
-      block('cached scenes:', 'd-inline-block', 'mr-1'),
-      block(`${cachedScenes} / ${totalScenes}`, 'd-inline-block'),
-      block('cached performers:', 'd-inline-block', 'mr-1'),
-      block(`${cachedPerformers} / ${totalPerformers}`, 'd-inline-block'),
-    );
-
-    if (isDev) {
-      const button = document.createElement('span');
-      button.innerText = 'Uncached/Outdated objects';
-      setStyles(button, { display: 'inline-block', color: 'aqua', fontWeight: '700', cursor: 'pointer', });
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        button.remove();
-        getUncachedOutdatedObjects(info, index, storedData);
-        return false;
-      })
-      info.append(button);
-      return;
-    }
   }
-
-  /**
-   * @param {HTMLDivElement} info
-   * @param {DataIndex} index
-   * @param {DataCache} storedData
-   */
-  function getUncachedOutdatedObjects(info, index, storedData) {
-    let anyUncachedOrOutdated = false;
-    /** @type {SupportedObject[]} */
-    (['scenes', 'performers']).forEach((obj) => {
-      const uncached = Object.entries(index[obj])
-        .filter(([objId, [hash]]) => !!hash && (!Object.keys(storedData[obj]).includes(objId) || storedData[obj][objId].contentHash !== hash))
-        .map(([objId, [hash]]) => {
-          const outdated = storedData[obj][objId] && storedData[obj][objId].contentHash !== hash;
-          const a = makeLink(`/${obj}/${objId}`, `${obj.slice(0, -1)}`, {
-            display: 'inline-block',
-            margin: '0 .2rem',
-            color: outdated ? 'var(--orange)' : 'var(--teal)',
-          });
-          a.target = '_blank';
-          return a;
-        });
-      if (uncached.length === 0) return;
-      const hr = document.createElement('hr');
-      hr.style.borderTopColor = '#fff';
-      info.append(hr, ...uncached);
-      anyUncachedOrOutdated = true;
-    });
-
-    if (anyUncachedOrOutdated) {
-      /** @type {HTMLSpanElement} */
-      const icon = info.parentElement.querySelector(':scope > span[title]');
-      icon.innerText = '📙';
-    }
-  }
-
-  async function _setUpMenu() {
-    if (!isDev) return;
-
-    //@ts-expect-error
-    GM.registerMenuCommand('🔄 Refresh index', async () => {
-      const index = await getOrFetchDataIndex(true);
-      if (index) setStatus('[backlog] index updated', 2500);
-      else setStatus('[backlog] failed to get index');
-    });
-
-    //@ts-expect-error
-    GM.registerMenuCommand('📥 Download cache', async () => {
-      const base = 'https://github.com/peolic/stashdb_backlog_data/releases/download/cache';
-      setStatus(`[backlog] getting cache...`);
-
-      /** @type {MutationDataCache} */
-      const legacyCache = (await request(`${base}/stashdb_backlog.json`, 'json'));
-      const dataCache = await applyDataCacheMigrations(legacyCache);
-      await Cache.setData(dataCache);
-
-      await wait(100);
-
-      /** @type {DataIndex} */
-      const indexCache = (await request(`${base}/stashdb_backlog_index.json`, 'json'));
-      indexCache.lastChecked = new Date().toISOString();
-      await Cache.setDataIndex(indexCache);
-
-      await updateInfo();
-      setStatus('[backlog] cache downloaded', 2500);
-    });
-
-    //@ts-expect-error
-    GM.registerMenuCommand('⭕ Force refetch', async () => {
-      const result = await backlogRefetch();
-      if (!result) {
-        setStatus('[backlog] failed to fetch object');
-        return;
-      }
-      setStatus('[backlog] reloading page...');
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
-    });
-  }
-
-  const setUpMenu = once(_setUpMenu);
 
   // =====
 
@@ -486,6 +405,7 @@ async function inject() {
    */
   async function request(url, responseType) {
     const response = await new Promise((resolve, reject) => {
+      console.debug(`[backlog] requesting ${responseType}: ${url}`);
       //@ts-expect-error
       GM.xmlHttpRequest({
         method: 'GET',
@@ -503,43 +423,6 @@ async function inject() {
       throw new Error(`HTTP ${response.status} ${response.statusText} GET ${url}`);
     }
     return response.response;
-  }
-
-  /**
-   * @template {BaseCache} T
-   * @param {string} url
-   * @returns {Promise<Omit<T, keyof BaseCache> | FetchError | null>}
-   */
-  async function fetchJSON(url) {
-    try {
-      const response = await fetch(url, {
-        credentials: 'same-origin',
-        referrerPolicy: 'same-origin',
-        cache: 'no-cache',
-      });
-      if (!response.ok) {
-        const body = await response.text();
-        console.error('[backlog] fetch bad response', response.status, response.url);
-        console.debug(body);
-        return { error: true, status: response.status, body };
-      }
-
-      let data = await response.json();
-
-      // Handle GitHub Content API
-      if ('content' in data) {
-        const { content, encoding } = data;
-        if (encoding !== 'base64') throw new Error(`Content in unsupported encoding ${encoding}`);
-        const decodedContent = atob(content);
-        data = JSON.parse(decodedContent);
-      }
-
-      return data;
-
-    } catch (error) {
-      console.error('[backlog] fetch error', url, error);
-      return null;
-    }
   }
 
   /**
@@ -573,11 +456,11 @@ async function inject() {
   /**
    * @returns {Promise<Date | null>}
    */
-  async function getDataIndexLastUpdatedDate() {
+  async function getDataLastUpdatedDate() {
     try {
-      console.debug('[backlog] fetching last updated date for data index');
+      console.debug('[backlog] fetching last updated date for data');
       const response = await fetch(
-        'https://api.github.com/repos/peolic/stashdb_backlog_data/commits?page=1&per_page=1&path=index.json',
+        'https://api.github.com/repos/peolic/stashdb_backlog_data/releases',
         { credentials: 'same-origin', referrerPolicy: 'same-origin' },
       );
       if (!response.ok) {
@@ -585,8 +468,11 @@ async function inject() {
         console.error('[backlog] api fetch bad response', response.status, body);
         return null;
       }
+      /** @type {{ tag_name: string, created_at: string, [k: string]: unknown }[]} */
       const data = await response.json();
-      return new Date(data[0].commit.committer.date);
+      const release = data.find((r) => r.tag_name === 'cache');
+      if (!release) throw new Error('cache release not found');
+      return new Date(release.created_at);
 
     } catch (error) {
       console.error('[backlog] api fetch error', error);
@@ -610,33 +496,6 @@ async function inject() {
       return await this._deleteValue(this._DATA_INDEX_KEY);
     }
 
-    /**
-     * @param {SupportedObject} object
-     * @param {string} uuid
-     * @param {DataIndex} [storedIndex]
-     * @returns {Promise<boolean>}
-     */
-    static async removeIndexEntry(object, uuid, storedIndex) {
-      if (!storedIndex) {
-        try {
-          storedIndex = await this.getStoredDataIndex();
-        } catch (error) {
-          return false;
-        }
-      }
-
-      const haystack = storedIndex[object];
-
-      let removed = false;
-      if (haystack[uuid] !== undefined) {
-        delete haystack[uuid];
-        removed = true;
-      }
-      await this.setDataIndex(storedIndex);
-
-      return removed;
-    }
-
     static async getStoredData() {
       const scenes = /** @type {DataCache['scenes']} */ (await this._getValue(this._SCENES_DATA_KEY));
       const performers = /** @type {DataCache['performers']} */ (await this._getValue(this._PERFORMERS_DATA_KEY));
@@ -656,31 +515,6 @@ async function inject() {
     static async clearData() {
       await this._deleteValue(this._SCENES_DATA_KEY);
       await this._deleteValue(this._PERFORMERS_DATA_KEY);
-    }
-
-    /**
-     * @param {SupportedObject} object
-     * @param {string} uuid
-     * @param {DataCache} [storedData]
-     * @returns {Promise<boolean>}
-     */
-    static async removeObjectData(object, uuid, storedData) {
-      if (!storedData) {
-        try {
-          storedData = await this.getStoredData();
-        } catch (error) {
-          return false;
-        }
-      }
-
-      const objectCache = storedData[object];
-      if (objectCache[uuid]) {
-        delete objectCache[uuid];
-        await this.setData(storedData);
-        return true;
-      }
-
-      return false;
     }
 
     // ===
@@ -765,22 +599,47 @@ async function inject() {
     return dataCache;
   }
 
+  async function fetchBacklogDataNow() {
+    setStatus(`[backlog] getting cache...`);
+    try {
+      /** @type {MutationDataCache} */
+      const legacyCache = (await request(`${BASE_URL}/stashdb_backlog.json`, 'json'));
+      const dataCache = await applyDataCacheMigrations(legacyCache);
+      await Cache.setData(dataCache);
+
+      await wait(100);
+
+      /** @type {DataIndex} */
+      const indexCache = (await request(`${BASE_URL}/stashdb_backlog_index.json`, 'json'));
+      indexCache.lastChecked = new Date().toISOString();
+      await Cache.setDataIndex(indexCache);
+
+      return true;
+
+    } catch (error) {
+      console.error('[backlog] error getting cache', error);
+      return false;
+    }
+  }
+
   /**
    * @param {boolean} [forceFetch=false]
-   * @returns {Promise<DataIndex | null>}
+   * @returns {Promise<'UPDATED' | 'CACHED' | 'ERROR'>}
    */
-  async function getOrFetchDataIndex(forceFetch=false) {
+  async function fetchBacklogData(forceFetch=false) {
+    /** @type {'UPDATED' | 'CACHED' | 'ERROR'} */
+    let result = 'CACHED';
     const storedDataIndex = await Cache.getStoredDataIndex();
     let shouldFetchIndex = shouldFetch(storedDataIndex, 1);
     try {
       if (!dev && !forceFetch && shouldFetchIndex) {
         // Only fetch if there really was an update
         setStatus(`[backlog] checking for updates`);
-        const lastUpdated = await getDataIndexLastUpdatedDate();
+        const lastUpdated = await getDataLastUpdatedDate();
         if (lastUpdated) {
           shouldFetchIndex = shouldFetch(storedDataIndex, lastUpdated);
           console.debug(
-            `[backlog] data index lastest remote update: ${formatDate(lastUpdated)}`
+            `[backlog] latest remote update: ${formatDate(lastUpdated)}`
             + ` - updating: ${shouldFetchIndex}`
           );
 
@@ -792,187 +651,35 @@ async function inject() {
       }
     } catch (error) {
       setStatus(`[backlog] error:\n${error}`);
-      console.error('[backlog] error trying to determine lastest data index update', error);
+      console.error('[backlog] error trying to determine latest data update', error);
       shouldFetchIndex = shouldFetch(storedDataIndex, 2);
+      return 'ERROR';
     }
 
     if (forceFetch || shouldFetchIndex) {
-      setStatus(`[backlog] updating...`);
-      const data = await fetchJSON(`${BASE_URL}/index.json`);
-      if (data === null || 'error' in data) {
+      if (!await fetchBacklogDataNow()) {
         setStatus(`[backlog] error`);
-        console.error('[backlog] index error', data);
-        return null;
+        return 'ERROR';
       }
       setStatus('');
-      const dataIndex = /** @type {DataIndex} */ (data);
-
-      await applyDataIndexMigrations(dataIndex);
-
-      const action = storedDataIndex.lastUpdated ? 'updated' : 'fetched';
-      dataIndex.lastUpdated = dataIndex.lastChecked = new Date().toISOString();
-      await Cache.setDataIndex(dataIndex);
-      console.debug(`[backlog] index ${action}`);
       updateInfo();
-      return dataIndex;
-    } else {
-      console.debug('[backlog] using stored index');
-      return storedDataIndex;
+      return 'UPDATED';
     }
+
+    return result;
   }
-
-  /**
-   * Mutates `dataIndex`
-   * @param {MutationDataIndex | DataIndex} dataIndex
-   * @returns {Promise<DataIndex>}
-   */
-  async function applyDataIndexMigrations(dataIndex) {
-    for (const key in dataIndex) {
-      if (key === 'lastUpdated') continue;
-      const thisIndex = dataIndex[/** @type {SupportedObject} */ (key)];
-      const log = once(() => console.debug(`[backlog] \`index.${key}\` migration: convert comma-separated to array`));
-      for (const thisId in thisIndex) {
-        let oldValue = thisIndex[thisId];
-        if (typeof oldValue === 'string') {
-          log();
-          thisIndex[thisId] = oldValue = ['', ...oldValue.split(/,/g)];
-        }
-      }
-    }
-
-    dataIndex = /** @type {DataIndex} */ (dataIndex);
-    await Cache.setDataIndex(dataIndex);
-    return dataIndex;
-  }
-
-  /**
-   * @param {SupportedObject} object
-   * @param {string} uuid
-   * @returns {string}
-   */
-  const makeDataUrl = (object, uuid) => `${BASE_URL}/${object}/${uuid.slice(0, 2)}/${uuid}.json`;
-
-  /**
-   * @template {DataObject} T
-   * @param {SupportedObject} object
-   * @param {string} uuid
-   * @param {DataCache} storedData
-   * @param {DataIndex} index
-   * @returns {Promise<T | null>}
-   */
-  const _fetchObjectData = async (object, uuid, storedData, index) => {
-    const data = await fetchJSON(makeDataUrl(object, uuid));
-    if (data && 'error' in data && data.status === 404) {
-      // remove from data index
-      const removedIndex = await Cache.removeIndexEntry(object, uuid, index);
-      // remove from data
-      const removedData = await Cache.removeObjectData(object, uuid, storedData);
-
-      if (removedIndex || removedData) {
-        const from = [
-          (removedIndex ? 'index cache' : null),
-          (removedData ? 'data cache' : null)
-        ].filter(Boolean).join(' and ');
-        console.debug(`[backlog] <${object} ${uuid}> removed from ${from}, no longer valid`);
-      }
-      updateInfo();
-      return null;
-    } else if (data === null || 'error' in data) {
-      console.error(`[backlog] <${object} ${uuid}> data error`, data);
-      return null;
-    }
-
-    const haystack = index[object];
-    const indexEntry = haystack[uuid];
-
-    const objectCache = storedData[object];
-    const action = objectCache[uuid] && objectCache[uuid].lastUpdated ? 'updated' : 'fetched';
-    const dataObject = /** @type {T} */ (data);
-    dataObject.contentHash = indexEntry[0];
-    dataObject.lastUpdated = new Date().toISOString();
-    objectCache[uuid] = dataObject;
-    await Cache.setData(storedData);
-    console.debug(`[backlog] <${object} ${uuid}> data ${action}`);
-
-    // add to data index if not present
-    if (haystack[uuid] === undefined) {
-      haystack[uuid] = [
-        '',
-        ...Object.keys(data).filter((k) => !ignoredContentKeys.includes(k)),
-      ];
-    }
-    await Cache.setDataIndex(index);
-    console.debug('[backlog] stored data index updated');
-    updateInfo();
-    return dataObject;
-  };
 
   /**
    * @template {SupportedObject} T
    * @template {string} I
    * @param {T} object
    * @param {I} uuid
-   * @param {DataIndex | null} [index]
    * @returns {Promise<DataCache[T][I] | null>}
    */
-  async function getDataFor(object, uuid, index) {
-    if (index === undefined) index = await getOrFetchDataIndex();
-    if (!index) throw new Error('[backlog] failed to get index');
-
-    const haystack = index[object];
-    if (haystack[uuid] === undefined) {
-      // Clear outdated
-      if (await Cache.removeObjectData(object, uuid)) {
-        console.debug(`[backlog] <${object} ${uuid}> cleared from cache (not found in index)`);
-      }
-      return null;
-    }
-
+  async function getDataFor(object, uuid) {
     const storedData = await Cache.getStoredData();
-
-    const indexEntry = haystack[uuid];
-    const contentHash = indexEntry[0];
     const objectCache = storedData[object];
-
-    // for performers, empty content hash = no file, usually
-    if (object === 'performers' && contentHash === '' && !objectCache[uuid]) {
-      return null;
-    }
-
-    if (shouldFetch(objectCache[uuid], contentHash)) {
-      setStatus(`[backlog] updating ${object.slice(0, -1)} data...`);
-      try {
-        return await _fetchObjectData(object, uuid, storedData, index);
-      } finally {
-        setStatus('');
-      }
-    }
-
-    console.debug(`[backlog] <${object} ${uuid}> using stored data`);
     return objectCache[uuid];
-  }
-
-  async function backlogRefetch(global = globalThis) {
-    const { object, ident: uuid } = parsePath();
-
-    const index = await getOrFetchDataIndex(true);
-    if (!index) throw new Error('[backlog] failed to get index');
-
-    if (!object) return false;
-
-    if (!isSupportedObject(object) || !uuid) {
-      global.console.warn(`[backlog] invalid request: <${object} ${uuid}>`);
-      return false;
-    }
-
-    const storedData = await Cache.getStoredData();
-    const data = await _fetchObjectData(object, uuid, storedData, index);
-    if (data === null) {
-      global.console.warn(`[backlog] <${object} ${uuid}> failed to refetch`);
-      return false;
-    }
-
-    return true;
   }
 
   /**
@@ -1183,47 +890,6 @@ async function inject() {
   };
 
   /**
-   * @param {DataObject | null} data
-   * @param {HTMLElement} target Checks `target` for existence of button
-   * @returns {HTMLButtonElement | null}
-   */
-  const createFetchButton = (data, target) => {
-    const className = 'backlog-refetch';
-    if (!target || target.querySelector(`:scope > button.${className}`)) return null;
-
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.classList.add('ml-2');
-    button.classList.add('btn', 'btn-light', className);
-    if (data) {
-      const update = data.lastUpdated ? `\nLast updated: ${formatDate(data.lastUpdated)}` : '';
-      button.title = `Refetch backlog data${update}`;
-      button.innerText = '🔄';
-    } else {
-      button.title = 'Fetch new backlog data';
-      button.innerText = '📥';
-    }
-
-    button.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      button.textContent = '⏳';
-      button.disabled = true;
-      const result = await backlogRefetch();
-      button.textContent = result ? '✔' : '❌';
-      setStyles(button, { backgroundColor: result ? 'yellow' : 'var(--gray-dark)', fontWeight: '800' });
-      if (result) {
-        setStatus('[backlog] reloading page...');
-        setTimeout(() => {
-          window.location.reload();
-        }, 500);
-      }
-    });
-
-    return button;
-  };
-
-  /**
    * @param {string} sceneId
    */
   async function iScenePage(sceneId) {
@@ -1244,13 +910,6 @@ async function inject() {
     }
 
     const found = await getDataFor('scenes', sceneId);
-
-    if (isDev) {
-      /** @type {HTMLDivElement} */
-      const sceneButtons = (sceneInfo.querySelector(':scope > .card-header > .float-right'));
-      const buttonRefetch = createFetchButton(found, sceneButtons);
-      if (buttonRefetch) sceneButtons.appendChild(buttonRefetch);
-    }
 
     if (!found) {
       console.debug('[backlog] not found', sceneId);
@@ -2308,10 +1967,10 @@ async function inject() {
       markerDataset.backlogInjected = 'true';
     }
 
-    const index = await getOrFetchDataIndex();
+    const index = await Cache.getStoredDataIndex();
     if (!index) return;
 
-    highlightSceneCards('performers', index);
+    highlightSceneCards('performers');
 
     /** @type {HTMLElement[]} */
     const highlightElements = [];
@@ -2450,7 +2109,7 @@ async function inject() {
       highlightElements.push(toSplit);
     }
 
-    const foundData = await getDataFor('performers', performerId, index);
+    const foundData = await getDataFor('performers', performerId);
     if (!foundData) {
       console.debug('[backlog] not found', performerId);
       return;
@@ -2522,18 +2181,15 @@ async function inject() {
     return `${style} var(--yellow)`;
   }
 
-  /**
-   * @param {AnyObject} [object]
-   * @param {DataIndex | null} [index]
-   */
-  async function highlightSceneCards(object, index) {
+  /** @param {AnyObject} [object] */
+  async function highlightSceneCards(object) {
     const selector = '.SceneCard > .card';
     if (!await elementReadyIn(selector, 2000)) {
       console.debug('[backlog] no scene cards found, skipping');
       return;
     }
 
-    if (index === undefined) index = await getOrFetchDataIndex();
+    const index = await Cache.getStoredDataIndex();
     if (!index) return;
 
     const highlight = async () => {
@@ -2576,7 +2232,7 @@ async function inject() {
       return;
     }
 
-    const index = await getOrFetchDataIndex();
+    const index = await Cache.getStoredDataIndex();
     if (!index) return;
 
     /** @type {HTMLDivElement[]} */
@@ -2604,7 +2260,7 @@ async function inject() {
       return;
     }
 
-    const index = await getOrFetchDataIndex();
+    const index = await Cache.getStoredDataIndex();
     if (!index) return;
 
     /** @type {HTMLAnchorElement[]} */
