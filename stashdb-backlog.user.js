@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.1
+// @version     1.22.2
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -261,7 +261,7 @@ async function inject() {
         top: '32px',
         right: '-20px',
         textAlign: 'center',
-        border: '.25rem solid #ccc',
+        border: '.25rem solid #cccccc',
         padding: '0.3rem',
         zIndex: '100',
         backgroundColor: 'var(--gray-dark)',
@@ -299,7 +299,7 @@ async function inject() {
     };
 
     info.innerHTML = '';
-    info.append(block('backlog index last updated:'));
+    info.append(block('backlog data last updated:'));
 
     const index = await Cache.getStoredDataIndex();
     if (!index.lastUpdated) {
@@ -311,6 +311,14 @@ async function inject() {
         block(ago, 'd-inline-block', 'mr-1'),
         block(`(${formatDate(lastUpdated)})`, 'd-inline-block'),
       );
+
+      const hr = document.createElement('hr');
+      hr.style.borderTopColor = '#cccccc';
+
+      //@ts-expect-error
+      const usVersion = GM.info.script.version;
+      const versionInfo = block(`userscript version: ${usVersion}`);
+      info.append(hr, versionInfo);
     }
   }
 
@@ -2034,7 +2042,7 @@ async function inject() {
 
       const sceneChanges = document.createElement('div');
       sceneChanges.classList.add('mb-1', 'p-1', 'font-weight-bold');
-      sceneChanges.innerHTML = 'This performer has pending scene changes: (info may be outdated or incomplete)';
+      sceneChanges.innerHTML = 'This performer has pending scene changes:';
       for (const [actionStr, scenes] of Object.entries(performerScenes)) {
         if (scenes.length === 0) continue;
         const action = /** @type {'append' | 'remove'} */ (actionStr);
