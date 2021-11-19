@@ -813,6 +813,25 @@ async function inject() {
   }
 
   /**
+   * @param {HTMLElement} element
+   * @param {string} value
+   * @see https://stackoverflow.com/a/48890844
+   */
+  function setNativeValue(element, value) {
+    const valueSetter = Object.getOwnPropertyDescriptor(element, 'value').set;
+    const prototype = Object.getPrototypeOf(element);
+    const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
+
+    if (valueSetter && valueSetter !== prototypeValueSetter) {
+      prototypeValueSetter.call(element, value);
+    } else {
+      valueSetter.call(element, value);
+    }
+
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  /**
    * @param {string} sheetId
    * @param {string} query
    * @returns {string}
@@ -1720,7 +1739,7 @@ async function inject() {
      * @param {string} value
      */
     const settableField = (field, fieldName, value) => {
-      /** @type {HTMLInputElement} */
+      /** @type {HTMLInputElement | HTMLTextAreaElement} */
       const fieldEl = sceneFormCol.querySelector(`*[name="${fieldName}"]`);
       if (!fieldEl) {
         console.error(`form field with name="${fieldName}" not found`);
@@ -1730,8 +1749,7 @@ async function inject() {
       set.innerText = 'set field';
       setStyles(set, { marginLeft: '.5rem', color: 'var(--yellow)', cursor: 'pointer' });
       set.addEventListener('click', () => {
-        fieldEl.value = value;
-        fieldEl.dispatchEvent(new Event('input'));
+        setNativeValue(fieldEl, value);
       });
       field.innerText += ':';
       field.append(set);
@@ -1837,8 +1855,7 @@ async function inject() {
                 set.innerText = 'set alias';
                 setStyles(set, { marginLeft: '.5rem', color: 'var(--yellow)', cursor: 'pointer', fontWeight: '700' });
                 set.addEventListener('click', () => {
-                  fieldEl.value = entry.appearance || '';
-                  fieldEl.dispatchEvent(new Event('input'));
+                  setNativeValue(fieldEl, entry.appearance || '');
                 });
                 a.after(set);
               }
