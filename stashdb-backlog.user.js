@@ -2019,21 +2019,53 @@ async function inject() {
 
       if (field === 'performers') {
         const performers = found[field];
+
+        const getPerformerItem = async (/** @type {string} */ id) =>
+          /** @type {HTMLDivElement} */
+          ((await elementReadyIn(`input[type="hidden"][value="${id}"]`, 100, sceneForm))?.parentElement);
+
+        /** @param {PerformerEntry} entry */
+        const addPerformer = async (entry) => {
+          /** @type {HTMLInputElement} */
+          const fieldEl = (sceneForm.querySelector('.add-performer input'));
+          setNativeValue(fieldEl, entry.id);
+          const result = /** @type {HTMLDivElement | null} */ (await elementReadyIn('.add-performer .react-select__option', 2000, sceneForm));
+          if (result) {
+            result.click();
+            const performerItem = await getPerformerItem(entry.id);
+
+            /** @type {HTMLInputElement} */
+            const aliasEl = performerItem.querySelector('input.performer-alias');
+            setNativeValue(aliasEl, entry.appearance || '');
+          }
+        };
+
+        /**
+         * @param {PerformerEntry} a
+         * @param {PerformerEntry} b
+         */
+        const nameSort = (a, b) => (a.appearance || a.name).localeCompare(b.appearance || b.name);
+
         const ul = document.createElement('ul');
         ul.classList.add('p-0');
         sortedKeys(performers, ['update', 'remove', 'append']).forEach((action) => {
-          performers[action].forEach((entry) => {
+          performers[action].sort(nameSort).forEach((entry) => {
             const li = document.createElement('li');
             li.classList.add('d-flex', 'justify-content-between');
+            /** @type {HTMLElement} */
+            let insertAfter;
 
-            const label = document.createElement('span');
-            label.style.flex = '0.25 0 0';
+            const label = document.createElement('a');
+            setStyles(label, { flex: '0.25 0 0', height: '1.5rem' });
+            if (entry.id) {
+              label.classList.add('fw-bold');
+              setStyles(label, { color: 'var(--bs-yellow)', cursor: 'pointer' });
+            }
             label.innerText = '[' + (action === 'append' ? 'add' : action) + ']';
             li.appendChild(label);
 
             const disambiguation = entry.disambiguation ? ` (${entry.disambiguation})` : '';
             let name = entry.name + disambiguation;
-            const appearance = entry.appearance ? ` (as ${entry.appearance})` : '';
 
             const info = document.createElement('span');
             setStyles(info, { flex: '1', whiteSpace: 'pre-wrap' });
@@ -2043,7 +2075,12 @@ async function inject() {
               const status = entry.status_url
                 ? makeLink(entry.status_url, statusText, { color: 'var(--bs-teal)' })
                 : statusText;
-              info.append(status, ` ${name + appearance}`);
+              info.append(status, ` ${name}`);
+              if (entry.appearance) {
+                const appearanceSpan = createSelectAllSpan(entry.appearance);
+                appearanceSpan.classList.add('fw-bold');
+                info.append(' (as ', appearanceSpan, ')');
+              }
             } else if (action === 'update') {
               const a = makeLink(`/performers/${entry.id}`, name, { color: 'var(--bs-teal)' });
               a.target = '_blank';
@@ -2060,17 +2097,14 @@ async function inject() {
               }
               info.append(...nodes);
 
-              /** @type {HTMLInputElement} */
-              const fieldEl = sceneForm.querySelector(`input[placeholder="${entry.name}"]`);
-              if (fieldEl) {
-                const set = document.createElement('a');
-                set.innerText = 'set alias';
-                setStyles(set, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer', fontWeight: '700' });
-                set.addEventListener('click', () => {
-                  setNativeValue(fieldEl, entry.appearance || '');
-                });
-                a.after(set);
-              }
+              label.addEventListener('click', async () => {
+                const performerItem = await getPerformerItem(entry.id);
+                if (!performerItem) return alert('performer not found');
+
+                /** @type {HTMLInputElement} */
+                const aliasEl = performerItem.querySelector('input.performer-alias');
+                setNativeValue(aliasEl, entry.appearance || '');
+              });
             } else {
               const a = makeLink(`/performers/${entry.id}`, name, { color: 'var(--bs-teal)' });
               a.target = '_blank';
@@ -2090,6 +2124,87 @@ async function inject() {
                 const uuid = createSelectAllSpan(entry.id);
                 uuid.style.fontSize = '.9rem';
                 info.append(document.createElement('br'), uuid);
+
+                // Attempt to find a performer-to-remove with the same name
+                const replacement = (
+                  performers.remove.find((toRemove) => [entry.appearance, entry.name].includes(toRemove.appearance || toRemove.name))
+                  || performers.remove.find((toRemove) => entry.name.split(/\b/)[0] == (toRemove.appearance || toRemove.name).split(/\b/)[0])
+                );
+                if (replacement) {
+                  label.innerText = '[replace]';
+                  label.style.color = 'var(--bs-cyan)';
+                  insertAfter = Array.from(ul.querySelectorAll('li')).find((li) => {
+                    const href = /** @type {HTMLAnchorElement} */ (li.querySelector('a[href]')).href;
+                    return parsePath(href).ident === replacement.id;
+                  });
+
+                  label.title = 'Hold <CTRL> to add instead.';
+
+                  const keydown = (/** @type {KeyboardEvent} */ e) => {
+                    if (e.ctrlKey) {
+                      label.firstChild.textContent = '[add]';
+                      label.style.color = 'var(--bs-yellow)';
+                    }
+                  };
+                  const keyup = () => {
+                    label.firstChild.textContent = '[replace]';
+                    label.style.color = 'var(--bs-cyan)';
+                  };
+                  window.addEventListener('keydown', keydown);
+                  window.addEventListener('keyup', keyup);
+
+                  window.addEventListener(locationChanged, () => {
+                    window.removeEventListener('keydown', keydown);
+                    window.removeEventListener('keyup', keyup);
+                  }, { once: true });
+                }
+
+                label.addEventListener('click', async (e) => {
+                  const performerItem = await getPerformerItem(entry.id);
+
+                  if (performerItem) {
+                    if (e.ctrlKey) window.dispatchEvent(new KeyboardEvent('keyup'));
+                    return alert('performer already added');
+                  }
+
+                  if (!replacement || e.ctrlKey) {
+                    return addPerformer(entry);
+                  }
+
+                  /** @type {HTMLDivElement} */
+                  const replPerformerItem = await getPerformerItem(replacement.id);
+                  if (!replPerformerItem) {
+                    alert('replacement performer not found or already removed\n\nadding as new performer');
+                    return addPerformer(entry);
+                  }
+
+                  const buttons = Array.from(replPerformerItem.querySelectorAll('button'));
+                  const changeButton = buttons.find((btn) => btn.innerText === 'Change');
+                  changeButton.click();
+
+                  const searchField = /** @type {HTMLElement} */ (changeButton.nextElementSibling);
+                  const fieldEl = /** @type {HTMLInputElement} */ (searchField.querySelector('input'));
+                  setNativeValue(fieldEl, entry.id);
+                  const result = /** @type {HTMLDivElement | null} */ (await elementReadyIn('.react-select__option', 2000, searchField));
+                  if (result) {
+                    result.click();
+                    const performerItem = await getPerformerItem(entry.id);
+                    /** @type {HTMLInputElement} */
+                    const aliasEl = performerItem.querySelector('input.performer-alias');
+                    setNativeValue(aliasEl, entry.appearance || '');
+                  }
+                });
+              }
+
+              if (action === 'remove') {
+                label.addEventListener('click', async () => {
+                  const performerItem = await getPerformerItem(entry.id);
+                  if (!performerItem) return alert('performer not found or already removed');
+
+                  const buttons = Array.from(performerItem.querySelectorAll('button'));
+                  const removeButton = buttons.find((btn) => btn.innerText === 'Remove');
+                  removeButton.click();
+                });
               }
             }
 
@@ -2099,7 +2214,8 @@ async function inject() {
 
             li.appendChild(info);
 
-            ul.appendChild(li);
+            if (insertAfter === undefined) ul.appendChild(li);
+            else insertAfter.after(li);
           });
         });
         dd.appendChild(ul);
