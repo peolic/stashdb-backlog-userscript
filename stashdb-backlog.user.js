@@ -92,9 +92,10 @@ async function inject() {
   /**
    * @param {string} selector
    * @param {number} [timeout] fail after, in milliseconds
+   * @param {HTMLElement} [parentEl]
    */
-  const elementReadyIn = (selector, timeout) => {
-    const promises = [elementReady(selector)];
+  const elementReadyIn = (selector, timeout, parentEl) => {
+    const promises = [elementReady(selector, parentEl)];
     if (timeout) promises.push(wait(timeout).then(() => null));
     return Promise.race(promises);
   };
@@ -2451,21 +2452,22 @@ async function inject() {
  * Useful for resolving race conditions.
  *
  * @param {string} selector
+ * @param {HTMLElement} [parentEl]
  * @returns {Promise<Element>}
  */
-function elementReady(selector) {
+function elementReady(selector, parentEl) {
   return new Promise((resolve, reject) => {
-    let el = document.querySelector(selector);
+    let el = (parentEl || document).querySelector(selector);
     if (el) {resolve(el);}
     new MutationObserver((mutationRecords, observer) => {
       // Query for elements matching the specified selector
-      Array.from(document.querySelectorAll(selector)).forEach((element) => {
+      Array.from((parentEl || document).querySelectorAll(selector)).forEach((element) => {
         resolve(element);
         //Once we have resolved we don't need the observer anymore.
         observer.disconnect();
       });
     })
-    .observe(document.documentElement, {
+    .observe(parentEl || document.documentElement, {
       childList: true,
       subtree: true
     });
