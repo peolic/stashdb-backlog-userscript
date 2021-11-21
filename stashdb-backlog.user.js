@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.2
+// @version     1.22.3
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -109,6 +109,8 @@ async function inject() {
     }
 
     await elementReadyIn('.StashDBContent > .LoadingIndicator', 100);
+
+    if (document.querySelector('.LoginPrompt')) return;
 
     isDev = devUsernames.includes(await getUser());
 
@@ -2014,7 +2016,7 @@ async function inject() {
       });
     }
 
-    // Performer scene changes based on cached data (could be out-of-date)
+    // Performer scene changes based on cached data
     await (async function () {
       const { scenes: storedScenes } = await Cache.getStoredData();
       /** @typedef {[sceneId: string, entry: PerformerEntry]} performerScene */
