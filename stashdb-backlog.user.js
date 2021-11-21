@@ -272,6 +272,21 @@ async function inject() {
 .SceneCard.backlog-highlight .card-footer {
   padding: .5rem;
 }
+
+input.backlog-flash,
+textarea.backlog-flash {
+  background-color: #0060df;
+  color: #ffffff;
+}
+
+button.nav-link.backlog-flash {
+  background-color: var(--bs-yellow);
+  color: var(--bs-dark);
+}
+
+.backlog-flash:not(input, textarea, button.nav-link) {
+  outline: .5rem solid var(--bs-yellow);
+}
     `);
   }
 
@@ -1945,6 +1960,22 @@ async function inject() {
       return button;
     };
 
+    /** @param {HTMLElement} fieldEl */
+    const flashField = (fieldEl) => {
+      const activeTabButton = sceneForm.querySelector('ul.nav button.nav-link.active');
+      const fieldTabButton = getTabButton(fieldEl);
+      const tabFlash = activeTabButton !== fieldTabButton && !fieldTabButton.classList.contains('backlog-flash');
+
+      fieldEl.classList.add('backlog-flash');
+      if (tabFlash)
+        fieldTabButton.classList.add('backlog-flash');
+      setTimeout(() => {
+        fieldEl.classList.remove('backlog-flash');
+        if (tabFlash)
+          fieldTabButton.classList.remove('backlog-flash');
+      }, 1500);
+    };
+
     /**
      * @param {HTMLElement} field
      * @param {string} fieldName
@@ -1964,6 +1995,7 @@ async function inject() {
       set.addEventListener('click', () => {
         setNativeValue(fieldEl, value);
         if (activeTab) getTabButton(fieldEl).click();
+        flashField(fieldEl);
       });
       field.innerText += ':';
       field.append(set);
@@ -2007,6 +2039,8 @@ async function inject() {
         return alert('unable to add url (add button disabled)');
       }
       addButton.click();
+      const newLink = /** @type {HTMLDivElement} */ (linksContainer.querySelector(':scope > ul > li:last-child > .input-group'));
+      flashField(newLink);
     };
 
     const keySortOrder = [
@@ -2079,10 +2113,12 @@ async function inject() {
           if (result) {
             result.click();
             const performerItem = await getPerformerItem(entry.id);
+            flashField(performerItem);
 
             /** @type {HTMLInputElement} */
             const aliasEl = performerItem.querySelector('input.performer-alias');
             setNativeValue(aliasEl, entry.appearance || '');
+            if (entry.appearance) flashField(aliasEl);
           }
         };
 
@@ -2150,6 +2186,7 @@ async function inject() {
                 /** @type {HTMLInputElement} */
                 const aliasEl = performerItem.querySelector('input.performer-alias');
                 setNativeValue(aliasEl, entry.appearance || '');
+                flashField(aliasEl);
               });
             } else {
               const a = makeLink(`/performers/${entry.id}`, name, { color: 'var(--bs-teal)' });
@@ -2235,9 +2272,12 @@ async function inject() {
                   if (result) {
                     result.click();
                     const performerItem = await getPerformerItem(entry.id);
+                    flashField(performerItem);
+
                     /** @type {HTMLInputElement} */
                     const aliasEl = performerItem.querySelector('input.performer-alias');
                     setNativeValue(aliasEl, entry.appearance || '');
+                    flashField(aliasEl);
                   }
                 });
               }
@@ -2295,6 +2335,7 @@ async function inject() {
           const results = (Array.from(studioSelect.querySelectorAll('.react-select__option')));
           if (results.length === 1) results[0].click();
           else getTabButton(fieldEl).click();
+          flashField(studioSelect);
         });
         dt.innerText += ':';
         dt.append(set);
