@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.3
+// @version     1.22.4
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2017,8 +2017,7 @@ async function inject() {
     }
 
     // Performer scene changes based on cached data
-    await (async function () {
-      const { scenes: storedScenes } = await Cache.getStoredData();
+    Cache.getStoredData().then(({ scenes: storedScenes }) => {
       /** @typedef {[sceneId: string, entry: PerformerEntry]} performerScene */
       /** @type {{ append: performerScene[], remove: performerScene[] }} */
       const performerScenes = { append: [], remove: [] };
@@ -2075,7 +2074,13 @@ async function inject() {
         const sceneLinks = document.createElement('div');
         setStyles(sceneLinks, { marginLeft: '1.3rem', fontWeight: 'normal' });
         scenes
-          .sort(([, a], [, b]) => pName[action](a).localeCompare(pName[action](b)))
+          .sort(([, a], [, b]) => {
+            const aName = pName[action](a), bName = pName[action](b);
+            if (aName !== null && bName !== null) return aName.localeCompare(bName);
+            if (aName === null) return 1;
+            if (bName === null) return -1;
+            return 0;
+          })
           .forEach(([sceneId, entry], idx) => {
             if (idx > 0) sceneLinks.append(document.createElement('br'));
             const a = makeLink(`/scenes/${sceneId}`, sceneId, {
@@ -2086,11 +2091,15 @@ async function inject() {
             a.target = '_blank';
             sceneLinks.append(a);
             if (action === 'append') sceneLinks.append(` (as ${pName[action](entry)})`);
-            if (action === 'remove' && entry) {
-              const pLink = entry.id
-                ? makeLink(`/performers/${entry.id}`, pName[action](entry), { color: 'var(--teal)' })
-                : pName[action](entry);
-              sceneLinks.append(' (target: ', pLink, ')');
+            if (action === 'remove') {
+              if (!entry) {
+                sceneLinks.append(' (unknown target)');
+              } else {
+                const pLink = entry.id
+                  ? makeLink(`/performers/${entry.id}`, pName[action](entry), { color: 'var(--teal)' })
+                  : pName[action](entry);
+                sceneLinks.append(' (target: ', pLink, ')');
+              }
             }
           });
         details.append(sceneLinks);
@@ -2102,7 +2111,9 @@ async function inject() {
       sceneChanges.prepend(emoji);
       performerInfo.prepend(sceneChanges);
       highlightElements.push(sceneChanges);
-    })();
+    }).catch((error) => {
+      console.error(error);
+    });
 
     const found = index.performers[performerId];
     if (!found) return;
