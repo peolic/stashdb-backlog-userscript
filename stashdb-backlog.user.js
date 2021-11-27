@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.4
+// @version     1.22.5
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -644,8 +644,8 @@ async function inject() {
     let result = 'CACHED';
     const storedDataIndex = await Cache.getStoredDataIndex();
     let shouldFetchIndex = shouldFetch(storedDataIndex, 1);
-    try {
-      if (!dev && !forceFetch && shouldFetchIndex) {
+    if (!dev && !forceFetch && shouldFetchIndex) {
+      try {
         // Only fetch if there really was an update
         setStatus(`[backlog] checking for updates`);
         const lastUpdated = await getDataLastUpdatedDate();
@@ -655,18 +655,17 @@ async function inject() {
             `[backlog] latest remote update: ${formatDate(lastUpdated)}`
             + ` - updating: ${shouldFetchIndex}`
           );
-
-          // Store the last-checked timestamp as to not spam GitHub API
-          storedDataIndex.lastChecked = new Date().toISOString();
-          await Cache.setDataIndex(storedDataIndex);
         }
         setStatus('');
+      } catch (error) {
+        setStatus(`[backlog] error:\n${error}`);
+        console.error('[backlog] error trying to determine latest data update', error);
+        return 'ERROR';
+      } finally {
+        // Store the last-checked timestamp as to not spam GitHub API
+        storedDataIndex.lastChecked = new Date().toISOString();
+        await Cache.setDataIndex(storedDataIndex);
       }
-    } catch (error) {
-      setStatus(`[backlog] error:\n${error}`);
-      console.error('[backlog] error trying to determine latest data update', error);
-      shouldFetchIndex = shouldFetch(storedDataIndex, 2);
-      return 'ERROR';
     }
 
     if (forceFetch || shouldFetchIndex) {
