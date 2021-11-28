@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.5
+// @version     1.22.6
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -100,6 +100,27 @@ async function inject() {
     return Promise.race(promises);
   };
 
+  const reactRouterHistory = await (async () => {
+    const getter = () => {
+      const e = document.querySelector('#root > div');
+      if (!e) return undefined;
+      //@ts-expect-error
+      const f = e[Object.getOwnPropertyNames(e).find((p) => p.startsWith('__reactFiber$'))];
+      if (!f) return undefined;
+      return f.return?.return?.memoizedProps?.value?.history;
+    };
+
+    let attempt = 0;
+    let history = getter();
+    while (!history) {
+      if (attempt === 5) return undefined;
+      attempt++;
+      await wait(100);
+      history = getter();
+    }
+    return history;
+  })();
+
   let isDev = false;
 
   async function dispatcher(init=false) {
@@ -166,7 +187,12 @@ async function inject() {
     console.debug(`[backlog] nothing to do for ${object}/${identAction}.`);
   }
 
-  window.addEventListener(`${eventPrefix}_locationchange`, () => dispatcher());
+  if (reactRouterHistory) {
+    reactRouterHistory.listen(() => dispatcher());
+    console.debug(`[backlog] hooked into react router`);
+  } else {
+    window.addEventListener(`${eventPrefix}_locationchange`, () => dispatcher());
+  }
 
   setTimeout(dispatcher, 0, true);
 
@@ -790,6 +816,7 @@ async function inject() {
     // Relative
     if (url.startsWith('/') || !/^https?:/.test(url)) {
       a.href = url;
+      routerLink(a);
       return a;
     }
 
@@ -803,6 +830,7 @@ async function inject() {
     // Safe, make relative
     if (urlObj && urlObj.hostname === 'stashdb.org') {
       a.href = urlObj.href.slice(urlObj.origin.length);
+      routerLink(a);
       return a;
     }
 
@@ -811,6 +839,20 @@ async function inject() {
     a.target = '_blank';
     a.rel = 'nofollow noopener noreferrer';
     return a;
+  }
+
+  /**
+   * @param {HTMLAnchorElement} el
+   * @param {string} [url]
+   */
+  function routerLink(el, url) {
+    if (!reactRouterHistory) return;
+    url = url ? url : el.getAttribute('href');
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      reactRouterHistory.push(url);
+    });
   }
 
   /**
@@ -1327,6 +1369,7 @@ async function inject() {
         pa.classList.add('scene-performer');
         if (entry.id) {
           pa.href = `/performers/${entry.id}`;
+          routerLink(pa);
         }
 
         pa.append(genderIcon(existingPerformers.length === 0), ...nameElements(entry));
