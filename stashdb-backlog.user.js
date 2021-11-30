@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.7
+// @version     1.22.8
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -637,20 +637,22 @@ async function inject() {
   }
 
   async function fetchBacklogData() {
-    setStatus(`[backlog] getting cache...`);
-    try {
+    const getDataCache = async () => {
       /** @type {MutationDataCache} */
       const legacyCache = (await request(`${BASE_URL}/stashdb_backlog.json`, 'json'));
       const dataCache = await applyDataCacheMigrations(legacyCache);
       await Cache.setData(dataCache);
-
-      await wait(100);
-
+    };
+    const getDataIndex = async () => {
       /** @type {DataIndex} */
       const indexCache = (await request(`${BASE_URL}/stashdb_backlog_index.json`, 'json'));
       indexCache.lastChecked = new Date().toISOString();
       await Cache.setDataIndex(indexCache);
+    };
 
+    try {
+      setStatus(`[backlog] getting cache...`);
+      await Promise.all([ getDataCache(), getDataIndex() ]);
       setStatus('[backlog] data updated', 5000);
       return 'UPDATED';
 
