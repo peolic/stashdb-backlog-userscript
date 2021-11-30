@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.6
+// @version     1.22.7
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -140,7 +140,7 @@ async function inject() {
 
     if (init) {
       console.log('[backlog] init');
-      await fetchBacklogData();
+      await updateBacklogData();
       setUpMenu();
     }
 
@@ -214,7 +214,7 @@ async function inject() {
   async function setUpMenu() {
     /** @param {boolean} forceFetch */
     const fetchData = async (forceFetch) => {
-      const result = await fetchBacklogData(forceFetch);
+      const result = await (forceFetch ? fetchBacklogData() : updateBacklogData(true));
       if (result === 'ERROR') {
         setStatus('[backlog] failed to download cache', 10000);
         return;
@@ -636,7 +636,7 @@ async function inject() {
     return dataCache;
   }
 
-  async function fetchBacklogDataNow() {
+  async function fetchBacklogData() {
     setStatus(`[backlog] getting cache...`);
     try {
       /** @type {MutationDataCache} */
@@ -652,34 +652,34 @@ async function inject() {
       await Cache.setDataIndex(indexCache);
 
       setStatus('[backlog] data updated', 5000);
-      return true;
+      return 'UPDATED';
 
     } catch (error) {
       setStatus(`[backlog] error:\n${error}`);
       console.error('[backlog] error getting cache', error);
-      return false;
+      return 'ERROR';
     }
   }
 
   /**
-   * @param {boolean} [forceFetch=false]
+   * @param {boolean} [forceCheck=false]
    * @returns {Promise<'UPDATED' | 'CACHED' | 'ERROR'>}
    */
-  async function fetchBacklogData(forceFetch=false) {
+  async function updateBacklogData(forceCheck=false) {
     /** @type {'UPDATED' | 'CACHED' | 'ERROR'} */
     let result = 'CACHED';
     const storedDataIndex = await Cache.getStoredDataIndex();
-    let shouldFetchIndex = shouldFetch(storedDataIndex, 1);
-    if (!dev && !forceFetch && shouldFetchIndex) {
+    let updateData = shouldFetch(storedDataIndex, 1);
+    if (!dev && (forceCheck || updateData)) {
       try {
         // Only fetch if there really was an update
         setStatus(`[backlog] checking for updates`);
         const lastUpdated = await getDataLastUpdatedDate();
         if (lastUpdated) {
-          shouldFetchIndex = shouldFetch(storedDataIndex, lastUpdated);
+          updateData = shouldFetch(storedDataIndex, lastUpdated);
           console.debug(
             `[backlog] latest remote update: ${formatDate(lastUpdated)}`
-            + ` - updating: ${shouldFetchIndex}`
+            + ` - updating: ${updateData}`
           );
         }
         setStatus('');
@@ -694,14 +694,12 @@ async function inject() {
       }
     }
 
-    if (forceFetch || shouldFetchIndex) {
-      if (!await fetchBacklogDataNow()) {
-        return 'ERROR';
-      }
-      updateInfo();
-      return 'UPDATED';
+    if (!updateData) {
+      return result;
     }
 
+    result = await fetchBacklogData();
+    if (result === 'UPDATED') updateInfo();
     return result;
   }
 
