@@ -204,6 +204,12 @@ async function inject() {
       return await highlightSearchResults();
     }
 
+    // Backlog list page
+    //@ts-expect-error
+    if (object === 'backlog') {
+      return await iBacklogPage();
+    }
+
     // Home page
     if (!object && !ident && !action) {
       return await iHomePage();
@@ -365,19 +371,28 @@ button.nav-link.backlog-flash {
         display: 'none',
       });
 
-      icon.addEventListener('click', async () => {
-        if (info.style.display === 'none') {
-          await updateInfo();
-          info.style.display = '';
-        } else {
-          info.style.display = 'none';
-        }
-      });
+      icon.addEventListener('click', () => toggleBacklogInfo());
 
       infoContainer.append(icon, info);
 
       const target = document.querySelector('#root nav');
       target.appendChild(infoContainer);
+    }
+  }
+
+  /** @param {boolean} [newState] */
+  async function toggleBacklogInfo(newState) {
+    const info = /** @type {HTMLDivElement} */ (document.querySelector('#root nav > .backlog-info > div'));
+
+    if (newState === undefined) {
+      newState = info.style.display === 'none';
+    }
+
+    if (newState) {
+      await updateInfo();
+      info.style.display = '';
+    } else {
+      info.style.display = 'none';
     }
   }
 
@@ -416,6 +431,9 @@ button.nav-link.backlog-flash {
       const usVersion = GM.info.script.version;
       const versionInfo = block(`userscript version: ${usVersion}`);
       info.append(hr, versionInfo);
+
+      const backlogLink = makeLink('/backlog', 'Backlog Summary Page');
+      info.append(hr.cloneNode(), backlogLink);
     }
   }
 
@@ -3231,6 +3249,133 @@ button.nav-link.backlog-flash {
 
   } // iEditPage
 
+  async function iBacklogPage() {
+    const main = /** @type {HTMLDivElement} */ (await elementReadyIn('.NarrowPage', 200));
+    if (!main) {
+      alert('failed to construct backlog page');
+      return;
+    }
+
+    toggleBacklogInfo(false);
+    document.title = `Backlog Summary | ${document.title}`;
+
+    const scenes = document.createElement('div');
+    main.appendChild(scenes);
+
+    const scenesHeader = document.createElement('h3');
+    scenesHeader.innerText = 'Scenes';
+    scenes.appendChild(scenesHeader);
+
+    const subTitle = document.createElement('h5');
+    subTitle.innerText = 'Loading...';
+    scenes.appendChild(subTitle);
+
+    const scenesList = document.createElement('ul');
+    scenes.appendChild(scenesList);
+
+    window.addEventListener(locationChanged, () => scenes.remove(), { once: true });
+
+    await wait(0);
+
+    /** @type {(keyof SceneDataObject)[]} */
+    const unsubmittableKeys = ['fingerprints'];
+    /** @param {string} key */
+    const submittableKeys = (key) => !(unsubmittableKeys).includes(/** @type {keyof SceneDataObject} */ (key));
+
+    /** @typedef {[string, SceneDataObject]} SceneEntriesItem */
+
+    /**
+     * @param {SceneEntriesItem[]} result
+     * @param {SceneEntriesItem} item
+     */
+    const reduceKey = (result, item) => {
+      const [key, value] = item;
+      const { comments, duplicates, duplicate_of, ...rest } = value;
+      return Object.keys(rest).filter(submittableKeys).length > 0 ? result.concat([[key, rest]]) : result;
+    };
+    /** @param {SceneDataObject} item */
+    const sortKey = (item) => {
+      const performers = item.performers ? Object.values(item.performers).flat().length - 1 : 0;
+      return Object.keys(item).length + performers;
+    };
+
+    const storedData = await Cache.getStoredData();
+    const sortedScenes =
+      Object.entries(storedData.scenes)
+        .reduce(reduceKey, [])
+        .sort((a, b) => sortKey(b[1]) - sortKey(a[1]));
+
+    const partiallySubmittable = sortedScenes.filter(([, item]) => {
+      // Performers missing ID / having any status
+      if (item.performers && Object.values(item.performers).flat().filter((p) => !(p.id && !p.status)).length > 0)
+        return true;
+      // No studio ID
+      if (item.studio && !item.studio[0])
+        return true;
+
+      return false;
+    });
+
+    const fullySubmittable = sortedScenes.filter((entry) => !partiallySubmittable.includes(entry));
+
+    /** @param {string} filter */
+    const renderList = (filter) => {
+      /** @type {NodeListOf<HTMLAnchorElement>} */
+      (subTitle.querySelectorAll('a[data-filter]')).forEach((el) => {
+        el.classList.toggle('fw-bold', el.dataset.filter === filter);
+      });
+
+      scenesList.innerHTML = '';
+
+      const list = ({
+        all: sortedScenes,
+        full: fullySubmittable,
+        partial: partiallySubmittable,
+      })[filter];
+
+      list.forEach(([sceneId, sceneData]) => {
+        const row = document.createElement('li');
+
+        const link = makeLink(`/scenes/${sceneId}`, sceneId);
+        link.classList.add('font-monospace', 'text-decoration-underline');
+
+        const sep = document.createElement('span');
+        sep.classList.add('mx-2');
+        sep.innerHTML = '&mdash;';
+
+        const keys = Object.keys(sceneData)
+          .map((k) => k === 'performers' ? `${Object.values(sceneData.performers).flat().length}x ${k}` : k)
+          .join(', ');
+
+        row.append(link, sep, keys);
+        scenesList.appendChild(row);
+      });
+    };
+
+    subTitle.innerText = 'Filter entries:';
+
+    ['all', 'full', 'partial'].forEach((filter, i) => {
+      const toggle = document.createElement('a');
+      toggle.dataset.filter = filter;
+      toggle.classList.add('mx-2');
+      toggle.href = `#${filter}`;
+      toggle.innerText = ({
+        all: `all entries (${sortedScenes.length})`,
+        full: `fully submittable (${fullySubmittable.length})`,
+        partial: `partially submittable (${partiallySubmittable.length})`,
+      })[filter];
+      toggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        const activeFilter = /** @type {HTMLAnchorElement} */ (subTitle.querySelector('a[data-filter].fw-bold'));
+        if (filter === activeFilter.dataset.filter)
+          return;
+        renderList(filter);
+      });
+      subTitle.append((i > 0 ? '|' : ''), toggle);
+    });
+
+    renderList(window.location.hash.slice(1) || 'full');
+  } // iBacklogPage
 }
 
 // Based on: https://dirask.com/posts/JavaScript-on-location-changed-event-on-url-changed-event-DKeyZj
