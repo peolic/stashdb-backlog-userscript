@@ -280,6 +280,19 @@ async function inject() {
   padding: .5rem;
 }
 
+/* https://codepen.io/zachhanding/pen/MKyVPq */
+.line-clamp {
+	display: block;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	position: relative;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	padding: 0 !important;
+	-webkit-line-clamp: var(--line-clamp);
+ 	max-height: calc(1em * var(--bs-body-line-height) * var(--line-clamp));
+}
+
 input.backlog-flash,
 textarea.backlog-flash {
   background-color: #0060df;
@@ -2905,12 +2918,43 @@ button.nav-link.backlog-flash {
     const storedData = await Cache.getStoredData();
     if (!storedData) return;
 
+    /** @param {HTMLDivElement} card */
+    const appendScenePerformers = (card) => {
+      if (!isDev) return;
+
+      /** @type {ScenePerformance} */
+      const data = getReactFiber(card)?.return?.return?.memoizedProps?.performance;
+      if (data) {
+        const { performers } = data;
+        const info = document.createElement('div');
+        info.classList.add('backlog-scene-performers', 'mt-1', 'text-muted', 'border-top', 'line-clamp');
+        info.style.setProperty('--line-clamp', '3');
+        const { svg: icon } = performersIcon();
+        icon.classList.add('me-1');
+        info.append(icon);
+        const performerId = object === 'performers' ? parsePath().ident : null;
+        performers.forEach((p, i) => {
+          const name = p.performer.name + (p.performer.disambiguation ? ` [${p.performer.disambiguation}]` : '');
+          const pa = makeLink(
+            `/performers/${p.performer.id}`,
+            p.as ? `${p.as} (${name})` : name,
+          )
+          if (performerId && p.performer.id === performerId) pa.classList.add('fw-bold');
+          if (i > 0) info.append(' | ', pa);
+          else info.appendChild(pa);
+        });
+        card.querySelector('.card-footer').appendChild(info);
+      }
+    };
+
     const highlight = async () => {
       /** @type {HTMLDivElement[]} */
       (Array.from(document.querySelectorAll(selector))).forEach((card) => {
         const markerDataset = card.dataset;
         if (markerDataset.backlogInjected) return;
         else markerDataset.backlogInjected = 'true';
+
+        appendScenePerformers(card);
 
         const sceneId = parsePath(card.querySelector('a').href).ident;
         const found = storedData.scenes[sceneId];
