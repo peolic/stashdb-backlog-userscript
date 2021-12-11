@@ -891,19 +891,23 @@ async function inject() {
    * @param {HTMLElement} element
    * @param {string} value
    * @see https://stackoverflow.com/a/48890844
+   * @see https://github.com/facebook/react/issues/10135#issuecomment-401496776
    */
   function setNativeValue(element, value) {
-    const valueSetter = Object.getOwnPropertyDescriptor(element, 'value').set;
+    const valueSetter = Object.getOwnPropertyDescriptor(element, 'value')?.set;
     const prototype = Object.getPrototypeOf(element);
-    const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
+    const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
 
-    if (valueSetter && valueSetter !== prototypeValueSetter) {
+    if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {
       prototypeValueSetter.call(element, value);
-    } else {
+    } else if (valueSetter) {
       valueSetter.call(element, value);
+    } else {
+      throw new Error('The given element does not have a value setter');
     }
 
-    element.dispatchEvent(new Event('input', { bubbles: true }));
+    const eventName = element instanceof HTMLSelectElement ? 'change' : 'input';
+    element.dispatchEvent(new Event(eventName, { bubbles: true }));
   }
 
   /**
@@ -1965,6 +1969,46 @@ async function inject() {
       field.append(set);
     };
 
+    /** @param {string} site */
+    const getLinkBySiteType = (site) =>
+      Array.from(sceneForm.querySelectorAll('.URLInput > ul > li > .input-group'))
+        .map(({ children }) => ({
+          remove: () => /** @type {HTMLButtonElement} */ (children[0]).click(),
+          type: /** @type {HTMLSpanElement} */ (children[1]).textContent,
+          value: /** @type {HTMLSpanElement} */ (children[2]).textContent,
+        }))
+        .find((l) => l.type === site);
+
+    /**
+     * @param {string} site
+     * @param {string} url
+     * @param {boolean} [replace=false]
+     */
+    const addLink = async (site, url, replace = false) => {
+      const link = getLinkBySiteType(site);
+
+      if (link) {
+        if (!replace && link.value === url) {
+          return alert('studio url already correct');
+        }
+        link.remove();
+      }
+
+      const linksContainer = /** @type {HTMLDivElement} */ (sceneForm.querySelector('.URLInput'));
+      const urlInput = linksContainer.querySelector(':scope > .input-group');
+      const typeSelect = /** @type {HTMLSelectElement} */ (urlInput.children[1]);
+      const inputField = /** @type {HTMLInputElement} */ (urlInput.children[2]);
+      const addButton = /** @type {HTMLButtonElement} */ (urlInput.children[3]);
+      const linkTypeStudio = Array.from(typeSelect.options).find((o) => o.text === site).value;
+      setNativeValue(typeSelect, linkTypeStudio);
+      setNativeValue(inputField, url);
+      if (addButton.disabled) {
+        getTabButton(addButton).click();
+        return alert('unable to add url (add button disabled)');
+      }
+      addButton.click();
+    };
+
     const keySortOrder = [
       'title', 'date', 'duration',
       'performers', 'studio', 'url',
@@ -1974,9 +2018,11 @@ async function inject() {
     sortedKeys(found, keySortOrder).forEach((field) => {
       const dt = document.createElement('dt');
       dt.innerText = field;
+      dt.id = `backlog-pending-${field}-title`;
       pendingChanges.appendChild(dt);
 
       const dd = document.createElement('dd');
+      dd.id = `backlog-pending-${field}`;
       pendingChanges.appendChild(dd);
 
       if (field === 'title') {
@@ -2256,9 +2302,16 @@ async function inject() {
       }
 
       if (field === 'url') {
-        const url = found[field];
-        dd.appendChild(makeLink(url));
-        settableField(dt, 'studioURL', url);
+        const studioUrl = found[field];
+        dt.innerText = 'studio link';
+        dd.appendChild(makeLink(studioUrl));
+
+        const set = document.createElement('a');
+        set.innerText = 'set field';
+        setStyles(set, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer' });
+        set.addEventListener('click', () => addLink('Studio', studioUrl, true));
+        dt.innerText += ':';
+        dt.append(set);
         return;
       }
 
@@ -2382,6 +2435,43 @@ async function inject() {
           .join('\n');
 
         settableField(dt, 'note', editNote, true);
+
+        // URLs from comments
+        const dtLinks = document.createElement('dt');
+        dtLinks.innerText = 'links from comments';
+        const ddLinks = document.createElement('dd');
+
+        found.comments.forEach((comment) => {
+          if (!/^https?:/.test(comment))
+            return;
+
+          /** @type {string} */
+          let site;
+          if (/iafd\.com\/title\.rme\//.test(comment)) {
+            site = 'IAFD';
+          } else if (/indexxx\.com\/set\//.test(comment)) {
+            site = 'Indexxx';
+          } else {
+            return;
+          }
+          const container = document.createElement('div');
+          const set = document.createElement('a');
+          set.innerText = `add ${site} link`;
+          set.classList.add('fw-bold');
+          setStyles(set, { color: 'var(--bs-yellow)', cursor: 'pointer' });
+          set.addEventListener('click', () => addLink(site, comment, true));
+          container.append(set, ':');
+          const link = makeLink(comment);
+          link.style.marginLeft = '.5rem';
+          container.appendChild(link);
+          ddLinks.appendChild(container);
+        });
+
+        if (ddLinks.children.length > 0) {
+          const pendingUrl = pendingChanges.querySelector('dd#backlog-pending-url');
+          if (pendingUrl) pendingUrl.after(dtLinks, ddLinks);
+          else pendingChanges.append(dtLinks, ddLinks);
+        }
 
         return;
       }
