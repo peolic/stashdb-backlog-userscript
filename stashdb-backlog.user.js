@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.8
+// @version     1.22.9
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -59,8 +59,7 @@ async function inject() {
     const match = urlRegex.exec(pathname);
     if (!match || match.length === 0) return result;
 
-    /** @type {AnyObject} */
-    result.object = (match[1]) || null;
+    result.object = /** @type {AnyObject} */ (match[1]) || null;
     result.ident = match[2] || null;
     result.action = match[3] || null;
 
@@ -73,8 +72,7 @@ async function inject() {
   };
 
   const getUser = async () => {
-    /** @type {HTMLAnchorElement} */
-    const profile = (await elementReadyIn('#root nav a[href^="/users/"]', 1000));
+    const profile = /** @type {HTMLAnchorElement} */ (await elementReadyIn('#root nav a[href^="/users/"]', 1000));
     if (!profile) return null;
     return profile.innerText;
   };
@@ -663,13 +661,7 @@ async function inject() {
     }
   }
 
-  /**
-   * @param {boolean} [forceCheck=false]
-   * @returns {Promise<'UPDATED' | 'CACHED' | 'ERROR'>}
-   */
   async function updateBacklogData(forceCheck=false) {
-    /** @type {'UPDATED' | 'CACHED' | 'ERROR'} */
-    let result = 'CACHED';
     const storedDataIndex = await Cache.getStoredDataIndex();
     let updateData = shouldFetch(storedDataIndex, 1);
     if (!dev && (forceCheck || updateData)) {
@@ -697,10 +689,10 @@ async function inject() {
     }
 
     if (!updateData) {
-      return result;
+      return 'CACHED';
     }
 
-    result = await fetchBacklogData();
+    const result = await fetchBacklogData();
     if (result === 'UPDATED') updateInfo();
     return result;
   }
@@ -1648,8 +1640,7 @@ async function inject() {
             return r;
           }, /** @type {FingerprintsColumnIndices} */ ({}));
       const currentFingerprints = fingerprintsTableRows.slice(1).map((row) => {
-        /** @type {HTMLTableCellElement[]} */
-        const cells = (Array.from(row.children));
+        const cells = /** @type {HTMLTableCellElement[]} */ (Array.from(row.children));
         return {
           row,
           algorithm: cells[headers.algorithm].innerText,
@@ -2378,8 +2369,7 @@ async function inject() {
   function sceneCardHighlightChanges(card, changes) {
     if (!isDev) return;
 
-    /** @type {HTMLDivElement | HTMLAnchorElement} */
-    const parent = (card.parentElement);
+    const parent = /** @type {HTMLDivElement | HTMLAnchorElement} */ (card.parentElement);
     const isSearchCard = parent.classList.contains('SearchPage-scene');
 
     if (changes.includes('image')) {
@@ -2419,8 +2409,7 @@ async function inject() {
       } else {
         /** @type {HTMLHeadingElement} */
         const titleEl = card.querySelector('h5');
-        /** @type {Text} */
-        const titleNode = (titleEl.childNodes[0]);
+        const titleNode = /** @type {Text} */ (titleEl.childNodes[0]);
         const title = document.createElement('span');
         title.append(titleNode);
         titleEl.prepend(title);
