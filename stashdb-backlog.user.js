@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.9
+// @version     1.22.10
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -521,35 +521,54 @@ async function inject() {
     static _PERFORMERS_DATA_KEY = 'stashdb_backlog_performers';
     static _LEGACY_DATA_KEY = 'stashdb_backlog';
 
-    static async getStoredDataIndex() {
-      return /** @type {DataIndex} */ (await this._getValue(this._DATA_INDEX_KEY));
+    /** @type {DataIndex | null} */
+    static _index = null;
+
+    /** @param {boolean} invalidate Force reload of stored index */
+    static async getStoredDataIndex(invalidate = false) {
+      if (!this._index || invalidate) {
+        this._index = /** @type {DataIndex} */ (await this._getValue(this._DATA_INDEX_KEY));
+      }
+      return this._index;
     }
     static async setDataIndex(/** @type {DataIndex} */ data) {
-      return await this._setValue(this._DATA_INDEX_KEY, data);
+      await this._setValue(this._DATA_INDEX_KEY, data);
+      this._index = data;
     }
     static async clearDataIndex() {
-      return await this._deleteValue(this._DATA_INDEX_KEY);
+      await this._deleteValue(this._DATA_INDEX_KEY);
+      this._index = null;
     }
 
-    static async getStoredData() {
-      const scenes = /** @type {DataCache['scenes']} */ (await this._getValue(this._SCENES_DATA_KEY));
-      const performers = /** @type {DataCache['performers']} */ (await this._getValue(this._PERFORMERS_DATA_KEY));
-      /** @type {DataCache} */
-      const dataCache = { scenes, performers };
-      if (Object.values(scenes).length === 0 && Object.values(performers).length === 0) {
-        const legacyCache = /** @type {MutationDataCache} */ (await this._getValue(this._LEGACY_DATA_KEY));
-        return await applyDataCacheMigrations(legacyCache);
+    /** @type {DataCache | null} */
+    static _data = null;
+
+    /** @param {boolean} invalidate Force reload of stored data */
+    static async getStoredData(invalidate = false) {
+      if (!this._data || invalidate) {
+        const scenes = /** @type {DataCache['scenes']} */ (await this._getValue(this._SCENES_DATA_KEY));
+        const performers = /** @type {DataCache['performers']} */ (await this._getValue(this._PERFORMERS_DATA_KEY));
+        /** @type {DataCache} */
+        const dataCache = { scenes, performers };
+        if (Object.values(scenes).length === 0 && Object.values(performers).length === 0) {
+          const legacyCache = /** @type {MutationDataCache} */ (await this._getValue(this._LEGACY_DATA_KEY));
+          this._data = await applyDataCacheMigrations(legacyCache);
+        } else {
+          this._data = dataCache;
+        }
       }
-      return dataCache;
+      return this._data;
     }
     static async setData(/** @type {DataCache} */ data) {
       const { scenes, performers } = data;
       this._setValue(this._SCENES_DATA_KEY, scenes);
       this._setValue(this._PERFORMERS_DATA_KEY, performers);
+      this._data = data;
     }
     static async clearData() {
       await this._deleteValue(this._SCENES_DATA_KEY);
       await this._deleteValue(this._PERFORMERS_DATA_KEY);
+      this._data = null;
     }
 
     // ===
