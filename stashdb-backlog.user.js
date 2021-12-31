@@ -1001,11 +1001,8 @@ async function inject() {
     return svg;
   };
 
-  /**
-   * @param {Partial<CSSStyleDeclaration>} [style]
-   * @returns {SVGSVGElement}
-   */
-  const performersIcon = (style) => {
+  /** @returns {{ div: HTMLDivElement, svg: SVGSVGElement }} */
+  const performersIcon = () => {
     const div = document.createElement('div');
     div.innerHTML = (
       '<svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="users" role="img"'
@@ -1020,8 +1017,7 @@ async function inject() {
       + '</svg>'
     );
     const svg = div.getElementsByTagName('svg')[0];
-    if (style) setStyles(svg, style);
-    return svg;
+    return { div, svg };
   };
 
   /**
@@ -2408,7 +2404,7 @@ async function inject() {
         card.style.outline = getHighlightStyle('scenes', changes);
         sceneCard.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
 
-        sceneCardHighlightChanges(card, changes);
+        sceneCardHighlightChanges(card, changes, sceneId);
       });
     };
 
@@ -2482,7 +2478,7 @@ async function inject() {
         card.style.outline = getHighlightStyle(object, changes);
         if (object === 'scenes') {
           cardLink.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
-          sceneCardHighlightChanges(card, changes);
+          sceneCardHighlightChanges(card, changes, uuid);
         } else if (object === 'performers') {
           cardLink.title = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
         }
@@ -2494,8 +2490,9 @@ async function inject() {
    * Field-specific scene card highlighting
    * @param {HTMLDivElement} card
    * @param {string[]} changes
+   * @param {string} sceneId
    */
-  function sceneCardHighlightChanges(card, changes) {
+  async function sceneCardHighlightChanges(card, changes, sceneId) {
     if (!isDev) return;
 
     const parent = /** @type {HTMLDivElement | HTMLAnchorElement} */ (card.parentElement);
@@ -2584,24 +2581,33 @@ async function inject() {
 
     if (changes.includes('performers')) {
       if (!isSearchCard) {
-        card.querySelector('a.SceneCard-image')
-          .append(
-            performersIcon({
-              color,
-              fontSize: '2em',
-              position: 'absolute',
-              left: '4px',
-              bottom: '72px',
-              filter: 'drop-shadow(3px 3px 2px rgba(0, 0, 0, .7))',
-            })
-          );
+        const { div: iconDiv, svg: icon } = performersIcon();
+        setStyles(iconDiv, { flex: '1', position: 'relative', marginTop: 'auto' });
+        setStyles(icon, {
+          color,
+          fontSize: '2em',
+          position: 'absolute',
+          left: '4px',
+          bottom: '4px',
+          filter: 'drop-shadow(3px 3px 2px rgba(0, 0, 0, .7))',
+        });
+        card.querySelector('.SceneCard-image').prepend(iconDiv);
+
+        const { object, ident: performerId } = parsePath();
+        if (object === 'performers' && performerId) {
+          const { performers } = await getDataFor('scenes', sceneId);
+          const thisPerformer = Object.values(performers).flat().find((p) => p.id === performerId);
+          if (!thisPerformer) {
+            icon.style.color = '';
+          }
+        }
       } else {
         const icon = card.querySelector('div > svg[data-icon="users"]');
         const performers = icon ? icon.parentElement : document.createElement('div');
         performers.style.color = color;
         if (!icon) {
           performers.innerText = '???';
-          performers.prepend(performersIcon());
+          performers.prepend(performersIcon().svg);
           card.querySelector('h5 + div').append(performers);
         }
       }
