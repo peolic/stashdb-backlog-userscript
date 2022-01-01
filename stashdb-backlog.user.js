@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.10
+// @version     1.22.11
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -860,6 +860,7 @@ async function inject() {
     if (!reactRouterHistory) return;
     url = url ? url : el.getAttribute('href');
     el.addEventListener('click', (e) => {
+      if (e.ctrlKey) return;
       e.preventDefault();
       e.stopPropagation();
       reactRouterHistory.push(url);
