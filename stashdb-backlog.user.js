@@ -2499,26 +2499,22 @@ async function inject() {
     const isSearchCard = parent.classList.contains('SearchPage-scene');
 
     if (changes.includes('image')) {
-      const imageColor = 'var(--primary)';
       /** @type {HTMLImageElement} */
       const img = card.querySelector(
         !isSearchCard
           ? '.SceneCard-image > img'
           : ':scope > img.SearchPage-scene-image'
       );
-      if (img.getAttribute('src')) {
-        if (!isSearchCard) {
-          const marker = document.createElement('div');
-          marker.style.borderTop = `0.4em solid ${imageColor}`;
-          const footer = /** @type {HTMLDivElement} */ (card.querySelector('.card-footer'));
-          card.insertBefore(marker, footer);
-        } else {
-          img.style.outline = `0.4em solid ${imageColor}`;
-        }
-      } else {
-        img.style.backgroundColor = imageColor;
-        if (isSearchCard) img.style.visibility = 'unset';
-      }
+      const imageSrc = img.getAttribute('src');
+      setStyles(img, {
+        color: `var(--${imageSrc ? 'danger' : 'success'})`,
+        background: ['left', 'right']
+          .map((d) => `linear-gradient(to ${d} top, transparent 47.75%, currentColor 49.5% 50.5%, transparent 52.25%)`)
+          .concat(`url('${imageSrc}') no-repeat top / cover`)
+          .join(', '),
+      });
+      // set transparent source
+      img.setAttribute('src', 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
     }
 
     const color = 'var(--yellow)';
