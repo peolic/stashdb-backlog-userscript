@@ -95,3 +95,59 @@ type FingerprintsColumnIndices = {
     duration: number;
     submissions: number;
 }
+
+//#region https://github.com/stashapp/stash-box/blob/develop/frontend/src/graphql/definitions/Scenes.ts
+interface ScenePerformance_URL {
+    __typename: "URL";
+    url: string;
+    type: string;
+}
+
+interface ScenePerformance_Image {
+    __typename: "Image";
+    id: string;
+    url: string;
+    width: number;
+    height: number;
+}
+
+interface ScenePerformance_Studio {
+    __typename: "Studio";
+    id: string;
+    name: string;
+}
+
+enum GenderEnum {
+    FEMALE = "FEMALE",
+    INTERSEX = "INTERSEX",
+    MALE = "MALE",
+    TRANSGENDER_FEMALE = "TRANSGENDER_FEMALE",
+    TRANSGENDER_MALE = "TRANSGENDER_MALE",
+}
+
+interface ScenePerformance_Performer {
+    __typename: "PerformerAppearance";
+    as: string | null;
+    performer: {
+        __typename: "Performer";
+        id: string;
+        name: string;
+        disambiguation: string | null;
+        deleted: boolean;
+        gender: GenderEnum | null;
+        aliases: string[];
+    };
+}
+
+interface ScenePerformance {
+    __typename: "Scene";
+    id: string;
+    date: string | null;
+    title: string | null;
+    duration: number | null;
+    urls: ScenePerformance_URL[];
+    images: ScenePerformance_Image[];
+    studio: ScenePerformance_Studio | null;
+    performers: ScenePerformance_Performer[];
+}
+//#endregion

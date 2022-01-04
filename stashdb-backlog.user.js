@@ -98,12 +98,19 @@ async function inject() {
     return Promise.race(promises);
   };
 
+  /**
+   * @param {Element} el
+   * @returns {Record<string, any> | undefined}
+   */
+  const getReactFiber = (el) =>
+    //@ts-expect-error
+    el[Object.getOwnPropertyNames(el).find((p) => p.startsWith('__reactFiber$'))];
+
   const reactRouterHistory = await (async () => {
     const getter = () => {
       const e = document.querySelector('#root > div');
       if (!e) return undefined;
-      //@ts-expect-error
-      const f = e[Object.getOwnPropertyNames(e).find((p) => p.startsWith('__reactFiber$'))];
+      const f = getReactFiber(e);
       if (!f) return undefined;
       return f.return?.return?.memoizedProps?.value?.history;
     };
@@ -806,13 +813,13 @@ button.nav-link.backlog-flash {
   }
 
   /**
-   * @param {HTMLImageElement} img
+   * @param {Promise<Blob>} image
    * @param {Promise<Blob>} newImage
    * @returns {Promise<boolean | Error>} same image?
    */
-  async function compareImages(img, newImage) {
+  async function compareImages(image, newImage) {
     try {
-      const dataURI = await blobAsDataURI(await getImageBlob(img.src));
+      const dataURI = await blobAsDataURI(await image);
       const newDataURI = await blobAsDataURI(await newImage);
       return dataURI === newDataURI;
     } catch (error) {
@@ -823,16 +830,20 @@ button.nav-link.backlog-flash {
   /**
    * @param {HTMLImageElement} img
    * @param {'start' | 'end' | null} position
+   * @param {ScenePerformance_Image} [full]
    * @returns {HTMLDivElement}
    */
-  function makeImageResolution(img, position) {
+  function makeImageResolution(img, position, full) {
     const imgRes = document.createElement('div');
     const positionClasses = position === null ? [] : [`${position}-0`, `m${position.charAt(0)}-2`];
     imgRes.classList.add('position-absolute', ...positionClasses, 'px-2', 'fw-bold');
     setStyles(imgRes, { backgroundColor: '#00689b', transition: 'opacity .2s ease' });
 
     imageReady(img).then(
-      () => imgRes.innerText = `${img.naturalWidth} x ${img.naturalHeight}`,
+      () => imgRes.innerText =
+        full
+          ? `${full.width} x ${full.height}`
+          : `${img.naturalWidth} x ${img.naturalHeight}`,
       () => imgRes.innerText = `??? x ???`,
     );
 
@@ -1100,6 +1111,9 @@ button.nav-link.backlog-flash {
     if (!found) return;
     console.debug('[backlog] found', found);
 
+    /** @type {ScenePerformance} */
+    const sceneFiber = getReactFiber(sceneInfo)?.return?.return?.memoizedProps?.scene;
+
     const sceneHeader = /** @type {HTMLDivElement} */ (sceneInfo.querySelector(':scope > .card-header'));
     sceneHeader.style.borderTop = '1rem solid var(--bs-warning)';
     sceneHeader.title = 'pending changes (backlog)';
@@ -1336,16 +1350,25 @@ button.nav-link.backlog-flash {
       const img = (document.querySelector('.scene-photo > img'));
       const imgContainer = img.parentElement;
 
-      // Enable CORS on the https://cdn.stashdb.org/* request
-      img.crossOrigin = 'anonymous';
-
       const newImageBlob = getImageBlob(found.image);
 
       if (img.getAttribute('src')) {
         setStatus(`[backlog] fetching/comparing images...`);
 
         const onCurrentImageReady = async () => {
-          const newImage = await compareImages(img, newImageBlob);
+          const fullImage = sceneFiber?.images?.find((i) => i.url === img.src);
+          const [isResized, fullImageURL] = (() => {
+            if (!fullImage) return [false, undefined];
+            const { id } = fullImage;
+            const imgURL = new URL(img.src);
+            const url = `${imgURL.origin}/${id.slice(0, 2)}/${id.slice(2, 4)}/${id}`;
+            // image id different from id in url = resized image
+            const resized = fullImage.id !== imgURL.pathname.split(/\//g).pop();
+            return [resized, url];
+          })();
+
+          const imageBlob = getImageBlob(isResized ? fullImageURL : img.src);
+          const newImage = await compareImages(imageBlob, newImageBlob);
           imgContainer.classList.add('p-2');
 
           if (newImage === true) {
@@ -1376,7 +1399,7 @@ button.nav-link.backlog-flash {
           const currentImageContainer = document.createElement('div');
           setStyles(currentImageContainer, { alignSelf: 'center', flex: '50%' });
           setStyles(img, { width: '100%', border: '.5em solid var(--bs-danger)' });
-          const cImgRes = makeImageResolution(img, null);
+          const cImgRes = makeImageResolution(img, null, fullImage);
           cImgRes.classList.add('start-0', 'ms-3', 'mt-2');
           currentImageContainer.append(cImgRes, img);
 
@@ -1389,7 +1412,10 @@ button.nav-link.backlog-flash {
           imgNewLink.appendChild(imgNew);
 
           const newImageContainer = document.createElement('div');
-          const isCurrentVertical = img.naturalHeight > img.naturalWidth;
+          const isCurrentVertical =
+            fullImage
+              ? fullImage.height > fullImage.width
+              : img.naturalHeight > img.naturalWidth;
           setStyles(newImageContainer, { alignSelf: 'center', flex: isCurrentVertical ? 'auto' : '50%' });
           const imgRes = makeImageResolution(imgNew, null);
           imgRes.classList.add('end-0', 'me-3', 'mt-2');
