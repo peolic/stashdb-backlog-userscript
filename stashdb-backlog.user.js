@@ -1014,7 +1014,9 @@ async function inject() {
     const makeAlreadyCorrectTitle = (/** @type {string} */ status='correct', /** @type {string} */ field='') =>
       `<already ${status}>${field ? ` ${field}`: ''}\nshould mark the entry on the backlog sheet as completed`;
 
-    if (found.comments && found.comments.length > 0) {
+    (function comments() {
+      if (!(found.comments && found.comments.length > 0)) return;
+
       const comments = document.createElement('div');
       comments.classList.add('bg-info');
 
@@ -1026,9 +1028,11 @@ async function inject() {
       });
 
       sceneHeader.appendChild(comments);
-    }
+    })();
 
-    if (found.duplicates || found.duplicate_of) {
+    (function duplicates() {
+      if (!(found.duplicates || found.duplicate_of)) return;
+
       let container = document.querySelector('.StashDBContent > div.backlog');
       if (!container) {
         container = document.createElement('div');
@@ -1070,9 +1074,11 @@ async function inject() {
         duplicateOf.prepend(emoji);
         container.prepend(duplicateOf);
       }
-    }
+    })();
 
-    if (found.title) {
+    (function title() {
+      if (!found.title) return;
+
       /** @type {HTMLHeadingElement} */
       const title = (document.querySelector('.scene-info h3'));
       const currentTitle = title.innerText;
@@ -1115,9 +1121,11 @@ async function inject() {
         newTitle.innerText = found.title;
         title.append(newTitle);
       }
-    }
+    })();
 
-    if (found.studio) {
+    (function studio() {
+      if (!found.studio) return;
+
       const studio_date = /** @type {HTMLHeadingElement} */ (sceneHeader.querySelector(':scope > h6'));
       const studioElement = studio_date.querySelector('a');
 
@@ -1149,9 +1157,11 @@ async function inject() {
       studioElement.title = title;
       studioElement.classList.add(currentColorClass, 'p-1');
       studioElement.before(newStudio);
-    }
+    })();
 
-    if (found.date) {
+    (function date() {
+      if (!found.date) return;
+
       const studio_date = /** @type {HTMLHeadingElement} */ (sceneHeader.querySelector(':scope > h6'));
       const dateNode = Array.from(studio_date.childNodes).slice(-1)[0];
       const separator = studio_date.querySelector('span.mx-1');
@@ -1182,9 +1192,11 @@ async function inject() {
       dateElement.title = title;
       dateElement.classList.add(currentColorClass, 'p-1');
       dateElement.after(newDate);
-    }
+    })();
 
-    if (found.image) {
+    (function image() {
+      if (!found.image) return;
+
       /** @type {HTMLImageElement} */
       const img = (document.querySelector('.scene-photo > img'));
       const imgContainer = img.parentElement;
@@ -1310,9 +1322,11 @@ async function inject() {
           onFailure
         );
       }
-    }
+    })();
 
-    if (found.performers) {
+    (function performers() {
+      if (!found.performers) return;
+
       const remove = Array.from(found.performers.remove); // shallow clone
       const append = Array.from(found.performers.append); // shallow clone
       const update = Array.from(found.performers.update || []); // shallow clone
@@ -1531,9 +1545,11 @@ async function inject() {
         pa.append(arrow, ...nameElements(entry));
         scenePerformers.appendChild(pa);
       });
-    }
+    })();
 
-    if (found.duration) {
+    (function duration() {
+      if (!found.duration) return;
+
       /** @type {HTMLDivElement | null} */
       let duration = (sceneFooter.querySelector(':scope > div[title $= " seconds"]'));
       const foundDuration = Number(found.duration);
@@ -1558,9 +1574,11 @@ async function inject() {
           duration.title = `<pending> Duration: ${formattedDuration}; ${foundDuration} seconds`;
         }
       }
-    }
+    })();
 
-    if (found.director) {
+    (function director() {
+      if (!found.director) return;
+
       /** @type {HTMLDivElement | null} */
       let director = (sceneFooter.querySelector(':scope > div:last-of-type'));
       if (!director || !/^Director:/.test(director.innerText)) {
@@ -1583,9 +1601,11 @@ async function inject() {
           director.title = `<pending> Director\n${found.director}`;
         }
       }
-    }
+    })();
 
-    if (found.details) {
+    (function details() {
+      if (!found.details) return;
+
       /** @type {HTMLDivElement} */
       const desc = (document.querySelector('.scene-description > h4 + div'));
       const currentDetails = desc.innerText;
@@ -1613,9 +1633,11 @@ async function inject() {
         newDetails.textContent = found.details;
         compareDiv.appendChild(newDetails);
       }
-    }
+    })();
 
-    if (found.url) {
+    (function url() {
+      if (!found.url) return;
+
       /** @type {HTMLAnchorElement} */
       const studioUrl = (document.querySelector('.scene-description > div:last-of-type > a'));
       const currentURL = studioUrl.innerText || studioUrl.getAttribute('href');
@@ -1643,9 +1665,11 @@ async function inject() {
         newURL.rel = studioUrl.rel;
         compareSpan.appendChild(newURL);
       }
-    }
+    })();
 
-    if (found.fingerprints) {
+    (function fingerprints() {
+      if (!found.fingerprints) return;
+
       // Parse current
       /** @type {HTMLTableRowElement[]} */
       const fingerprintsTableRows = (Array.from(document.querySelectorAll('.scene-fingerprints > table tr')));
@@ -1727,7 +1751,7 @@ async function inject() {
         // Hook to remove it
         window.addEventListener(`${eventPrefix}_locationchange`, () => fpInfo.remove(), { once: true });
       }
-    }
+    })();
 
   } // iScenePage
 
@@ -2070,110 +2094,115 @@ async function inject() {
     }
 
     // Performer scene changes based on cached data
-    Cache.getStoredData().then(({ scenes: storedScenes }) => {
-      /** @typedef {[sceneId: string, entry: PerformerEntry]} performerScene */
-      /** @type {{ append: performerScene[], remove: performerScene[] }} */
-      const performerScenes = { append: [], remove: [] };
-      for (const [sceneId, scene] of Object.entries(storedScenes)) {
-        if (!scene.performers) continue;
-        const { append, remove } = scene.performers;
-        const appendEntry = append.find(({ id }) => id === performerId);
-        if (appendEntry) {
-          performerScenes.append.push([sceneId, appendEntry]);
-        }
-        const removeEntry = remove.find(({ id }) => id === performerId);
-        if (removeEntry) {
-          const targetEntry = append.find(({ appearance, name }) => {
-            if (appearance) return [appearance, name].includes(removeEntry.name);
-            return name.split(/\b/)[0] === removeEntry.name.split(/\b/)[0];
-          });
-          performerScenes.remove.push([sceneId, targetEntry]);
-        }
-      }
-
-      if (performerScenes.append.length === 0 && performerScenes.remove.length === 0) return;
-
-      const pName = {
-        /** @param {PerformerEntry} entry */
-        append: (entry) => {
-          if (!entry) return null;
-          const { appearance, name } = entry;
-          return appearance || name;
-        },
-        /** @param {PerformerEntry} entry */
-        remove: (entry) => {
-          if (!entry) return null;
-          const { name, disambiguation } = entry;
-          return name + (disambiguation ? ` (${disambiguation})` : '');
-        },
-      };
-      const actionPrefix = {
-        append: '\u{FF0B}', // ＋
-        remove: '\u{FF0D}', // －
-      };
-
-      const sceneChanges = document.createElement('div');
-      sceneChanges.classList.add('mb-1', 'p-1', 'font-weight-bold');
-      sceneChanges.innerHTML = 'This performer has pending scene changes:';
-      for (const [actionStr, scenes] of Object.entries(performerScenes)) {
-        if (scenes.length === 0) continue;
-        const action = /** @type {'append' | 'remove'} */ (actionStr);
-        const details = document.createElement('details');
-        details.style.marginLeft = '1.5rem';
-        const summary = document.createElement('summary');
-        setStyles(summary, { color: 'tan', width: 'max-content' });
-        summary.innerText = `${actionPrefix[action]} ${scenes.length} scene${scenes.length === 1 ? '' : 's'}`;
-        details.append(summary);
-        const sceneLinks = document.createElement('div');
-        setStyles(sceneLinks, { marginLeft: '1.3rem', fontWeight: 'normal' });
-        scenes
-          .sort(([, a], [, b]) => {
-            const aName = pName[action](a), bName = pName[action](b);
-            if (aName !== null && bName !== null) return aName.localeCompare(bName);
-            if (aName === null) return 1;
-            if (bName === null) return -1;
-            return 0;
-          })
-          .forEach(([sceneId, entry], idx) => {
-            if (idx > 0) sceneLinks.append(document.createElement('br'));
-            const a = makeLink(`/scenes/${sceneId}`, sceneId, {
-              color: 'var(--teal)',
-              fontFamily: 'monospace',
-              fontSize: '16px',
+    (async function sceneChanges() {
+      try {
+        const { scenes: storedScenes } = await Cache.getStoredData();
+        /** @typedef {[sceneId: string, entry: PerformerEntry]} performerScene */
+        /** @type {{ append: performerScene[], remove: performerScene[] }} */
+        const performerScenes = { append: [], remove: [] };
+        for (const [sceneId, scene] of Object.entries(storedScenes)) {
+          if (!scene.performers) continue;
+          const { append, remove } = scene.performers;
+          const appendEntry = append.find(({ id }) => id === performerId);
+          if (appendEntry) {
+            performerScenes.append.push([sceneId, appendEntry]);
+          }
+          const removeEntry = remove.find(({ id }) => id === performerId);
+          if (removeEntry) {
+            const targetEntry = append.find(({ appearance, name }) => {
+              if (appearance) return [appearance, name].includes(removeEntry.name);
+              return name.split(/\b/)[0] === removeEntry.name.split(/\b/)[0];
             });
-            a.target = '_blank';
-            sceneLinks.append(a);
-            if (action === 'append') sceneLinks.append(` (as ${pName[action](entry)})`);
-            if (action === 'remove') {
-              if (!entry) {
-                sceneLinks.append(' (unknown target)');
-              } else {
-                const pLink = entry.id
-                  ? makeLink(`/performers/${entry.id}`, pName[action](entry), { color: 'var(--teal)' })
-                  : pName[action](entry);
-                sceneLinks.append(' (target: ', pLink, ')');
+            performerScenes.remove.push([sceneId, targetEntry]);
+          }
+        }
+
+        if (performerScenes.append.length === 0 && performerScenes.remove.length === 0) return;
+
+        const pName = {
+          /** @param {PerformerEntry} entry */
+          append: (entry) => {
+            if (!entry) return null;
+            const { appearance, name } = entry;
+            return appearance || name;
+          },
+          /** @param {PerformerEntry} entry */
+          remove: (entry) => {
+            if (!entry) return null;
+            const { name, disambiguation } = entry;
+            return name + (disambiguation ? ` (${disambiguation})` : '');
+          },
+        };
+        const actionPrefix = {
+          append: '\u{FF0B}', // ＋
+          remove: '\u{FF0D}', // －
+        };
+
+        const sceneChanges = document.createElement('div');
+        sceneChanges.classList.add('mb-1', 'p-1', 'font-weight-bold');
+        sceneChanges.innerHTML = 'This performer has pending scene changes:';
+        for (const [actionStr, scenes] of Object.entries(performerScenes)) {
+          if (scenes.length === 0) continue;
+          const action = /** @type {'append' | 'remove'} */ (actionStr);
+          const details = document.createElement('details');
+          details.style.marginLeft = '1.5rem';
+          const summary = document.createElement('summary');
+          setStyles(summary, { color: 'tan', width: 'max-content' });
+          summary.innerText = `${actionPrefix[action]} ${scenes.length} scene${scenes.length === 1 ? '' : 's'}`;
+          details.append(summary);
+          const sceneLinks = document.createElement('div');
+          setStyles(sceneLinks, { marginLeft: '1.3rem', fontWeight: 'normal' });
+          scenes
+            .sort(([, a], [, b]) => {
+              const aName = pName[action](a), bName = pName[action](b);
+              if (aName !== null && bName !== null) return aName.localeCompare(bName);
+              if (aName === null) return 1;
+              if (bName === null) return -1;
+              return 0;
+            })
+            .forEach(([sceneId, entry], idx) => {
+              if (idx > 0) sceneLinks.append(document.createElement('br'));
+              const a = makeLink(`/scenes/${sceneId}`, sceneId, {
+                color: 'var(--teal)',
+                fontFamily: 'monospace',
+                fontSize: '16px',
+              });
+              a.target = '_blank';
+              sceneLinks.append(a);
+              if (action === 'append') sceneLinks.append(` (as ${pName[action](entry)})`);
+              if (action === 'remove') {
+                if (!entry) {
+                  sceneLinks.append(' (unknown target)');
+                } else {
+                  const pLink = entry.id
+                    ? makeLink(`/performers/${entry.id}`, pName[action](entry), { color: 'var(--teal)' })
+                    : pName[action](entry);
+                  sceneLinks.append(' (target: ', pLink, ')');
+                }
               }
-            }
-          });
-        details.append(sceneLinks);
-        sceneChanges.append(details);
+            });
+          details.append(sceneLinks);
+          sceneChanges.append(details);
+        }
+        const emoji = document.createElement('span');
+        emoji.classList.add('mr-1');
+        emoji.innerText = '🎥';
+        sceneChanges.prepend(emoji);
+        performerInfo.prepend(sceneChanges);
+        highlightElements.push(sceneChanges);
+      } catch (error) {
+        console.error(error);
       }
-      const emoji = document.createElement('span');
-      emoji.classList.add('mr-1');
-      emoji.innerText = '🎥';
-      sceneChanges.prepend(emoji);
-      performerInfo.prepend(sceneChanges);
-      highlightElements.push(sceneChanges);
-    }).catch((error) => {
-      console.error(error);
-    });
+    })();
 
     const found = index.performers[performerId];
     if (!found) return;
 
     const info = found.slice(1);
 
-    if (info.includes('split')) {
+    (function split() {
+      if (!info.includes('split')) return;
+
       const toSplit = document.createElement('div');
       toSplit.classList.add('mb-1', 'p-1', 'font-weight-bold');
       toSplit.style.transition = 'background-color .5s';
@@ -2199,7 +2228,7 @@ async function inject() {
       toSplit.prepend(emoji);
       performerInfo.prepend(toSplit);
       highlightElements.push(toSplit);
-    }
+    })();
 
     const foundData = await getDataFor('performers', performerId);
     if (!foundData) {
@@ -2213,7 +2242,9 @@ async function inject() {
       return indexEntry && indexEntry.includes('split');
     };
 
-    if (foundData.duplicates) {
+    (function duplicates() {
+      if (!foundData.duplicates) return;
+
       const hasDuplicates = document.createElement('div');
       hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
       hasDuplicates.innerHTML = 'This performer has duplicates:';
@@ -2232,9 +2263,11 @@ async function inject() {
       hasDuplicates.prepend(emoji);
       performerInfo.prepend(hasDuplicates);
       highlightElements.push(hasDuplicates);
-    }
+    })();
 
-    if (foundData.duplicate_of) {
+    (function duplicateOf() {
+      if (!foundData.duplicate_of) return;
+
       const duplicateOf = document.createElement('div');
       duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
       duplicateOf.innerText = 'This performer is a duplicate of: ';
@@ -2249,7 +2282,7 @@ async function inject() {
       duplicateOf.prepend(emoji);
       performerInfo.prepend(duplicateOf);
       highlightElements.push(duplicateOf);
-    }
+    })();
 
   } // iPerformerPage
 
