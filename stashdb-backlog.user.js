@@ -1021,6 +1021,23 @@ async function inject() {
   };
 
   /**
+   * @param {HTMLElement} el
+   * @param {SupportedObject} object
+   * @param {string} uuid
+   * @see https://stackoverflow.com/a/48890844
+   */
+  const removeHook = (el, object, uuid) => {
+    const hook = () => {
+      const loc = parsePath();
+      if (loc.object === object && loc.ident === uuid && !loc.action) return;
+      el.remove();
+      window.removeEventListener(`${eventPrefix}_locationchange`, hook);
+    };
+    // Hook to remove it
+    window.addEventListener(`${eventPrefix}_locationchange`, hook);
+  };
+
+  /**
    * @param {string} sceneId
    */
   async function iScenePage(sceneId) {
@@ -1034,10 +1051,7 @@ async function inject() {
 
     const markerDataset = sceneInfo.dataset;
     if (markerDataset.backlogInjected) {
-      console.debug('[backlog] already injected, skipping');
-      return;
-    } else {
-      markerDataset.backlogInjected = 'true';
+      console.debug('[backlog] already injected');
     }
 
     const found = await getDataFor('scenes', sceneId);
@@ -1064,6 +1078,7 @@ async function inject() {
 
     (function comments() {
       if (!(found.comments && found.comments.length > 0)) return;
+      if (markerDataset.backlogInjected) return;
 
       const comments = document.createElement('div');
       comments.classList.add('bg-info');
@@ -1078,54 +1093,59 @@ async function inject() {
       sceneHeader.appendChild(comments);
     })();
 
+    /** @type {HTMLDivElement} */
+    let backlogDiv = (document.querySelector('.scene-backlog'));
+    if (!backlogDiv) {
+      backlogDiv = document.createElement('div');
+      backlogDiv.classList.add('scene-backlog');
+      sceneInfo.before(backlogDiv);
+      removeHook(backlogDiv, 'scenes', sceneId);
+    }
+
     (function duplicates() {
-      if (!(found.duplicates || found.duplicate_of)) return;
+      if (!found.duplicates) return;
+      if (backlogDiv.querySelector('[data-backlog="duplicates"]')) return;
 
-      let container = document.querySelector('.StashDBContent > div.backlog');
-      if (!container) {
-        container = document.createElement('div');
-        container.classList.add('backlog');
-        sceneInfo.before(container);
-        // Hook to remove it
-        window.addEventListener(`${eventPrefix}_locationchange`, () => container.remove(), { once: true });
-      }
-
-      if (found.duplicates) {
-        const hasDuplicates = document.createElement('div');
-        hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
-        hasDuplicates.innerHTML = 'This scene has duplicates:';
-        found.duplicates.forEach((dupId) => {
-          hasDuplicates.append(document.createElement('br'));
-          const a = makeLink(`/scenes/${dupId}`, dupId, { color: 'var(--teal)', marginLeft: '1.75rem' });
-          a.target = '_blank';
-          a.classList.add('font-weight-normal');
-          hasDuplicates.append(a);
-        });
-        const emoji = document.createElement('span');
-        emoji.classList.add('mr-1');
-        emoji.innerText = '♊';
-        hasDuplicates.prepend(emoji);
-        container.prepend(hasDuplicates);
-      }
-
-      if (found.duplicate_of) {
-        const duplicateOf = document.createElement('div');
-        duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
-        duplicateOf.innerText = 'This scene is a duplicate of: ';
-        const a = makeLink(`/scenes/${found.duplicate_of}`, found.duplicate_of, { color: 'var(--teal)' });
+      const hasDuplicates = document.createElement('div');
+      hasDuplicates.dataset.backlog = 'duplicates';
+      hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
+      hasDuplicates.innerHTML = 'This scene has duplicates:';
+      found.duplicates.forEach((dupId) => {
+        hasDuplicates.append(document.createElement('br'));
+        const a = makeLink(`/scenes/${dupId}`, dupId, { color: 'var(--teal)', marginLeft: '1.75rem' });
         a.target = '_blank';
         a.classList.add('font-weight-normal');
-        duplicateOf.append(a);
-        const emoji = document.createElement('span');
-        emoji.classList.add('mr-1');
-        emoji.innerText = '♊';
-        duplicateOf.prepend(emoji);
-        container.prepend(duplicateOf);
-      }
+        hasDuplicates.append(a);
+      });
+      const emoji = document.createElement('span');
+      emoji.classList.add('mr-1');
+      emoji.innerText = '♊';
+      hasDuplicates.prepend(emoji);
+      backlogDiv.append(hasDuplicates);
+    })();
+
+    (function duplicateOf() {
+      if (!found.duplicate_of) return;
+      if (backlogDiv.querySelector('[data-backlog="duplicate-of"]')) return;
+
+      const duplicateOf = document.createElement('div');
+      duplicateOf.dataset.backlog = 'duplicate-of';
+      duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
+      duplicateOf.innerText = 'This scene is a duplicate of: ';
+      const a = makeLink(`/scenes/${found.duplicate_of}`, found.duplicate_of, { color: 'var(--teal)' });
+      a.target = '_blank';
+      a.classList.add('font-weight-normal');
+      duplicateOf.append(a);
+      const emoji = document.createElement('span');
+      emoji.classList.add('mr-1');
+      emoji.innerText = '♊';
+      duplicateOf.prepend(emoji);
+      backlogDiv.append(duplicateOf);
     })();
 
     (function title() {
       if (!found.title) return;
+      if (markerDataset.backlogInjected) return;
 
       /** @type {HTMLHeadingElement} */
       const title = (document.querySelector('.scene-info h3'));
@@ -1173,6 +1193,7 @@ async function inject() {
 
     (function studio() {
       if (!found.studio) return;
+      if (markerDataset.backlogInjected) return;
 
       const studio_date = /** @type {HTMLHeadingElement} */ (sceneHeader.querySelector(':scope > h6'));
       const studioElement = studio_date.querySelector('a');
@@ -1209,6 +1230,7 @@ async function inject() {
 
     (function date() {
       if (!found.date) return;
+      if (markerDataset.backlogInjected) return;
 
       const studio_date = /** @type {HTMLHeadingElement} */ (sceneHeader.querySelector(':scope > h6'));
       const dateNode = Array.from(studio_date.childNodes).slice(-1)[0];
@@ -1244,6 +1266,7 @@ async function inject() {
 
     (function image() {
       if (!found.image) return;
+      if (markerDataset.backlogInjected) return;
 
       /** @type {HTMLImageElement} */
       const img = (document.querySelector('.scene-photo > img'));
@@ -1374,6 +1397,7 @@ async function inject() {
 
     (function performers() {
       if (!found.performers) return;
+      if (markerDataset.backlogInjected) return;
 
       const remove = Array.from(found.performers.remove); // shallow clone
       const append = Array.from(found.performers.append); // shallow clone
@@ -1612,6 +1636,7 @@ async function inject() {
 
     (function duration() {
       if (!found.duration) return;
+      if (markerDataset.backlogInjected) return;
 
       /** @type {HTMLDivElement | null} */
       let duration = (sceneFooter.querySelector(':scope > div[title $= " seconds"]'));
@@ -1641,6 +1666,7 @@ async function inject() {
 
     (function director() {
       if (!found.director) return;
+      if (markerDataset.backlogInjected) return;
 
       /** @type {HTMLDivElement | null} */
       let director = (sceneFooter.querySelector(':scope > div:last-of-type'));
@@ -1668,6 +1694,7 @@ async function inject() {
 
     (function details() {
       if (!found.details) return;
+      if (markerDataset.backlogInjected) return;
 
       /** @type {HTMLDivElement} */
       const desc = (document.querySelector('.scene-description > h4 + div'));
@@ -1700,6 +1727,7 @@ async function inject() {
 
     (function url() {
       if (!found.url) return;
+      if (markerDataset.backlogInjected) return;
 
       /** @type {HTMLAnchorElement} */
       const studioUrl = (document.querySelector('.scene-description > div:last-of-type > a'));
@@ -1732,6 +1760,7 @@ async function inject() {
 
     (function fingerprints() {
       if (!found.fingerprints) return;
+      if (document.querySelector('[data-backlog="fingerprints"]')) return;
 
       // Parse current
       /** @type {HTMLTableRowElement[]} */
@@ -1774,6 +1803,7 @@ async function inject() {
 
       if (matches || notFound) {
         const fpInfo = document.createElement('div');
+        fpInfo.dataset.backlog = 'fingerprints';
         fpInfo.classList.add('float-right', 'my-2', 'd-flex', 'flex-column');
 
         const backlogSheetId = '357846927'; // Fingerprints
@@ -1811,11 +1841,11 @@ async function inject() {
         if (matches) fpInfo.appendChild(makeElement('Reported incorrect fingerprints:', `${matches} ℹ`));
         if (notFound) fpInfo.appendChild(makeElement('Missing reported fingerprints:', `${notFound} ⚠`));
         document.querySelector('nav[role="tablist"]').before(fpInfo);
-        // Hook to remove it
-        window.addEventListener(`${eventPrefix}_locationchange`, () => fpInfo.remove(), { once: true });
+        removeHook(fpInfo, 'scenes', sceneId);
       }
     })();
 
+    markerDataset.backlogInjected = 'true';
   } // iScenePage
 
   // =====
@@ -2135,15 +2165,6 @@ async function inject() {
     const performerInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.performer-info', 1000));
     if (!performerInfo) return;
 
-    const markerDataset = performerInfo.dataset;
-    if (markerDataset.backlogInjected) {
-      console.debug('[backlog] already injected, skipping');
-      highlightSceneCards('performers');
-      return;
-    } else {
-      markerDataset.backlogInjected = 'true';
-    }
-
     const index = await Cache.getStoredDataIndex();
     if (!index) return;
 
@@ -2165,8 +2186,19 @@ async function inject() {
       });
     }
 
+    /** @type {HTMLDivElement} */
+    let backlogDiv = (document.querySelector('.performer-backlog'));
+    if (!backlogDiv) {
+      backlogDiv = document.createElement('div');
+      backlogDiv.classList.add('performer-backlog');
+      performerInfo.prepend(backlogDiv);
+      removeHook(backlogDiv, 'performers', performerId);
+    }
+
     // Performer scene changes based on cached data
     (async function sceneChanges() {
+      if (backlogDiv.querySelector('[data-backlog="scene-changes"]')) return;
+
       try {
         const { scenes: storedScenes } = await Cache.getStoredData();
         /** @typedef {[sceneId: string, entry: PerformerEntry]} performerScene */
@@ -2211,6 +2243,7 @@ async function inject() {
         };
 
         const sceneChanges = document.createElement('div');
+        sceneChanges.dataset.backlog = 'scene-changes';
         sceneChanges.classList.add('mb-1', 'p-1', 'font-weight-bold');
         sceneChanges.innerHTML = 'This performer has pending scene changes:';
         for (const [actionStr, scenes] of Object.entries(performerScenes)) {
@@ -2260,7 +2293,7 @@ async function inject() {
         emoji.classList.add('mr-1');
         emoji.innerText = '🎥';
         sceneChanges.prepend(emoji);
-        performerInfo.prepend(sceneChanges);
+        backlogDiv.append(sceneChanges);
         highlightElements.push(sceneChanges);
       } catch (error) {
         console.error(error);
@@ -2274,8 +2307,10 @@ async function inject() {
 
     (function split() {
       if (!info.includes('split')) return;
+      if (backlogDiv.querySelector('[data-backlog="split"]')) return;
 
       const toSplit = document.createElement('div');
+      toSplit.dataset.backlog = 'split';
       toSplit.classList.add('mb-1', 'p-1', 'font-weight-bold');
       toSplit.style.transition = 'background-color .5s';
 
@@ -2298,7 +2333,7 @@ async function inject() {
       emoji.classList.add('mr-1');
       emoji.innerText = '🔀';
       toSplit.prepend(emoji);
-      performerInfo.prepend(toSplit);
+      backlogDiv.append(toSplit);
       highlightElements.push(toSplit);
     })();
 
@@ -2316,8 +2351,10 @@ async function inject() {
 
     (function duplicates() {
       if (!foundData.duplicates) return;
+      if (backlogDiv.querySelector('[data-backlog="duplicates"]')) return;
 
       const hasDuplicates = document.createElement('div');
+      hasDuplicates.dataset.backlog = 'duplicates';
       hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
       hasDuplicates.innerHTML = 'This performer has duplicates:';
       foundData.duplicates.forEach((dupId) => {
@@ -2333,14 +2370,16 @@ async function inject() {
       emoji.classList.add('mr-1');
       emoji.innerText = '♊';
       hasDuplicates.prepend(emoji);
-      performerInfo.prepend(hasDuplicates);
+      backlogDiv.append(hasDuplicates);
       highlightElements.push(hasDuplicates);
     })();
 
     (function duplicateOf() {
       if (!foundData.duplicate_of) return;
+      if (backlogDiv.querySelector('[data-backlog="duplicate-of"]')) return;
 
       const duplicateOf = document.createElement('div');
+      duplicateOf.dataset.backlog = 'duplicate-of';
       duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
       duplicateOf.innerText = 'This performer is a duplicate of: ';
       const a = makeLink(`/performers/${foundData.duplicate_of}`, foundData.duplicate_of, { color: 'var(--teal)' });
@@ -2352,10 +2391,16 @@ async function inject() {
       emoji.classList.add('mr-1');
       emoji.innerText = '♊';
       duplicateOf.prepend(emoji);
-      performerInfo.prepend(duplicateOf);
+      backlogDiv.append(duplicateOf);
       highlightElements.push(duplicateOf);
     })();
 
+    // const markerDataset = performerInfo.dataset;
+    // if (markerDataset.backlogInjected) {
+    //   console.debug('[backlog] already injected');
+    // }
+
+    // markerDataset.backlogInjected = 'true';
   } // iPerformerPage
 
   // =====
