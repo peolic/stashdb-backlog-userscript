@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.11
+// @version     1.22.12
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -147,7 +147,14 @@ async function inject() {
     if (object === 'scenes') {
       if (ident) {
         // Scene page
-        if (!action) return await iScenePage(ident);
+        if (!action) {
+          await iScenePage(ident);
+          if (window.location.hash === '#edits') {
+            await elementReadyIn('div[id$="-tabpane-edits"] > div:not([class]) > div.card', 1000);
+            await iEditCards();
+          }
+          return;
+        }
         // Scene edit page
         else if (action === 'edit') return await iSceneEditPage(ident);
       } else {
@@ -167,8 +174,20 @@ async function inject() {
       }
 
       if (ident && !action) {
-        return await iPerformerPage(ident);
+        await iPerformerPage(ident);
+        if (window.location.hash === '#edits') {
+          await elementReadyIn('div[id$="-tabpane-edits"] > div:not([class]) > div.card', 1000);
+          await iEditCards();
+        }
+        return;
       }
+    }
+
+    if (
+      (object === 'edits' && !action)
+      || (object === 'users' && ident && action === 'edits')
+    ) {
+      return await iEditCards();
     }
 
     // Search results
@@ -2531,6 +2550,39 @@ async function inject() {
       }
     }
   }
+
+  async function iEditCards() {
+    const selector = 'div:not([class]) > div.card';
+    if (!await elementReadyIn(selector, 1000)) return;
+
+    const index = await Cache.getStoredDataIndex();
+    if (!index) return;
+
+    const cards = /** @type {HTMLDivElement[]} */ (Array.from(document.querySelectorAll(selector)));
+    for (const card of cards) {
+      const cardBody = card.querySelector('.card-body');
+      /** @type {HTMLAnchorElement} */
+      const targetLink = (cardBody.querySelector('h6 > a, :scope > .mb-4 .row:nth-child(2) a, :scope > .row:first-child a'));
+      if (!targetLink) continue;
+      const { ident, object } = parsePath(targetLink.href);
+      if (!isSupportedObject(object)) continue;
+
+      const found = index[object][ident];
+      if (!found) continue;
+      const changes = found.slice(1);
+
+      setStyles(targetLink, {
+        backgroundColor: 'var(--warning)',
+        padding: '.2rem',
+        fontWeight: '700',
+        maxWidth: 'max-content',
+      });
+      const type = object.slice(0, -1);
+      targetLink.title = `${type} is listed for:\n - ${changes.join('\n - ')}\n(click ${type} for more info)`;
+    }
+
+  } // iEditPage
+
 }
 
 // Based on: https://dirask.com/posts/JavaScript-on-location-changed-event-on-url-changed-event-DKeyZj
