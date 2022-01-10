@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.13
+// @version     1.22.14
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1497,7 +1497,8 @@ async function inject() {
               );
             }
           } else {
-            performer.querySelectorAll('span, small').forEach((el) => el.classList.add('text-decoration-line-through'));
+            /** @type {NodeListOf<HTMLElement>} */
+            (performer.querySelectorAll('span, small')).forEach((el) => el.style.textDecoration = 'line-through');
             performer.title = `<pending>\nremoval`;
           }
           if (!toRemove.id) {
