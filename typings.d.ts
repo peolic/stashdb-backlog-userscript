@@ -91,6 +91,7 @@ interface PerformerEntry {
     name: string;
     disambiguation?: string;
     appearance: string | null;
+    notes?: string[];
     /** Only for remove/append */
     status?: string;
     /** Only for remove/append, with specific statuses */

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.12
+// @version     1.22.13
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -916,6 +916,39 @@ async function inject() {
   }
 
   /**
+   * @param {PerformerEntry} [entry]
+   * @returns {HTMLElement[]}
+   */
+  function makeNoteElements(entry) {
+    /** @type {HTMLElement[]} */
+    const result = [];
+    if (!entry.notes) return result;
+
+    const links = /** @type {string[]} */ ([]);
+    const notes = /** @type {string[]} */ ([]);
+    entry.notes.forEach((note) => (/^https?:/.test(note) ? links : notes).push(note));
+
+    if (notes.length > 0) {
+      const sup = document.createElement('sup');
+      sup.title = notes.join('\n');
+      sup.innerText = '!!!';
+      setStyles(sup, { color: 'var(--yellow)' });
+      result.push(sup);
+    }
+
+    return result.concat(
+      links.map((url, cite) => {
+        const sup = document.createElement('sup');
+        const link = sup.appendChild(
+          makeLink(url, `[${cite + 1}]`, { color: 'var(--teal)' })
+        );
+        link.title = url;
+        return sup;
+      })
+    );
+  }
+
+  /**
    * @template T
    * @param {T} obj
    * @param {string[]} keySortOrder
@@ -1387,6 +1420,14 @@ async function inject() {
         return entry.appearance + ` (${entry.name})` + disambiguation;
       };
 
+      const paStatus = (/** @type {string} */ status) => {
+        const statusEl = document.createElement('sup');
+        statusEl.innerText = `[${status}]`;
+        const statusSep = document.createElement('span');
+        statusSep.innerText = ' ';
+        return [statusEl, statusSep];
+      };
+
       const nameElements = (/** @type {PerformerEntry} */ entry) => {
         const c = (/** @type {string} */ text, small=false) => {
           const el = document.createElement(small ? 'small' : 'span');
@@ -1398,7 +1439,7 @@ async function inject() {
         const { status, appearance, name, disambiguation } = entry;
         const namePart = c(name, !!appearance);
         const parts = /** @type {Array<HTMLElement | string>} */ ([]);
-        if (status) parts.push(`[${entry.status}] `);
+        if (status) parts.push(...paStatus(entry.status));
         if (appearance) parts.push(c(appearance));
         parts.push(namePart);
         if (disambiguation) {
@@ -1441,7 +1482,7 @@ async function inject() {
           highlight(performer, '--danger');
           performer.classList.add('backlog-remove'); // Useful for new performers below
           if (toRemove.status) {
-            performer.children[1].prepend(`[${toRemove.status}] `);
+            performer.children[1].prepend(...paStatus(toRemove.status));
             performer.title = `<pending>\n${toRemove.status}`;
             setStyles(performer, { color: 'violet', fontStyle: 'italic' });
             if (toRemove.status == 'edit') {
@@ -1456,13 +1497,15 @@ async function inject() {
               );
             }
           } else {
-            performer.style.textDecoration = 'line-through';
+            performer.querySelectorAll('span, small').forEach((el) => el.classList.add('text-decoration-line-through'));
             performer.title = `<pending>\nremoval`;
           }
           if (!toRemove.id) {
             performer.title += '\n[missing ID - matched by name]';
             performer.classList.add('bg-danger');
           }
+          (performer.querySelector('sup') /* status */ || performer.querySelector('svg') /* icon */)
+            .after(...makeNoteElements(toRemove));
           removeFrom(toRemove, remove);
         }
 
@@ -1517,6 +1560,10 @@ async function inject() {
           if (entry.status_url) {
             makeLink(entry.status_url, null, null, pa);
           }
+        }
+        if (entry.notes) {
+          (pa.querySelector('sup') /* status */ || pa.querySelector('svg') /* icon */)
+            .after(...makeNoteElements(entry));
         }
         highlight(pa, hColor);
 
@@ -1929,7 +1976,11 @@ async function inject() {
             setStyles(info, { flex: '1', whiteSpace: 'pre-wrap' });
 
             if (!entry.id) {
-              info.innerText = `<${entry.status}> ${name + appearance}`;
+              const statusText = `<${entry.status || 'no id'}>`;
+              const status = entry.status_url
+                ? makeLink(entry.status_url, statusText, { color: 'var(--teal)' })
+                : statusText;
+              info.append(status, ` ${name + appearance}`);
             } else if (action === 'update') {
               const a = makeLink(`/performers/${entry.id}`, name, { color: 'var(--teal)' });
               a.target = '_blank';
@@ -1970,6 +2021,11 @@ async function inject() {
                 a.before(`<${entry.status}> `);
               }
             }
+
+            if (entry.notes) {
+              label.append(...makeNoteElements(entry));
+            }
+
             li.appendChild(info);
 
             ul.appendChild(li);
