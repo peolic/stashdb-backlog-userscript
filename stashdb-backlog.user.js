@@ -1081,7 +1081,7 @@ async function inject() {
       if (markerDataset.backlogInjected) return;
 
       const comments = document.createElement('div');
-      comments.classList.add('bg-info');
+      setStyles(comments, { padding: '0 .25rem', backgroundColor: 'var(--info)' });
 
       found.comments.forEach((comment, index) => {
         if (index > 0) comments.append(document.createElement('br'));
