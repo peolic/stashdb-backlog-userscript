@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.15
+// @version     1.22.16
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -808,12 +808,14 @@ async function inject() {
   /**
    * @param {HTMLImageElement} img
    * @param {'left' | 'right'} position
+   * @param {boolean} [margin]
    * @returns {HTMLDivElement}
    */
-  function makeImageResolution(img, position) {
+  function makeImageResolution(img, position, margin=true) {
     const imgRes = document.createElement('div');
-    imgRes.classList.add('position-absolute', `m${position.charAt(0)}-2`, 'px-2', 'font-weight-bold');
-    setStyles(imgRes, { [position]: '0', backgroundColor: '#2fb59c', transition: 'opacity .2s ease' });
+    const positionClasses = margin ? [`m${position.charAt(0)}-2`] : [];
+    imgRes.classList.add('position-absolute', ...positionClasses, 'px-2', 'font-weight-bold');
+    setStyles(imgRes, { [position]: '0', backgroundColor: '#00689b', transition: 'opacity .2s ease' });
 
     imageReady(img).then(
       () => imgRes.innerText = `${img.naturalWidth} x ${img.naturalHeight}`,
@@ -1285,7 +1287,7 @@ async function inject() {
           imgContainer.classList.add('p-2');
 
           if (newImage === true) {
-            imgContainer.style.backgroundColor = 'var(--pink)';
+            imgContainer.style.backgroundColor = 'var(--warning)';
             imgContainer.title = `${makeAlreadyCorrectTitle('added')}\n\n${found.image}`;
             setStatus('');
             return;
@@ -1310,25 +1312,25 @@ async function inject() {
           }
 
           const currentImageContainer = document.createElement('div');
-          setStyles(currentImageContainer, { borderRight: '.5rem solid var(--warning)', flex: '50%' });
-          img.style.width = '100%';
-          const cImgRes = makeImageResolution(img, 'left');
+          setStyles(currentImageContainer, { alignSelf: 'center', flex: '50%' });
+          setStyles(img, { width: '100%', border: '.5em solid var(--danger)' });
+          const cImgRes = makeImageResolution(img, 'left', false);
+          cImgRes.classList.add('ml-3', 'mt-2');
           currentImageContainer.append(cImgRes, img);
 
           imgContainer.appendChild(currentImageContainer);
 
-          imgContainer.classList.add('bg-warning');
-
           const imgNew = document.createElement('img');
           imgNew.src = URL.createObjectURL(await newImageBlob);
-          setStyles(imgNew, { width: '100%', height: 'auto' });
+          setStyles(imgNew, { width: '100%', height: 'auto', border: '.5em solid var(--success)' });
 
           imgNewLink.appendChild(imgNew);
 
           const newImageContainer = document.createElement('div');
           const isCurrentVertical = img.naturalHeight > img.naturalWidth;
-          newImageContainer.style.flex = isCurrentVertical ? 'auto' : '50%';
-          const imgRes = makeImageResolution(imgNew, 'right');
+          setStyles(newImageContainer, { alignSelf: 'center', flex: isCurrentVertical ? 'auto' : '50%' });
+          const imgRes = makeImageResolution(imgNew, 'right', false);
+          imgRes.classList.add('mr-3', 'mt-2');
           newImageContainer.append(imgRes, imgNewLink);
 
           imgContainer.appendChild(newImageContainer);
