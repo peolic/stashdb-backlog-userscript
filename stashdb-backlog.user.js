@@ -1111,7 +1111,11 @@ async function inject() {
       const hasDuplicates = document.createElement('div');
       hasDuplicates.dataset.backlog = 'duplicates';
       hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
-      hasDuplicates.innerHTML = 'This scene has duplicates:';
+
+      const label = document.createElement('span');
+      label.innerText = 'This scene has duplicates:';
+      hasDuplicates.appendChild(label);
+
       found.duplicates.forEach((dupId) => {
         hasDuplicates.append(document.createElement('br'));
         const a = makeLink(`/scenes/${dupId}`, dupId, { color: 'var(--teal)', marginLeft: '1.75rem' });
@@ -1133,7 +1137,11 @@ async function inject() {
       const duplicateOf = document.createElement('div');
       duplicateOf.dataset.backlog = 'duplicate-of';
       duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
-      duplicateOf.innerText = 'This scene is a duplicate of: ';
+
+      const label = document.createElement('span');
+      label.innerText = 'This scene is a duplicate of: ';
+      duplicateOf.appendChild(label);
+
       const a = makeLink(`/scenes/${found.duplicate_of}`, found.duplicate_of, { color: 'var(--teal)' });
       a.target = '_blank';
       a.classList.add('font-weight-normal');
@@ -2247,7 +2255,7 @@ async function inject() {
         const sceneChanges = document.createElement('div');
         sceneChanges.dataset.backlog = 'scene-changes';
         sceneChanges.classList.add('mb-1', 'p-1', 'font-weight-bold');
-        sceneChanges.innerHTML = 'This performer has pending scene changes:';
+        sceneChanges.innerText = 'This performer has pending scene changes:';
         for (const [actionStr, scenes] of Object.entries(performerScenes)) {
           if (scenes.length === 0) continue;
           const action = /** @type {'append' | 'remove'} */ (actionStr);
@@ -2295,7 +2303,7 @@ async function inject() {
         emoji.classList.add('mr-1');
         emoji.innerText = '🎥';
         sceneChanges.prepend(emoji);
-        backlogDiv.append(sceneChanges);
+        backlogDiv.prepend(sceneChanges);
         highlightElements.push(sceneChanges);
       } catch (error) {
         console.error(error);
@@ -2355,11 +2363,42 @@ async function inject() {
       if (!foundData.duplicates) return;
       if (backlogDiv.querySelector('[data-backlog="duplicates"]')) return;
 
+      // backwards compatible
+      /** @type {PerformerDataObject['duplicates']} */
+      const { ids, notes } = (
+        Array.isArray(foundData.duplicates)
+          ? { ids: foundData.duplicates, notes: undefined }
+          : foundData.duplicates
+        );
+
       const hasDuplicates = document.createElement('div');
       hasDuplicates.dataset.backlog = 'duplicates';
       hasDuplicates.classList.add('mb-1', 'p-1', 'font-weight-bold');
-      hasDuplicates.innerHTML = 'This performer has duplicates:';
-      foundData.duplicates.forEach((dupId) => {
+
+      const label = document.createElement('span');
+      label.innerText = 'This performer has duplicates:';
+      hasDuplicates.appendChild(label);
+
+      (notes || []).forEach((note) => {
+        if (/^https?:/.test(note)) {
+          const siteName = (new URL(note)).hostname.split(/\./).slice(-2)[0];
+          const link = makeLink(note, `[${siteName}]`, { color: 'var(--yellow)' });
+          link.classList.add('ml-1');
+          link.title = note;
+          hasDuplicates.appendChild(link);
+        } else {
+          if (!label.title) {
+            label.append(' 📝');
+            setStyles(label, {
+              textDecoration: 'underline dotted currentColor 2px',
+              cursor: 'help',
+            });
+          }
+          label.title += (label.title ? '\n' : '') + note;
+        }
+      });
+
+      ids.forEach((dupId) => {
         hasDuplicates.append(document.createElement('br'));
         const a = makeLink(`/performers/${dupId}`, dupId, { color: 'var(--teal)', marginLeft: '1.75rem' });
         a.target = '_blank';
@@ -2383,7 +2422,11 @@ async function inject() {
       const duplicateOf = document.createElement('div');
       duplicateOf.dataset.backlog = 'duplicate-of';
       duplicateOf.classList.add('mb-1', 'p-1', 'font-weight-bold');
-      duplicateOf.innerText = 'This performer is a duplicate of: ';
+
+      const label = document.createElement('span');
+      label.innerText = 'This performer is a duplicate of: ';
+      duplicateOf.appendChild(label);
+
       const a = makeLink(`/performers/${foundData.duplicate_of}`, foundData.duplicate_of, { color: 'var(--teal)' });
       a.target = '_blank';
       a.classList.add('font-weight-normal');

@@ -69,7 +69,10 @@ interface SceneDataObject extends Omit<BaseCache, "lastChecked"> {
 }
 
 interface PerformerDataObject extends Omit<BaseCache, "lastChecked"> {
-    duplicates?: string[];
+    duplicates?: {
+        ids: string[];
+        notes?: string[];
+    };
     duplicate_of?: string;
 }
 
