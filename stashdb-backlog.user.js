@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.16
+// @version     1.22.17
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2707,27 +2707,52 @@ async function inject() {
     const index = await Cache.getStoredDataIndex();
     if (!index) return;
 
+    /**
+     * @template {Element} E
+     * @param {E | undefined} v
+     * @returns {E[]}
+     */
+    const makeArray = (v) => Array.isArray(v) ? v : [v].filter(Boolean);
+
+    /** @type {Record<string, (body: HTMLDivElement) => HTMLAnchorElement[]>} */
+    const targetSelectors = {
+      // ModifyEdit
+      modify: (body) => makeArray(body.querySelector(':scope > .row:first-child a')),
+      // MergeEdit (sources / target)
+      merge: (body) => Array.from(body.querySelectorAll(':scope > .mb-4 .row:nth-child(-n+2) a')),
+      // DestroyEdit
+      destroy: (body) => makeArray(body.querySelector('h6 > a')),
+    };
+
     const cards = /** @type {HTMLDivElement[]} */ (Array.from(document.querySelectorAll(selector)));
     for (const card of cards) {
+      const operation = card.querySelector('.card-header h5').textContent.split(' ')[0];
+      if (!(operation in targetSelectors)) continue;
+
+      /** @type {HTMLDivElement} */
       const cardBody = card.querySelector('.card-body');
-      /** @type {HTMLAnchorElement} */
-      const targetLink = (cardBody.querySelector('h6 > a, :scope > .mb-4 .row:nth-child(2) a, :scope > .row:first-child a'));
-      if (!targetLink) continue;
-      const { ident, object } = parsePath(targetLink.href);
-      if (!isSupportedObject(object)) continue;
+      const targetLinks = targetSelectors[operation](cardBody);
+      if (targetLinks.length === 0) {
+        console.error('target link not found', cardBody);
+        continue;
+      }
+      targetLinks.forEach((targetLink) => {
+        const { ident, object } = parsePath(targetLink.href);
+        if (!isSupportedObject(object)) return;
 
-      const found = index[object][ident];
-      if (!found) continue;
-      const changes = found.slice(1);
+        const found = index[object][ident];
+        if (!found) return;
+        const changes = found.slice(1);
 
-      setStyles(targetLink, {
-        backgroundColor: 'var(--warning)',
-        padding: '.2rem',
-        fontWeight: '700',
-        maxWidth: 'max-content',
+        setStyles(targetLink, {
+          backgroundColor: 'var(--warning)',
+          padding: '.2rem',
+          fontWeight: '700',
+          maxWidth: 'max-content',
+        });
+        const type = object.slice(0, -1);
+        targetLink.title = `${type} is listed for:\n - ${changes.join('\n - ')}\n(click ${type} for more info)`;
       });
-      const type = object.slice(0, -1);
-      targetLink.title = `${type} is listed for:\n - ${changes.join('\n - ')}\n(click ${type} for more info)`;
     }
 
   } // iEditPage
