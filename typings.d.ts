@@ -20,34 +20,13 @@ interface FetchError {
     body: string | null;
 }
 
-interface BaseCache {
-    contentHash?: string;
-    lastUpdated?: string;
-    lastChecked?: string;
-}
-
-type DataIndexItem = [
-    contentHash: string,
-    ...keys: string[],
-]
-
-interface DataIndex extends Omit<BaseCache, "contentHash"> {
-    scenes: { [uuid: string]: DataIndexItem };
-    performers: { [uuid: string]: DataIndexItem };
-}
-
-type MutationDataIndex = {
-    scenes: { [uuid: string]: string };
-    performers: { [uuid: string]: string };
-}
-
 type SceneFingerprint = {
     algorithm: string;
     hash: string;
     correct_scene_id: string | null;
 }
 
-interface SceneDataObject extends Omit<BaseCache, "lastChecked"> {
+interface SceneDataObject {
     duplicates?: string[];
     duplicate_of?: string;
     title?: string;
@@ -68,24 +47,31 @@ interface SceneDataObject extends Omit<BaseCache, "lastChecked"> {
     comments?: string[];
 }
 
-interface PerformerDataObject extends Omit<BaseCache, "lastChecked"> {
+interface PerformerDataObject {
     duplicates?: {
         ids: string[];
         notes?: string[];
     };
     duplicate_of?: string;
+    split?: {}
 }
 
-interface DataCache {
+interface BaseCache {
+    lastUpdated?: string;
+    lastChecked?: string;
+}
+
+interface DataCache extends BaseCache {
     scenes: { [uuid: string]: SceneDataObject };
     performers: { [uuid: string]: PerformerDataObject };
 }
 
-type SupportedObject = Exclude<keyof DataIndex, keyof BaseCache> | keyof DataCache;
+type SupportedObject = Exclude<keyof DataCache, keyof BaseCache>
 
 type DataObject = DataCache[SupportedObject][string]
+type DataObjectKeys = keyof (SceneDataObject & PerformerDataObject)
 
-type MutationDataCache = {
+type MutationDataCache = BaseCache & {
     [cacheKey: string]: DataObject;
 }
 

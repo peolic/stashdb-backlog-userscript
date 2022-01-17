@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.18
+// @version     1.23.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -346,11 +346,11 @@ async function inject() {
     info.innerHTML = '';
     info.append(block('backlog data last updated:'));
 
-    const index = await Cache.getStoredDataIndex();
-    if (!index.lastUpdated) {
+    const storedData = await Cache.getStoredData();
+    if (!storedData.lastUpdated) {
       info.append(block('?', 'd-inline-block'));
     } else {
-      const { lastUpdated } = index;
+      const { lastUpdated } = storedData;
       const ago = humanRelativeDate(new Date(lastUpdated));
       info.append(
         block(ago, 'd-inline-block', 'mr-1'),
@@ -480,7 +480,7 @@ async function inject() {
 
   /**
    * @param {BaseCache} storedObject
-   * @param {string | number | Date} diff new content hash or max time in hours
+   * @param {number | Date} diff max time in hours or last updated date
    * @returns {boolean}
    */
   function shouldFetch(storedObject, diff) {
@@ -489,11 +489,6 @@ async function inject() {
     if (diff instanceof Date) {
       const { lastUpdated } = storedObject;
       return !lastUpdated || diff.getTime() > new Date(lastUpdated).getTime();
-    }
-
-    if (typeof diff === 'string') {
-      const { contentHash } = storedObject;
-      return !contentHash || contentHash !== diff;
     }
 
     if (typeof diff === 'number') {
@@ -539,25 +534,6 @@ async function inject() {
     static _PERFORMERS_DATA_KEY = 'stashdb_backlog_performers';
     static _LEGACY_DATA_KEY = 'stashdb_backlog';
 
-    /** @type {DataIndex | null} */
-    static _index = null;
-
-    /** @param {boolean} invalidate Force reload of stored index */
-    static async getStoredDataIndex(invalidate = false) {
-      if (!this._index || invalidate) {
-        this._index = /** @type {DataIndex} */ (await this._getValue(this._DATA_INDEX_KEY));
-      }
-      return this._index;
-    }
-    static async setDataIndex(/** @type {DataIndex} */ data) {
-      await this._setValue(this._DATA_INDEX_KEY, data);
-      this._index = data;
-    }
-    static async clearDataIndex() {
-      await this._deleteValue(this._DATA_INDEX_KEY);
-      this._index = null;
-    }
-
     /** @type {DataCache | null} */
     static _data = null;
 
@@ -566,8 +542,10 @@ async function inject() {
       if (!this._data || invalidate) {
         const scenes = /** @type {DataCache['scenes']} */ (await this._getValue(this._SCENES_DATA_KEY));
         const performers = /** @type {DataCache['performers']} */ (await this._getValue(this._PERFORMERS_DATA_KEY));
+        const cache = /** @type {BaseCache} */ (await this._getValue(this._DATA_INDEX_KEY));
+        const { lastChecked, lastUpdated } = cache;
         /** @type {DataCache} */
-        const dataCache = { scenes, performers };
+        const dataCache = { scenes, performers, lastChecked, lastUpdated };
         if (Object.values(scenes).length === 0 && Object.values(performers).length === 0) {
           const legacyCache = /** @type {MutationDataCache} */ (await this._getValue(this._LEGACY_DATA_KEY));
           this._data = await applyDataCacheMigrations(legacyCache);
@@ -578,14 +556,16 @@ async function inject() {
       return this._data;
     }
     static async setData(/** @type {DataCache} */ data) {
-      const { scenes, performers } = data;
+      const { scenes, performers, ...cache } = data;
       this._setValue(this._SCENES_DATA_KEY, scenes);
       this._setValue(this._PERFORMERS_DATA_KEY, performers);
+      this._setValue(this._DATA_INDEX_KEY, cache);
       this._data = data;
     }
     static async clearData() {
       await this._deleteValue(this._SCENES_DATA_KEY);
       await this._deleteValue(this._PERFORMERS_DATA_KEY);
+      await this._deleteValue(this._DATA_INDEX_KEY);
       this._data = null;
     }
 
@@ -625,14 +605,26 @@ async function inject() {
   } // Cache
 
   /**
+   * @template {DataObject} T
+   * @param {T} dataObject
+   * @returns {Array<keyof T>}
+   */
+  function dataObjectKeys(dataObject) {
+    return /** @type {Array<keyof T>} */ (Object.keys(dataObject));
+  }
+
+  /**
    * @param {MutationDataCache} legacyCache
    * @returns {Promise<DataCache>}
    */
   async function applyDataCacheMigrations(legacyCache) {
+    const { lastChecked, lastUpdated } = legacyCache;
     /** @type {DataCache} */
     const dataCache = {
       scenes: {},
       performers: {},
+      lastChecked,
+      lastUpdated,
     };
 
     // `scene/${uuid}` | `performer/${uuid}`
@@ -672,22 +664,14 @@ async function inject() {
   }
 
   async function fetchBacklogData() {
-    const getDataCache = async () => {
+    try {
+      setStatus(`[backlog] getting cache...`);
+
       /** @type {MutationDataCache} */
       const legacyCache = (await request(`${BASE_URL}/stashdb_backlog.json`, 'json'));
       const dataCache = await applyDataCacheMigrations(legacyCache);
       await Cache.setData(dataCache);
-    };
-    const getDataIndex = async () => {
-      /** @type {DataIndex} */
-      const indexCache = (await request(`${BASE_URL}/stashdb_backlog_index.json`, 'json'));
-      indexCache.lastChecked = new Date().toISOString();
-      await Cache.setDataIndex(indexCache);
-    };
 
-    try {
-      setStatus(`[backlog] getting cache...`);
-      await Promise.all([ getDataCache(), getDataIndex() ]);
       setStatus('[backlog] data updated', 5000);
       return 'UPDATED';
 
@@ -699,15 +683,15 @@ async function inject() {
   }
 
   async function updateBacklogData(forceCheck=false) {
-    const storedDataIndex = await Cache.getStoredDataIndex();
-    let updateData = shouldFetch(storedDataIndex, 1);
+    const storedData = await Cache.getStoredData();
+    let updateData = shouldFetch(storedData, 1);
     if (!dev && (forceCheck || updateData)) {
       try {
         // Only fetch if there really was an update
         setStatus(`[backlog] checking for updates`);
         const lastUpdated = await getDataLastUpdatedDate();
         if (lastUpdated) {
-          updateData = shouldFetch(storedDataIndex, lastUpdated);
+          updateData = shouldFetch(storedData, lastUpdated);
           console.debug(
             `[backlog] latest remote update: ${formatDate(lastUpdated)}`
             + ` - updating: ${updateData}`
@@ -720,8 +704,8 @@ async function inject() {
         return 'ERROR';
       } finally {
         // Store the last-checked timestamp as to not spam GitHub API
-        storedDataIndex.lastChecked = new Date().toISOString();
-        await Cache.setDataIndex(storedDataIndex);
+        storedData.lastChecked = new Date().toISOString();
+        await Cache.setData(storedData);
       }
     }
 
@@ -1056,11 +1040,7 @@ async function inject() {
     }
 
     const found = await getDataFor('scenes', sceneId);
-
-    if (!found) {
-      console.debug('[backlog] not found', sceneId);
-      return;
-    }
+    if (!found) return;
     console.debug('[backlog] found', found);
 
     const sceneHeader = /** @type {HTMLDivElement} */ (sceneInfo.querySelector(':scope > .card-header'));
@@ -1891,10 +1871,7 @@ async function inject() {
     }
 
     const found = await getDataFor('scenes', sceneId);
-    if (!found) {
-      console.debug('[backlog] not found', sceneId);
-      return;
-    }
+    if (!found) return;
     console.debug('[backlog] found', found);
 
     const StashDBContent = /** @type {HTMLDivElement} */ (document.querySelector('.StashDBContent'));
@@ -1959,8 +1936,6 @@ async function inject() {
       'image', 'fingerprints',
     ];
     sortedKeys(found, keySortOrder).forEach((field) => {
-      if (['contentHash'].includes(field)) return;
-
       const dt = document.createElement('dt');
       dt.innerText = field;
       pendingChanges.appendChild(dt);
@@ -2165,16 +2140,6 @@ async function inject() {
         return;
       }
 
-      if (field === 'lastUpdated') {
-        const hr = document.createElement('span');
-        hr.classList.add('mt-4');
-        hr.style.borderTopColor = 'initial';
-        dt.before(hr);
-        dt.innerText = 'data last fetched at';
-        dd.innerText = formatDate(found[field]);
-        return;
-      }
-
       // unmatched
       dd.innerText = found[field];
     });
@@ -2190,8 +2155,8 @@ async function inject() {
     const performerInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.performer-info', 1000));
     if (!performerInfo) return;
 
-    const index = await Cache.getStoredDataIndex();
-    if (!index) return;
+    const storedData = await Cache.getStoredData();
+    if (!storedData) return;
 
     highlightSceneCards('performers');
 
@@ -2223,11 +2188,10 @@ async function inject() {
       if (backlogDiv.querySelector('[data-backlog="scene-changes"]')) return;
 
       try {
-        const { scenes: storedScenes } = await Cache.getStoredData();
         /** @typedef {[sceneId: string, entry: PerformerEntry]} performerScene */
         /** @type {{ append: performerScene[], remove: performerScene[] }} */
         const performerScenes = { append: [], remove: [] };
-        for (const [sceneId, scene] of Object.entries(storedScenes)) {
+        for (const [sceneId, scene] of Object.entries(storedData.scenes)) {
           if (!scene.performers) continue;
           const { append, remove } = scene.performers;
           const appendEntry = append.find(({ id }) => id === performerId);
@@ -2322,13 +2286,12 @@ async function inject() {
       }
     })();
 
-    const found = index.performers[performerId];
-    if (!found) return;
-
-    const info = found.slice(1);
+    const foundData = await getDataFor('performers', performerId);
+    if (!foundData) return;
+    console.debug('[backlog] found', foundData);
 
     (function split() {
-      if (!info.includes('split')) return;
+      if (!foundData.split) return;
       if (backlogDiv.querySelector('[data-backlog="split"]')) return;
 
       const toSplit = document.createElement('div');
@@ -2357,16 +2320,9 @@ async function inject() {
       backlogDiv.append(toSplit);
     })();
 
-    const foundData = await getDataFor('performers', performerId);
-    if (!foundData) {
-      console.debug('[backlog] not found', performerId);
-      return;
-    }
-    console.debug('[backlog] found', foundData);
-
     const isMarkedForSplit = (/** @type {string} */ uuid) => {
-      const indexEntry = index.performers[uuid];
-      return indexEntry && indexEntry.includes('split');
+      const dataEntry = storedData.performers[uuid];
+      return dataEntry && !!dataEntry.split;
     };
 
     (function duplicates() {
@@ -2460,7 +2416,7 @@ async function inject() {
 
   /**
    * @param {AnyObject} object
-   * @param {string[]} changes
+   * @param {DataObjectKeys[]} changes
    * @returns {string}
    */
   const getHighlightStyle = (object, changes) => {
@@ -2484,8 +2440,8 @@ async function inject() {
       return;
     }
 
-    const index = await Cache.getStoredDataIndex();
-    if (!index) return;
+    const storedData = await Cache.getStoredData();
+    if (!storedData) return;
 
     const highlight = async () => {
       /** @type {HTMLDivElement[]} */
@@ -2496,9 +2452,9 @@ async function inject() {
         else markerDataset.backlogInjected = 'true';
 
         const sceneId = parsePath(card.querySelector('a').href).ident;
-        const found = index.scenes[sceneId];
+        const found = storedData.scenes[sceneId];
         if (!found) return;
-        const changes = found.slice(1);
+        const changes = dataObjectKeys(found);
         card.style.outline = getHighlightStyle('scenes', changes);
         sceneCard.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
 
@@ -2527,8 +2483,8 @@ async function inject() {
       return;
     }
 
-    const index = await Cache.getStoredDataIndex();
-    if (!index) return;
+    const storedData = await Cache.getStoredData();
+    if (!storedData) return;
 
     /** @type {HTMLDivElement[]} */
     (Array.from(document.querySelectorAll(selector))).forEach((card) => {
@@ -2537,9 +2493,9 @@ async function inject() {
       else markerDataset.backlogInjected = 'true';
 
       const performerId = parsePath(card.querySelector('a').href).ident;
-      const found = index.performers[performerId];
+      const found = storedData.performers[performerId];
       if (!found) return;
-      const changes = found.slice(1);
+      const changes = dataObjectKeys(found);
       card.style.outline = getHighlightStyle('performers', changes);
       const info = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
       card.title = info;
@@ -2555,8 +2511,8 @@ async function inject() {
       return;
     }
 
-    const index = await Cache.getStoredDataIndex();
-    if (!index) return;
+    const storedData = await Cache.getStoredData();
+    if (!storedData) return;
 
     /** @type {HTMLAnchorElement[]} */
     (Array.from(document.querySelectorAll(selector))).forEach((cardLink) => {
@@ -2567,9 +2523,9 @@ async function inject() {
       const { object, ident: uuid } = parsePath(cardLink.href);
       if (!isSupportedObject(object)) return;
 
-      const found = index[object][uuid];
+      const found = storedData[object][uuid];
       if (!found) return;
-      const changes = found.slice(1);
+      const changes = dataObjectKeys(found);
 
       if (changes) {
         const card = /** @type {HTMLDivElement} */ (cardLink.querySelector(':scope > .card'));
@@ -2587,7 +2543,7 @@ async function inject() {
   /**
    * Field-specific scene card highlighting
    * @param {HTMLDivElement} card
-   * @param {string[]} changes
+   * @param {DataObjectKeys[]} changes
    * @param {string} sceneId
    */
   async function sceneCardHighlightChanges(card, changes, sceneId) {
@@ -2712,8 +2668,8 @@ async function inject() {
     const selector = 'div:not([class]) > div.card';
     if (!await elementReadyIn(selector, 1000)) return;
 
-    const index = await Cache.getStoredDataIndex();
-    if (!index) return;
+    const storedData = await Cache.getStoredData();
+    if (!storedData) return;
 
     /**
      * @template {Element} E
@@ -2748,9 +2704,9 @@ async function inject() {
         const { ident, object } = parsePath(targetLink.href);
         if (!isSupportedObject(object)) return;
 
-        const found = index[object][ident];
+        const found = storedData[object][ident];
         if (!found) return;
-        const changes = found.slice(1);
+        const changes = dataObjectKeys(found);
 
         setStyles(targetLink, {
           backgroundColor: 'var(--warning)',
