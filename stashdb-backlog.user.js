@@ -21,7 +21,6 @@
 
 const dev = false;
 
-const eventPrefix = 'stashdb_backlog';
 const devUsernames = ['peolic', 'root'];
 
 async function inject() {
@@ -208,7 +207,7 @@ async function inject() {
     reactRouterHistory.listen(() => dispatcher());
     console.debug(`[backlog] hooked into react router`);
   } else {
-    window.addEventListener(`${eventPrefix}_locationchange`, () => dispatcher());
+    window.addEventListener(locationChanged, () => dispatcher());
   }
 
   setTimeout(dispatcher, 0, true);
@@ -221,7 +220,7 @@ async function inject() {
     const navLeft = await elementReadyIn('nav > :first-child', 1000);
     navLeft.after(statusDiv);
 
-    window.addEventListener(`${eventPrefix}_locationchange`, () => setStatus(''));
+    window.addEventListener(locationChanged, () => setStatus(''));
 
     new MutationObserver(() => {
       statusDiv.classList.toggle('d-none', !statusDiv.innerText);
@@ -1033,10 +1032,10 @@ async function inject() {
       const loc = parsePath();
       if (loc.object === object && loc.ident === uuid && !loc.action) return;
       el.remove();
-      window.removeEventListener(`${eventPrefix}_locationchange`, hook);
+      window.removeEventListener(locationChanged, hook);
     };
     // Hook to remove it
-    window.addEventListener(`${eventPrefix}_locationchange`, hook);
+    window.addEventListener(locationChanged, hook);
   };
 
   /**
@@ -1885,7 +1884,7 @@ async function inject() {
     const StashDBContent = /** @type {HTMLDivElement} */ (document.querySelector('.StashDBContent'));
     StashDBContent.style.maxWidth = '1600px';
     // Hook to the global style
-    window.addEventListener(`${eventPrefix}_locationchange`, () => {
+    window.addEventListener(locationChanged, () => {
       StashDBContent.style.maxWidth = '';
       if (StashDBContent.getAttribute('style') === '') StashDBContent.removeAttribute('style');
     }, { once: true });
@@ -2369,7 +2368,7 @@ async function inject() {
         Array.isArray(foundData.duplicates)
           ? { ids: foundData.duplicates, notes: undefined }
           : foundData.duplicates
-        );
+      );
 
       const hasDuplicates = document.createElement('div');
       hasDuplicates.dataset.backlog = 'duplicates';
@@ -2760,28 +2759,35 @@ async function inject() {
 }
 
 // Based on: https://dirask.com/posts/JavaScript-on-location-changed-event-on-url-changed-event-DKeyZj
-(function() {
+const locationChanged = (function() {
   const { pushState, replaceState } = history;
 
-  const eventPushState = new Event(`${eventPrefix}_pushstate`);
-  const eventReplaceState = new Event(`${eventPrefix}_replacestate`);
-  const eventLocationChange = new Event(`${eventPrefix}_locationchange`);
+  // @ts-expect-error
+  const prefix = GM.info.script.name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9 -]/g, '')
+    .replace(/\s+/g, '-');
 
-  history.pushState = function() {
-    pushState.apply(history, /** @type {*} */ (arguments));
-    window.dispatchEvent(eventPushState);
+  const eventLocationChange = new Event(`${prefix}$locationchange`);
+
+  history.pushState = function(...args) {
+    pushState.apply(history, args);
+    window.dispatchEvent(new Event(`${prefix}$pushstate`));
     window.dispatchEvent(eventLocationChange);
   }
 
-  history.replaceState = function() {
-    replaceState.apply(history, /** @type {*} */ (arguments));
-    window.dispatchEvent(eventReplaceState);
+  history.replaceState = function(...args) {
+    replaceState.apply(history, args);
+    window.dispatchEvent(new Event(`${prefix}$replacestate`));
     window.dispatchEvent(eventLocationChange);
   }
 
   window.addEventListener('popstate', function() {
     window.dispatchEvent(eventLocationChange);
   });
+
+  return eventLocationChange.type;
 })();
 
 // MIT Licensed
