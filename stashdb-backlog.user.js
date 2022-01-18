@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.22.17
+// @version     1.22.18
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1099,8 +1099,24 @@ async function inject() {
     if (!backlogDiv) {
       backlogDiv = document.createElement('div');
       backlogDiv.classList.add('scene-backlog');
+      setStyles(backlogDiv, {
+        maxWidth: 'fit-content',
+        minWidth: 'calc(50% - 15px)',
+        transition: 'background-color .5s',
+      });
       sceneInfo.before(backlogDiv);
       removeHook(backlogDiv, 'scenes', sceneId);
+
+      /** @type {HTMLDivElement} */
+      const actionsContainer = (sceneHeader.querySelector(':scope > .float-right'));
+      if (actionsContainer) {
+        actionsContainer.addEventListener('mouseover', () => {
+          backlogDiv.style.backgroundColor = '#8c2020';
+        });
+        actionsContainer.addEventListener('mouseout', () => {
+          backlogDiv.style.backgroundColor = '';
+        });
+      }
     }
 
     (function duplicates() {
@@ -2179,29 +2195,27 @@ async function inject() {
 
     highlightSceneCards('performers');
 
-    /** @type {HTMLElement[]} */
-    const highlightElements = [];
-
-    /** @type {HTMLDivElement} */
-    const header = (performerInfo.querySelector('.card-header'));
-    if (!header.dataset.injectedBacklog) {
-      header.dataset.injectedBacklog = 'true';
-
-      header.addEventListener('mouseover', () => {
-        highlightElements.forEach((el) => el.style.backgroundColor = '#8c2020');
-      });
-      header.addEventListener('mouseout', () => {
-        highlightElements.forEach((el) => el.style.backgroundColor = '');
-      });
-    }
-
     /** @type {HTMLDivElement} */
     let backlogDiv = (document.querySelector('.performer-backlog'));
     if (!backlogDiv) {
       backlogDiv = document.createElement('div');
       backlogDiv.classList.add('performer-backlog');
+      setStyles(backlogDiv, {
+        maxWidth: 'fit-content',
+        minWidth: 'calc(50% - 15px)',
+        transition: 'background-color .5s',
+      });
       performerInfo.prepend(backlogDiv);
       removeHook(backlogDiv, 'performers', performerId);
+
+      /** @type {HTMLDivElement} */
+      const header = (performerInfo.querySelector('.card-header'));
+      header.addEventListener('mouseover', () => {
+        backlogDiv.style.backgroundColor = '#8c2020';
+      });
+      header.addEventListener('mouseout', () => {
+        backlogDiv.style.backgroundColor = '';
+      });
     }
 
     // Performer scene changes based on cached data
@@ -2303,7 +2317,6 @@ async function inject() {
         emoji.innerText = '🎥';
         sceneChanges.prepend(emoji);
         backlogDiv.prepend(sceneChanges);
-        highlightElements.push(sceneChanges);
       } catch (error) {
         console.error(error);
       }
@@ -2321,7 +2334,6 @@ async function inject() {
       const toSplit = document.createElement('div');
       toSplit.dataset.backlog = 'split';
       toSplit.classList.add('mb-1', 'p-1', 'font-weight-bold');
-      toSplit.style.transition = 'background-color .5s';
 
       const backlogSheetId = '1067038397'; // Performers To Split Up
       const quickViewLink = makeLink(
@@ -2343,7 +2355,6 @@ async function inject() {
       emoji.innerText = '🔀';
       toSplit.prepend(emoji);
       backlogDiv.append(toSplit);
-      highlightElements.push(toSplit);
     })();
 
     const foundData = await getDataFor('performers', performerId);
@@ -2411,7 +2422,6 @@ async function inject() {
       emoji.innerText = '♊';
       hasDuplicates.prepend(emoji);
       backlogDiv.append(hasDuplicates);
-      highlightElements.push(hasDuplicates);
     })();
 
     (function duplicateOf() {
@@ -2436,7 +2446,6 @@ async function inject() {
       emoji.innerText = '♊';
       duplicateOf.prepend(emoji);
       backlogDiv.append(duplicateOf);
-      highlightElements.push(duplicateOf);
     })();
 
     // const markerDataset = performerInfo.dataset;
