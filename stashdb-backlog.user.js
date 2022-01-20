@@ -2770,40 +2770,98 @@ button.nav-link.backlog-flash {
     if (!foundData) return;
     console.debug('[backlog] found', foundData);
 
+    const isMarkedForSplit = (/** @type {string} */ uuid) => {
+      const dataEntry = storedData.performers[uuid];
+      return dataEntry && !!dataEntry.split;
+    };
+
     (function split() {
       if (!foundData.split) return;
       if (backlogDiv.querySelector('[data-backlog="split"]')) return;
+      const splitItem = foundData.split;
 
       const toSplit = document.createElement('div');
       toSplit.dataset.backlog = 'split';
       toSplit.classList.add('mb-1', 'p-1', 'fw-bold');
 
       const backlogSheetId = '1067038397'; // Performers To Split Up
-      const quickViewLink = makeLink(
-        backlogQuickViewURL(
-          backlogSheetId,
-          `select A,B,E,F,G,H,I,J,K,L,M,N,O,P where D="${performerId}" label A "Done", F "Notes"`,
-        ),
-        'quick view',
-        { color: 'var(--bs-teal)' },
-      );
       const sheetLink = makeLink(
         `${backlogSpreadsheet}/edit#gid=${backlogSheetId}`,
         'Performers To Split Up',
         { color: 'var(--bs-orange)' },
       );
-      toSplit.append('This performer is listed on ', sheetLink, '. (', quickViewLink, ')');
+      toSplit.append('This performer is listed on ', sheetLink, ':');
+
+      const performerName =
+        /** @type {HTMLElement[]} */
+        (Array.from(performerInfo.querySelectorAll('h3 > span, h3 > small')))
+          .map(e => e.innerText).join(' ');
+      if (performerName !== splitItem.name) {
+        const warning = document.createElement('span');
+        warning.classList.add('text-warning', 'fw-bold');
+        warning.innerText = `Unexpected performer name. Expected "${splitItem.name}".`;
+        toSplit.appendChild(warning);
+      }
+
+      if (splitItem.notes) {
+        const notes = document.createElement('div');
+        notes.style.marginLeft = '1.75rem';
+        notes.classList.add('fw-normal');
+        notes.innerText = splitItem.notes.join('\n');
+        toSplit.append(notes);
+      }
+
+      const shardsList = document.createElement('details');
+      shardsList.style.marginLeft = '1.5rem';
+      const summary = document.createElement('summary');
+      setStyles(summary, { color: 'tan', width: 'max-content' });
+      summary.innerText = `${splitItem.shards.length} shard${splitItem.shards.length === 1 ? '' : 's'}`;
+      shardsList.append(summary);
+
+      splitItem.shards.forEach((shard) => {
+        const shardEl = document.createElement('li');
+        shardEl.style.marginLeft = '2rem';
+
+        let shardName;
+        if (shard.id) {
+          shardName = makeLink(`/performers/${shard.id}`, shard.name, { color: 'var(--bs-teal)' });
+          shardName.target = '_blank';
+        } else {
+          shardName = document.createElement('span');
+          shardName.innerText = shard.name;
+        }
+        shardEl.appendChild(shardName);
+
+        if (shard.text) {
+          const text = document.createElement('span');
+          text.innerText = `: ${shard.text}`;
+          text.classList.add('fw-normal');
+          shardEl.appendChild(text);
+        }
+
+        if (shard.id && isMarkedForSplit(shard.id))
+          shardEl.append(' 🔀 needs to be split up');
+
+        const links = document.createElement('div');
+        (shard.links || []).forEach((url) => {
+          const siteName = (new URL(url)).hostname.split(/\./).slice(-2)[0];
+          const link = makeLink(url, `[${siteName}]`, { color: 'var(--bs-yellow)' });
+          link.classList.add('me-1');
+          link.title = url;
+          links.appendChild(link);
+        });
+        shardEl.appendChild(links);
+
+        shardsList.appendChild(shardEl);
+      });
+      toSplit.appendChild(shardsList);
+
       const emoji = document.createElement('span');
       emoji.classList.add('me-1');
       emoji.innerText = '🔀';
       toSplit.prepend(emoji);
       backlogDiv.append(toSplit);
     })();
-
-    const isMarkedForSplit = (/** @type {string} */ uuid) => {
-      const dataEntry = storedData.performers[uuid];
-      return dataEntry && !!dataEntry.split;
-    };
 
     (function duplicates() {
       if (!foundData.duplicates) return;

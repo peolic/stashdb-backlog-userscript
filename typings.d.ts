@@ -47,13 +47,25 @@ interface SceneDataObject {
     comments?: string[];
 }
 
+interface SplitShard {
+    id: string | null;
+    name: string;
+    text?: string;
+    links?: string[];
+    notes?: string[];
+}
+
 interface PerformerDataObject {
     duplicates?: {
         ids: string[];
         notes?: string[];
     };
     duplicate_of?: string;
-    split?: {}
+    split?: {
+        name: string;
+        shards: SplitShard[];
+        notes?: string[];
+    };
 }
 
 interface BaseCache {
