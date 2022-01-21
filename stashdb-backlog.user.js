@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.1
+// @version     1.24.2
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1214,7 +1214,7 @@ button.nav-link.backlog-flash {
       backlogDiv = document.createElement('div');
       backlogDiv.classList.add('scene-backlog');
       setStyles(backlogDiv, {
-        maxWidth: 'min-content',
+        maxWidth: 'max-content',
         minWidth: 'calc(50% - 15px)',
         transition: 'background-color .5s',
       });
@@ -2671,7 +2671,7 @@ button.nav-link.backlog-flash {
       backlogDiv = document.createElement('div');
       backlogDiv.classList.add('performer-backlog', 'mb-2');
       setStyles(backlogDiv, {
-        maxWidth: 'min-content',
+        maxWidth: 'max-content',
         minWidth: 'calc(50% - 15px)',
         transition: 'background-color .5s',
       });
