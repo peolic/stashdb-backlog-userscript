@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.2
+// @version     1.24.3
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -189,6 +189,10 @@ async function inject() {
           await iEditCards();
         }
         return;
+      }
+
+      if (ident && action === 'merge') {
+        return await iPerformerMergePage(ident);
       }
     }
 
@@ -2980,6 +2984,151 @@ button.nav-link.backlog-flash {
 
     // markerDataset.backlogInjected = 'true';
   } // iPerformerPage
+
+  // =====
+
+  /**
+   * @param {string} performerId
+   */
+   async function iPerformerMergePage(performerId) {
+    const performerMerge = /** @type {HTMLDivElement} */ (await elementReadyIn('.PerformerMerge', 1000));
+    if (!performerMerge) return;
+
+    const performerSelect = /** @type {HTMLDivElement} */ (performerMerge.querySelector('.PerformerSelect'));
+
+    const storedData = await Cache.getStoredData();
+    if (!storedData) return;
+
+    /** @type {HTMLDivElement} */
+    let backlogDiv = (document.querySelector('.performer-backlog'));
+    if (!backlogDiv) {
+      backlogDiv = document.createElement('div');
+      backlogDiv.classList.add('performer-backlog', 'mb-2');
+      setStyles(backlogDiv, {
+        maxWidth: 'max-content',
+        minWidth: 'calc(50% - 15px)',
+        transition: 'background-color .5s',
+      });
+      const target = performerMerge.querySelector(':scope > .row > .col-6:last-child');
+      target.prepend(backlogDiv);
+      removeHook(backlogDiv, 'performers', performerId);
+
+      performerSelect.addEventListener('mouseover', () => {
+        backlogDiv.style.backgroundColor = '#8c2020';
+      });
+      performerSelect.addEventListener('mouseout', () => {
+        backlogDiv.style.backgroundColor = '';
+      });
+    }
+
+    const foundData = await getDataFor('performers', performerId);
+    if (!foundData) return;
+    console.debug('[backlog] found', foundData);
+
+    const isMarkedForSplit = (/** @type {string} */ uuid) => {
+      const dataEntry = storedData.performers[uuid];
+      return dataEntry && !!dataEntry.split;
+    };
+
+    (function duplicates() {
+      if (!foundData.duplicates) return;
+      if (backlogDiv.querySelector('[data-backlog="duplicates"]')) return;
+
+      // backwards compatible
+      /** @type {PerformerDataObject['duplicates']} */
+      const { ids, notes } = (
+        Array.isArray(foundData.duplicates)
+          ? { ids: foundData.duplicates, notes: undefined }
+          : foundData.duplicates
+      );
+
+      /** @param {string} uuid */
+      const addPerformer = async (uuid) => {
+        /** @type {HTMLInputElement} */
+        const fieldEl = (performerSelect.querySelector('input'));
+        setNativeValue(fieldEl, uuid);
+        const result = /** @type {HTMLDivElement | null} */ (await elementReadyIn('.react-select__option', 2000, performerSelect));
+        if (result) result.click();
+      };
+
+      const hasDuplicates = document.createElement('div');
+      hasDuplicates.dataset.backlog = 'duplicates';
+      hasDuplicates.classList.add('mb-1', 'p-1', 'fw-bold');
+
+      const label = document.createElement('span');
+      label.innerText = 'This performer has duplicates:';
+      hasDuplicates.appendChild(label);
+
+      (notes || []).forEach((note) => {
+        if (/^https?:/.test(note)) {
+          const siteName = (new URL(note)).hostname.split(/\./).slice(-2)[0];
+          const link = makeLink(note, `[${siteName}]`, { color: 'var(--bs-yellow)' });
+          link.classList.add('ms-1');
+          link.title = note;
+          hasDuplicates.appendChild(link);
+        } else {
+          if (!label.title) {
+            label.append(' 📝');
+            setStyles(label, {
+              textDecoration: 'underline dotted currentColor 2px',
+              cursor: 'help',
+            });
+          }
+          label.title += (label.title ? '\n' : '') + note;
+        }
+      });
+
+      ids.forEach((dupId) => {
+        hasDuplicates.append(document.createElement('br'));
+
+        const add = document.createElement('span');
+        setStyles(add, { marginLeft: '1.5rem', marginRight: '0.5rem', cursor: 'pointer' });
+        add.innerText = '\u{2795}';
+        add.addEventListener('click', () => {
+          addPerformer(dupId);
+        });
+        hasDuplicates.append(add);
+
+        const a = makeLink(`/performers/${dupId}`, dupId, { color: 'var(--bs-teal)' });
+        a.target = '_blank';
+        a.classList.add('fw-normal');
+        hasDuplicates.append(a);
+
+        if (isMarkedForSplit(dupId)) a.after(' 🔀 needs to be split up');
+      });
+      const emoji = document.createElement('span');
+      emoji.classList.add('me-1');
+      emoji.innerText = '♊';
+      hasDuplicates.prepend(emoji);
+      backlogDiv.append(hasDuplicates);
+    })();
+
+    (function duplicateOf() {
+      if (!foundData.duplicate_of) return;
+      if (backlogDiv.querySelector('[data-backlog="duplicate-of"]')) return;
+
+      const duplicateOf = document.createElement('div');
+      duplicateOf.dataset.backlog = 'duplicate-of';
+      duplicateOf.classList.add('mb-1', 'p-1', 'fw-bold');
+
+      const label = document.createElement('span');
+      label.innerText = 'This performer is a duplicate of: ';
+      duplicateOf.appendChild(label);
+
+      const a = makeLink(`/performers/${foundData.duplicate_of}`, foundData.duplicate_of, { color: 'var(--bs-teal)' });
+      a.target = '_blank';
+      a.classList.add('fw-normal');
+      duplicateOf.append(a);
+      if (isMarkedForSplit(foundData.duplicate_of)) a.after(' 🔀 needs to be split up');
+      const emoji = document.createElement('span');
+      emoji.classList.add('me-1');
+      emoji.innerText = '♊';
+      duplicateOf.prepend(emoji);
+      backlogDiv.append(duplicateOf);
+    })();
+  } // iPerformerMergePage
+
+  // =====
 
   async function iHomePage() {
     if (document.querySelector('main > .LoadingIndicator')) {
