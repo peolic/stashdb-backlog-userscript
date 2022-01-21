@@ -68,6 +68,13 @@ interface PerformerDataObject {
     };
 }
 
+interface PerformerScenes {
+    [uuid: string]: Array<{
+        sceneId: string;
+        action: keyof SceneDataObject["performers"];
+    }>;
+}
+
 interface BaseCache {
     lastUpdated?: string;
     lastChecked?: string;
@@ -81,7 +88,16 @@ interface DataCache extends BaseCache {
 type SupportedObject = Exclude<keyof DataCache, keyof BaseCache>
 
 type DataObject = DataCache[SupportedObject][string]
-type DataObjectKeys = keyof (SceneDataObject & PerformerDataObject)
+
+type ObjectKeys = {
+    performers: keyof PerformerDataObject | "scenes"
+    scenes: keyof SceneDataObject
+}
+
+type DataObjectKeys<T extends DataObject> =
+    T extends PerformerDataObject ? ObjectKeys["performers"] :
+    T extends SceneDataObject ? ObjectKeys["scenes"] :
+    never;
 
 type MutationDataCache = BaseCache & {
     [cacheKey: string]: DataObject;

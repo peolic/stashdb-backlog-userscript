@@ -606,6 +606,8 @@ button.nav-link.backlog-flash {
 
     /** @type {DataCache | null} */
     static _data = null;
+    /** @type {PerformerScenes | null} */
+    static _performerScenes = null;
 
     /** @param {boolean} invalidate Force reload of stored data */
     static async getStoredData(invalidate = false) {
@@ -622,6 +624,7 @@ button.nav-link.backlog-flash {
         } else {
           this._data = dataCache;
         }
+        this._performerScenes = this._generatePerformerScenes();
       }
       return this._data;
     }
@@ -637,6 +640,33 @@ button.nav-link.backlog-flash {
       await this._deleteValue(this._PERFORMERS_DATA_KEY);
       await this._deleteValue(this._DATA_INDEX_KEY);
       this._data = null;
+      this._performerScenes = null;
+    }
+
+    static _generatePerformerScenes() {
+      if (!this._data) return null;
+      /** @type {PerformerScenes} */
+      const result = {};
+      for (const [sceneId, scene] of Object.entries(this._data.scenes)) {
+        if (!scene.performers) continue;
+        for (const [actionStr, entries] of Object.entries(scene.performers)) {
+          const action = /** @type {keyof SceneDataObject["performers"]} */ (actionStr);
+          for (const entry of entries) {
+            if (!entry.id) continue;
+            if (!result[entry.id]) result[entry.id] = [];
+            result[entry.id].push({ sceneId, action });
+          }
+        }
+      }
+      return result;
+    }
+
+    /**
+     * @param {string} performerId
+     */
+    static performerScenes(performerId) {
+      if (!this._performerScenes) throw new Error('No performer-scenes data');
+      return this._performerScenes[performerId] ?? [];
     }
 
     // ===
@@ -677,10 +707,10 @@ button.nav-link.backlog-flash {
   /**
    * @template {DataObject} T
    * @param {T} dataObject
-   * @returns {Array<keyof T>}
+   * @returns {DataObjectKeys<T>[]}
    */
   function dataObjectKeys(dataObject) {
-    return /** @type {Array<keyof T>} */ (Object.keys(dataObject));
+    return /** @type {DataObjectKeys<T>[]} */ (Object.keys(dataObject));
   }
 
   /**
@@ -2664,22 +2694,23 @@ button.nav-link.backlog-flash {
     }
 
     // Performer scene changes based on cached data
-    (async function sceneChanges() {
+    (function sceneChanges() {
       if (backlogDiv.querySelector('[data-backlog="scene-changes"]')) return;
 
       try {
         /** @typedef {[sceneId: string, entry: PerformerEntry]} performerScene */
         /** @type {{ append: performerScene[], remove: performerScene[] }} */
         const performerScenes = { append: [], remove: [] };
-        for (const [sceneId, scene] of Object.entries(storedData.scenes)) {
-          if (!scene.performers) continue;
+
+        for (const { sceneId, action } of Cache.performerScenes(performerId)) {
+          const scene = storedData.scenes[sceneId];
+
           const { append, remove } = scene.performers;
-          const appendEntry = append.find(({ id }) => id === performerId);
-          if (appendEntry) {
+          if (action === 'append') {
+            const appendEntry = append.find(({ id }) => id === performerId);
             performerScenes.append.push([sceneId, appendEntry]);
-          }
-          const removeEntry = remove.find(({ id }) => id === performerId);
-          if (removeEntry) {
+          } else if (action === 'remove') {
+            const removeEntry = remove.find(({ id }) => id === performerId);
             const targetEntry = append.find(({ appearance, name }) => {
               if (appearance) return [appearance, name].includes(removeEntry.name);
               return name.split(/\b/)[0] === removeEntry.name.split(/\b/)[0];
@@ -2965,8 +2996,9 @@ button.nav-link.backlog-flash {
   // =====
 
   /**
-   * @param {AnyObject} object
-   * @param {DataObjectKeys[]} changes
+   * @template {SupportedObject} T
+   * @param {T} object
+   * @param {ObjectKeys[T][]} changes
    * @returns {string}
    */
   const getHighlightStyle = (object, changes) => {
@@ -2977,6 +3009,9 @@ button.nav-link.backlog-flash {
       }
       if (changes[0] === 'fingerprints') {
         return `${style} var(--bs-cyan)`;
+      }
+      if (changes[0] === 'scenes') {
+        return `${style} var(--bs-green)`;
       }
     }
     return `${style} var(--bs-yellow)`;
@@ -3077,8 +3112,11 @@ button.nav-link.backlog-flash {
 
       const performerId = parsePath(card.querySelector('a').href).ident;
       const found = storedData.performers[performerId];
-      if (!found) return;
-      const changes = dataObjectKeys(found);
+      const changes = dataObjectKeys(found || {});
+      if (Cache.performerScenes(performerId).length > 0)
+        changes.push('scenes');
+      if (changes.length === 0)
+        return;
       card.style.outline = getHighlightStyle('performers', changes);
       const info = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
       card.title = info;
@@ -3107,15 +3145,22 @@ button.nav-link.backlog-flash {
       if (!isSupportedObject(object)) return;
 
       const found = storedData[object][uuid];
-      if (!found) return;
-      const changes = dataObjectKeys(found);
+      const changes = dataObjectKeys(found || {});
+      if (object === 'performers') {
+        if (Cache.performerScenes(uuid).length > 0)
+          changes.push('scenes');
+      }
+
+      if (changes.length === 0)
+        return;
 
       if (changes) {
         const card = /** @type {HTMLDivElement} */ (cardLink.querySelector(':scope > .card'));
         card.style.outline = getHighlightStyle(object, changes);
         if (object === 'scenes') {
-          cardLink.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
-          sceneCardHighlightChanges(card, changes, uuid);
+          const sceneChanges = /** @type {ObjectKeys["scenes"][]} */ (changes);
+          cardLink.title = `<pending> changes to:\n - ${sceneChanges.join('\n - ')}\n(click scene to view changes)`;
+          sceneCardHighlightChanges(card, sceneChanges, uuid);
         } else if (object === 'performers') {
           cardLink.title = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
         }
@@ -3126,7 +3171,7 @@ button.nav-link.backlog-flash {
   /**
    * Field-specific scene card highlighting
    * @param {HTMLDivElement} card
-   * @param {DataObjectKeys[]} changes
+   * @param {ObjectKeys["scenes"][]} changes
    * @param {string} sceneId
    */
   async function sceneCardHighlightChanges(card, changes, sceneId) {
@@ -3291,8 +3336,11 @@ button.nav-link.backlog-flash {
         if (!isSupportedObject(object)) return;
 
         const found = storedData[object][ident];
-        if (!found) return;
-        const changes = dataObjectKeys(found);
+        const changes = dataObjectKeys(found || {});
+        if (Cache.performerScenes(ident).length > 0)
+          changes.push('scenes');
+        if (changes.length === 0)
+          return;
 
         setStyles(targetLink, {
           backgroundColor: 'var(--bs-warning)',
