@@ -2611,7 +2611,7 @@ button.nav-link.backlog-flash {
 
         // URLs from comments
         const dtLinks = document.createElement('dt');
-        dtLinks.innerText = 'links from comments';
+        dtLinks.innerText = 'links from comments:';
         const ddLinks = document.createElement('dd');
 
         found.comments.forEach((comment) => {
@@ -3526,6 +3526,7 @@ button.nav-link.backlog-flash {
     scenes.appendChild(subTitle);
 
     const scenesList = document.createElement('ul');
+    scenesList.classList.add('list-unstyled', 'ps-2');
     scenes.appendChild(scenesList);
 
     window.addEventListener(locationChanged, () => scenes.remove(), { once: true });
@@ -3591,8 +3592,13 @@ button.nav-link.backlog-flash {
       list.forEach(([sceneId, sceneData]) => {
         const row = document.createElement('li');
 
-        const link = makeLink(`/scenes/${sceneId}`, sceneId);
+        const view = makeLink(`/scenes/${sceneId}`, '⭕');
+        view.classList.add('me-1', 'text-decoration-none');
+        view.title = 'View scene';
+
+        const link = makeLink(`/scenes/${sceneId}/edit`, sceneId);
         link.classList.add('font-monospace', 'text-decoration-underline');
+        link.title = 'Edit scene';
 
         const sep = document.createElement('span');
         sep.classList.add('mx-2');
@@ -3602,7 +3608,7 @@ button.nav-link.backlog-flash {
           .map((k) => k === 'performers' ? `${Object.values(sceneData.performers).flat().length}x ${k}` : k)
           .join(', ');
 
-        row.append(link, sep, keys);
+        row.append(view, link, sep, keys);
         scenesList.appendChild(row);
       });
     };
