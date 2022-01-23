@@ -2043,13 +2043,14 @@ button.nav-link.backlog-flash {
     /** @param {HTMLElement | string} fieldOrText */
     const getTabButton = (fieldOrText) => {
       /** @type {HTMLButtonElement[]} */
-      const buttons = (Array.from(sceneForm.querySelectorAll('ul.nav button.nav-link')));
+      const buttons = (Array.from(document.querySelectorAll('form ul.nav button.nav-link')));
 
       if (typeof fieldOrText === 'string') {
         return buttons.find((btn) => btn.textContent.trim() === fieldOrText);
       }
 
-      const index = sceneFormTabs.indexOf(fieldOrText.closest('.SceneForm > .tab-content > *'));
+      const tabContent = fieldOrText.closest('form > .tab-content > *');
+      const index = Array.prototype.indexOf.call(tabContent.parentElement.children, tabContent);
       const button = buttons[index];
       if (!button) throw new Error('tab button not found');
       return button;
@@ -2057,7 +2058,7 @@ button.nav-link.backlog-flash {
 
     /** @param {HTMLElement} fieldEl */
     const flashField = (fieldEl) => {
-      const activeTabButton = sceneForm.querySelector('ul.nav button.nav-link.active');
+      const activeTabButton = document.querySelector('form ul.nav button.nav-link.active');
       const fieldTabButton = getTabButton(fieldEl);
       const tabFlash = activeTabButton !== fieldTabButton && !fieldTabButton.classList.contains('backlog-flash');
 
@@ -2098,7 +2099,7 @@ button.nav-link.backlog-flash {
 
     /** @param {string} site */
     const getLinkBySiteType = (site) =>
-      Array.from(sceneForm.querySelectorAll('.URLInput > ul > li > .input-group'))
+      Array.from(document.querySelectorAll('form .URLInput > ul > li > .input-group'))
         .map(({ children }) => ({
           remove: () => /** @type {HTMLButtonElement} */ (children[0]).click(),
           type: /** @type {HTMLSpanElement} */ (children[1]).textContent,
@@ -2121,7 +2122,7 @@ button.nav-link.backlog-flash {
         link.remove();
       }
 
-      const linksContainer = /** @type {HTMLDivElement} */ (sceneForm.querySelector('.URLInput'));
+      const linksContainer = /** @type {HTMLDivElement} */ (document.querySelector('form .URLInput'));
       const urlInput = linksContainer.querySelector(':scope > .input-group');
       const typeSelect = /** @type {HTMLSelectElement} */ (urlInput.children[1]);
       const inputField = /** @type {HTMLInputElement} */ (urlInput.children[2]);
