@@ -2111,7 +2111,7 @@ button.nav-link.backlog-flash {
      * @param {string} url
      * @param {boolean} [replace=false]
      */
-    const addLink = async (site, url, replace = false) => {
+    const addSiteURL = async (site, url, replace = false) => {
       const link = getLinkBySiteType(site);
 
       if (link) {
@@ -2445,7 +2445,7 @@ button.nav-link.backlog-flash {
         const set = document.createElement('a');
         set.innerText = 'set field';
         setStyles(set, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer' });
-        set.addEventListener('click', () => addLink('Studio', studioUrl, true));
+        set.addEventListener('click', () => addSiteURL('Studio', studioUrl, true));
         dt.innerText += ':';
         dt.append(set);
         return;
@@ -2632,7 +2632,7 @@ button.nav-link.backlog-flash {
           set.innerText = `add ${site} link`;
           set.classList.add('fw-bold');
           setStyles(set, { color: 'var(--bs-yellow)', cursor: 'pointer' });
-          set.addEventListener('click', () => addLink(site, comment, true));
+          set.addEventListener('click', () => addSiteURL(site, comment, true));
           container.append(set, ':');
           const link = makeLink(comment);
           link.style.marginLeft = '.5rem';
