@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.3
+// @version     1.24.4
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1068,6 +1068,80 @@ button.nav-link.backlog-flash {
     );
   }
 
+  /** @param {HTMLElement | string} fieldOrText */
+  const getTabButton = (fieldOrText) => {
+    /** @type {HTMLButtonElement[]} */
+    const buttons = (Array.from(document.querySelectorAll('form ul.nav button.nav-link')));
+
+    if (typeof fieldOrText === 'string') {
+      return buttons.find((btn) => btn.textContent.trim() === fieldOrText);
+    }
+
+    const tabContent = fieldOrText.closest('form > .tab-content > *');
+    const index = Array.prototype.indexOf.call(tabContent.parentElement.children, tabContent);
+    const button = buttons[index];
+    if (!button) throw new Error('tab button not found');
+    return button;
+  };
+
+  /** @param {HTMLElement} fieldEl */
+  const flashField = (fieldEl) => {
+    const activeTabButton = document.querySelector('form ul.nav button.nav-link.active');
+    const fieldTabButton = getTabButton(fieldEl);
+    const tabFlash = activeTabButton !== fieldTabButton && !fieldTabButton.classList.contains('backlog-flash');
+
+    fieldEl.classList.add('backlog-flash');
+    if (tabFlash)
+      fieldTabButton.classList.add('backlog-flash');
+    setTimeout(() => {
+      fieldEl.classList.remove('backlog-flash');
+      if (tabFlash)
+        fieldTabButton.classList.remove('backlog-flash');
+    }, 1500);
+  };
+
+  /** @param {string} site */
+  const getLinkBySiteType = (site) =>
+    Array.from(document.querySelectorAll('form .URLInput > ul > li > .input-group'))
+      .map(({ children }) => ({
+        remove: () => /** @type {HTMLButtonElement} */ (children[0]).click(),
+        type: /** @type {HTMLSpanElement} */ (children[1]).textContent,
+        value: /** @type {HTMLSpanElement} */ (children[2]).textContent,
+      }))
+      .find((l) => l.type === site);
+
+  /**
+   * @param {string} site
+   * @param {string} url
+   * @param {boolean} [replace=false]
+   */
+  const addSiteURL = async (site, url, replace = false) => {
+    const link = getLinkBySiteType(site);
+
+    if (link) {
+      if (!replace && link.value === url) {
+        return alert('studio url already correct');
+      }
+      link.remove();
+    }
+
+    const linksContainer = /** @type {HTMLDivElement} */ (document.querySelector('form .URLInput'));
+    const urlInput = linksContainer.querySelector(':scope > .input-group');
+    const typeSelect = /** @type {HTMLSelectElement} */ (urlInput.children[1]);
+    const inputField = /** @type {HTMLInputElement} */ (urlInput.children[2]);
+    const addButton = /** @type {HTMLButtonElement} */ (urlInput.children[3]);
+    const linkTypeStudio = Array.from(typeSelect.options).find((o) => o.text === site).value;
+    setNativeValue(typeSelect, linkTypeStudio);
+    setNativeValue(inputField, url);
+    if (addButton.disabled) {
+      getTabButton(addButton).click();
+      return alert('unable to add url (add button disabled)');
+    }
+    addButton.click();
+    const newLink = /** @type {HTMLDivElement} */ (linksContainer.querySelector(':scope > ul > li:last-child > .input-group'));
+    flashField(newLink);
+  };
+
   /**
    * @template T
    * @param {T} obj
@@ -2040,38 +2114,6 @@ button.nav-link.backlog-flash {
       return span;
     };
 
-    /** @param {HTMLElement | string} fieldOrText */
-    const getTabButton = (fieldOrText) => {
-      /** @type {HTMLButtonElement[]} */
-      const buttons = (Array.from(document.querySelectorAll('form ul.nav button.nav-link')));
-
-      if (typeof fieldOrText === 'string') {
-        return buttons.find((btn) => btn.textContent.trim() === fieldOrText);
-      }
-
-      const tabContent = fieldOrText.closest('form > .tab-content > *');
-      const index = Array.prototype.indexOf.call(tabContent.parentElement.children, tabContent);
-      const button = buttons[index];
-      if (!button) throw new Error('tab button not found');
-      return button;
-    };
-
-    /** @param {HTMLElement} fieldEl */
-    const flashField = (fieldEl) => {
-      const activeTabButton = document.querySelector('form ul.nav button.nav-link.active');
-      const fieldTabButton = getTabButton(fieldEl);
-      const tabFlash = activeTabButton !== fieldTabButton && !fieldTabButton.classList.contains('backlog-flash');
-
-      fieldEl.classList.add('backlog-flash');
-      if (tabFlash)
-        fieldTabButton.classList.add('backlog-flash');
-      setTimeout(() => {
-        fieldEl.classList.remove('backlog-flash');
-        if (tabFlash)
-          fieldTabButton.classList.remove('backlog-flash');
-      }, 1500);
-    };
-
     /**
      * @param {HTMLElement} field
      * @param {string} fieldName
@@ -2095,48 +2137,6 @@ button.nav-link.backlog-flash {
       });
       field.innerText += ':';
       field.append(set);
-    };
-
-    /** @param {string} site */
-    const getLinkBySiteType = (site) =>
-      Array.from(document.querySelectorAll('form .URLInput > ul > li > .input-group'))
-        .map(({ children }) => ({
-          remove: () => /** @type {HTMLButtonElement} */ (children[0]).click(),
-          type: /** @type {HTMLSpanElement} */ (children[1]).textContent,
-          value: /** @type {HTMLSpanElement} */ (children[2]).textContent,
-        }))
-        .find((l) => l.type === site);
-
-    /**
-     * @param {string} site
-     * @param {string} url
-     * @param {boolean} [replace=false]
-     */
-    const addSiteURL = async (site, url, replace = false) => {
-      const link = getLinkBySiteType(site);
-
-      if (link) {
-        if (!replace && link.value === url) {
-          return alert('studio url already correct');
-        }
-        link.remove();
-      }
-
-      const linksContainer = /** @type {HTMLDivElement} */ (document.querySelector('form .URLInput'));
-      const urlInput = linksContainer.querySelector(':scope > .input-group');
-      const typeSelect = /** @type {HTMLSelectElement} */ (urlInput.children[1]);
-      const inputField = /** @type {HTMLInputElement} */ (urlInput.children[2]);
-      const addButton = /** @type {HTMLButtonElement} */ (urlInput.children[3]);
-      const linkTypeStudio = Array.from(typeSelect.options).find((o) => o.text === site).value;
-      setNativeValue(typeSelect, linkTypeStudio);
-      setNativeValue(inputField, url);
-      if (addButton.disabled) {
-        getTabButton(addButton).click();
-        return alert('unable to add url (add button disabled)');
-      }
-      addButton.click();
-      const newLink = /** @type {HTMLDivElement} */ (linksContainer.querySelector(':scope > ul > li:last-child > .input-group'));
-      flashField(newLink);
     };
 
     const keySortOrder = [
@@ -3031,6 +3031,9 @@ button.nav-link.backlog-flash {
       return dataEntry && !!dataEntry.split;
     };
 
+    /** @type {string[]} */
+    const profiles = [];
+
     (function duplicates() {
       if (!foundData.duplicates) return;
       if (backlogDiv.querySelector('[data-backlog="duplicates"]')) return;
@@ -3067,6 +3070,7 @@ button.nav-link.backlog-flash {
           link.classList.add('ms-1');
           link.title = note;
           hasDuplicates.appendChild(link);
+          profiles.push(note);
         } else {
           if (!label.title) {
             label.append(' 📝');
@@ -3127,6 +3131,45 @@ button.nav-link.backlog-flash {
       duplicateOf.prepend(emoji);
       backlogDiv.append(duplicateOf);
     })();
+
+    (async function profileUrls() {
+      await elementReady('.PerformerForm', performerMerge);
+
+      const list = document.createElement('ul');
+      setStyles(list, {
+        listStyle: 'square inside',
+        paddingLeft: '0.5rem',
+      });
+
+      profiles.forEach((url) => {
+        /** @type {string} */
+        let site;
+        if (/iafd\.com\/person\.rme\/perfid=/.test(url)) {
+          site = 'IAFD';
+        } else if (/indexxx\.com\/m\//.test(url)) {
+          site = 'Indexxx';
+        } else if (/thenude\.com\/.*?_\d+.htm/.test(url)) {
+          site = 'theNude';
+        } else {
+          return;
+        }
+        const li = document.createElement('li');
+        li.classList.add('text-truncate');
+        const set = document.createElement('a');
+        set.innerText = `add ${site} profile link`;
+        set.classList.add('fw-bold');
+        setStyles(set, { color: 'var(--bs-yellow)', cursor: 'pointer' });
+        set.addEventListener('click', () => addSiteURL(site, url, true));
+        li.append(set, ':');
+        const link = makeLink(url);
+        link.style.marginLeft = '.5rem';
+        li.appendChild(link);
+        list.appendChild(li);
+      });
+
+      backlogDiv.appendChild(list);
+  })();
+
   } // iPerformerMergePage
 
   // =====
