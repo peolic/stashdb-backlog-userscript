@@ -3491,8 +3491,15 @@ button.nav-link.backlog-flash {
         if (changes.length === 0)
           return;
 
+        let backgroundColor = 'var(--bs-warning)';
+        if (changes.length === 1) {
+          if (changes[0] === 'scenes') {
+            backgroundColor = 'var(--bs-green)';
+          }
+        }
+
         setStyles(targetLink, {
-          backgroundColor: 'var(--bs-warning)',
+          backgroundColor,
           padding: '.2rem',
           fontWeight: '700',
           maxWidth: 'max-content',
