@@ -2698,6 +2698,33 @@ button.nav-link.backlog-flash {
       }
     }
 
+    (function performerLinks() {
+      if (!isDev) return;
+
+      const header = performerInfo.querySelector('.card-header');
+      if (header.querySelector('[data-backlog="links"]')) return;
+
+      /** @type {{ urls: ScenePerformance_URL[] }} */
+      const performerFiber = getReactFiber(performerInfo)?.return?.memoizedProps?.performer;
+      if (!performerFiber) return;
+
+      const links = document.createElement('div');
+      links.classList.add('ms-auto');
+      links.dataset.backlog = 'links';
+      header.appendChild(links);
+
+      links.append(...performerFiber.urls.map((url) => {
+        const icon = document.createElement('img');
+        icon.classList.add('SiteLink-icon', 'me-0', 'ms-1');
+        icon.src = url.site.icon;
+        icon.alt = '';
+        const a = makeLink(url.url, '');
+        a.classList.add('SiteLink');
+        a.appendChild(icon);
+        return a;
+      }));
+    })();
+
     // Performer scene changes based on cached data
     (function sceneChanges() {
       if (backlogDiv.querySelector('[data-backlog="scene-changes"]')) return;

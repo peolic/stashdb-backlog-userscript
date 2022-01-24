@@ -128,7 +128,11 @@ type FingerprintsColumnIndices = {
 interface ScenePerformance_URL {
     __typename: "URL";
     url: string;
-    type: string;
+    site: {
+        id: string;
+        name: string;
+        icon: string;
+    };
 }
 
 interface ScenePerformance_Image {
