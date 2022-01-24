@@ -2724,7 +2724,8 @@ button.nav-link.backlog-flash {
       if (!performerFiber) return;
 
       const links = document.createElement('div');
-      links.classList.add('ms-auto');
+      links.classList.add('ms-auto', 'text-end', 'lh-sm');
+      setStyles(links, { flexBasis: '60px' });
       links.dataset.backlog = 'links';
       header.appendChild(links);
 
@@ -2735,6 +2736,7 @@ button.nav-link.backlog-flash {
         icon.alt = '';
         const a = makeLink(url.url, '');
         a.classList.add('SiteLink');
+        a.title = url.site.name;
         a.appendChild(icon);
         return a;
       }));
