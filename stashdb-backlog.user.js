@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.4
+// @version     1.24.5
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1488,12 +1488,12 @@ button.nav-link.backlog-flash {
       if (markerDataset.backlogInjected) return;
 
       /** @type {HTMLDivElement} */
-      const scenePhoto = document.querySelector('.scene-photo');
+      const scenePhoto = document.querySelector('.ScenePhoto');
       const img = scenePhoto.querySelector('img');
 
       const newImageBlob = getImageBlob(found.image);
 
-      if (img.getAttribute('src')) {
+      if (img) {
         setStatus(`[backlog] fetching/comparing images...`);
 
         const onCurrentImageReady = async () => {
@@ -1519,7 +1519,7 @@ button.nav-link.backlog-flash {
             return;
           }
 
-          scenePhoto.classList.add('d-flex');
+          scenePhoto.classList.add('flex-row');
           scenePhoto.title = `<pending>\n${found.image}`;
 
           const imgNewLink = makeLink(found.image, '');
@@ -1540,9 +1540,9 @@ button.nav-link.backlog-flash {
           const imgContainer = document.createElement('div');
           imgContainer.classList.add('position-relative');
           setStyles(imgContainer, { alignSelf: 'center', flex: '50%' });
-          setStyles(img, { width: '100%', border: '.5rem solid var(--bs-danger)' });
+          setStyles(img, { border: '.5rem solid var(--bs-danger)' });
           const cImgRes = makeImageResolution(img, 'start', 'top', fullImage);
-          imgContainer.append(img, cImgRes);
+          imgContainer.append(img.parentElement, cImgRes);
 
           scenePhoto.appendChild(imgContainer);
 
@@ -1604,21 +1604,29 @@ button.nav-link.backlog-flash {
         scenePhoto.style.transition = 'min-height 1s ease';
         scenePhoto.title = `<MISSING>\n${found.image}`;
 
+        const imgContainer = /** @type {HTMLDivElement} */ (scenePhoto.querySelector('.Image'));
+
         const imgLink = makeLink(found.image, '');
-        scenePhoto.appendChild(imgLink);
+        imgLink.classList.add('Image-image');
+        imgContainer.appendChild(imgLink);
+
+        const img = document.createElement('img');
+        img.classList.add('Image-image');
         imgLink.appendChild(img);
 
         /** @param {any} reason */
         const onFailure = (reason) => {
-          setStyles(scenePhoto, { minHeight: '0', textAlign: 'center', fontSize: '1.2em', fontWeight: '600' });
+          setStyles(scenePhoto, { minHeight: '150px', textAlign: 'center', fontSize: '1.2em', fontWeight: '600' });
           imgLink.prepend(found.image);
-          img.classList.add('d-none');
+          img.remove();
+          scenePhoto.append(imgLink);
           setStatus(`[backlog] error fetching new image:\n${reason}`);
         };
         newImageBlob.then(
           (blob) => {
-            const imgRes = makeImageResolution(img, 'end');
-            scenePhoto.prepend(imgRes);
+            imgContainer.querySelector('.Image-missing').classList.add('d-none');
+            const imgRes = makeImageResolution(img, 'end', null);
+            imgContainer.after(imgRes);
             img.src = URL.createObjectURL(blob);
             setStatus('');
           },
