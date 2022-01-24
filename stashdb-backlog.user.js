@@ -894,14 +894,16 @@ button.nav-link.backlog-flash {
 
   /**
    * @param {HTMLImageElement} img
-   * @param {'start' | 'end' | null} position
+   * @param {'start' | 'end' | null} [hPosition]
+   * @param {'top' | 'bottom' | null} [vPosition]
    * @param {ScenePerformance_Image} [full]
    * @returns {HTMLDivElement}
    */
-  function makeImageResolution(img, position, full) {
+  function makeImageResolution(img, hPosition, vPosition, full) {
     const imgRes = document.createElement('div');
-    const positionClasses = position === null ? [] : [`${position}-0`, `m${position.charAt(0)}-2`];
-    imgRes.classList.add('position-absolute', ...positionClasses, 'px-2', 'fw-bold');
+    const hPositionClasses = !hPosition ? [] : [`${hPosition}-0`, `m${hPosition.charAt(0)}-2`];
+    const vPositionClasses = !vPosition ? [] : [`${vPosition}-0`, `m${vPosition.charAt(0)}-2`];
+    imgRes.classList.add('position-absolute', ...hPositionClasses, ...vPositionClasses, 'px-2', 'fw-bold');
     setStyles(imgRes, { backgroundColor: '#00689b', transition: 'opacity .2s ease' });
 
     imageReady(img).then(
@@ -1485,9 +1487,9 @@ button.nav-link.backlog-flash {
       if (!found.image) return;
       if (markerDataset.backlogInjected) return;
 
-      /** @type {HTMLImageElement} */
-      const img = (document.querySelector('.scene-photo > img'));
-      const imgContainer = img.parentElement;
+      /** @type {HTMLDivElement} */
+      const scenePhoto = document.querySelector('.scene-photo');
+      const img = scenePhoto.querySelector('img');
 
       const newImageBlob = getImageBlob(found.image);
 
@@ -1508,68 +1510,68 @@ button.nav-link.backlog-flash {
 
           const imageBlob = getImageBlob(isResized ? fullImageURL : img.src);
           const newImage = await compareImages(imageBlob, newImageBlob);
-          imgContainer.classList.add('p-2');
+          scenePhoto.classList.add('p-2');
 
           if (newImage === true) {
-            imgContainer.style.backgroundColor = 'var(--bs-warning)';
-            imgContainer.title = `${makeAlreadyCorrectTitle('added')}\n\n${found.image}`;
+            scenePhoto.style.backgroundColor = 'var(--bs-warning)';
+            scenePhoto.title = `${makeAlreadyCorrectTitle('added')}\n\n${found.image}`;
             setStatus('');
             return;
           }
 
-          imgContainer.classList.add('d-flex');
-          imgContainer.title = `<pending>\n${found.image}`;
+          scenePhoto.classList.add('d-flex');
+          scenePhoto.title = `<pending>\n${found.image}`;
 
           const imgNewLink = makeLink(found.image, '');
 
           if (newImage instanceof Error) {
-            imgContainer.style.backgroundColor = 'var(--bs-purple)';
-            imgContainer.title = 'error comparing image';
+            scenePhoto.style.backgroundColor = 'var(--bs-purple)';
+            scenePhoto.title = 'error comparing image';
             console.error('[backlog] error comparing image', newImage);
             imgNewLink.innerText = found.image;
             imgNewLink.classList.add('p-1');
             imgNewLink.style.flex = '50%';
 
-            imgContainer.appendChild(imgNewLink);
+            scenePhoto.appendChild(imgNewLink);
             setStatus(`[backlog] error fetching/comparing images:\n${newImage}`);
             return;
           }
 
-          const currentImageContainer = document.createElement('div');
-          setStyles(currentImageContainer, { alignSelf: 'center', flex: '50%' });
-          setStyles(img, { width: '100%', border: '.5em solid var(--bs-danger)' });
-          const cImgRes = makeImageResolution(img, null, fullImage);
-          cImgRes.classList.add('start-0', 'ms-3', 'mt-2');
-          currentImageContainer.append(cImgRes, img);
+          const imgContainer = document.createElement('div');
+          imgContainer.classList.add('position-relative');
+          setStyles(imgContainer, { alignSelf: 'center', flex: '50%' });
+          setStyles(img, { width: '100%', border: '.5rem solid var(--bs-danger)' });
+          const cImgRes = makeImageResolution(img, 'start', 'top', fullImage);
+          imgContainer.append(img, cImgRes);
 
-          imgContainer.appendChild(currentImageContainer);
+          scenePhoto.appendChild(imgContainer);
 
           const imgNew = document.createElement('img');
           imgNew.src = URL.createObjectURL(await newImageBlob);
-          setStyles(imgNew, { width: '100%', height: 'auto', border: '.5em solid var(--bs-success)' });
+          setStyles(imgNew, { width: '100%', height: 'auto', border: '.5rem solid var(--bs-success)' });
 
           imgNewLink.appendChild(imgNew);
 
-          const newImageContainer = document.createElement('div');
+          const newImgContainer = document.createElement('div');
+          newImgContainer.classList.add('position-relative');
           const isCurrentVertical =
             fullImage
               ? fullImage.height > fullImage.width
               : img.naturalHeight > img.naturalWidth;
-          setStyles(newImageContainer, { alignSelf: 'center', flex: isCurrentVertical ? 'auto' : '50%' });
-          const imgRes = makeImageResolution(imgNew, null);
-          imgRes.classList.add('end-0', 'me-3', 'mt-2');
-          newImageContainer.append(imgRes, imgNewLink);
+          setStyles(newImgContainer, { alignSelf: 'center', flex: isCurrentVertical ? 'auto' : '50%' });
+          const imgRes = makeImageResolution(imgNew, 'end', 'top');
+          newImgContainer.append(imgRes, imgNewLink);
 
-          imgContainer.appendChild(newImageContainer);
+          scenePhoto.appendChild(newImgContainer);
           setStatus('');
         };
 
         /** @param {any} reason */
         const onCurrentImageFailed = async (reason) => {
-          imgContainer.style.backgroundColor = 'var(--bs-purple)';
+          scenePhoto.style.backgroundColor = 'var(--bs-purple)';
 
-          imgContainer.classList.add('p-2', 'd-flex');
-          imgContainer.title = `error loading current image\n<pending>\n${found.image}`;
+          scenePhoto.classList.add('p-2', 'd-flex');
+          scenePhoto.title = `error loading current image\n<pending>\n${found.image}`;
 
           const imgNewLink = makeLink(found.image, '');
 
@@ -1584,7 +1586,7 @@ button.nav-link.backlog-flash {
           const imgRes = makeImageResolution(imgNew, 'end');
           newImageContainer.append(imgRes, imgNewLink);
 
-          imgContainer.appendChild(newImageContainer);
+          scenePhoto.appendChild(newImageContainer);
 
           setStatus(`[backlog] error loading current image:\n${reason}`);
         };
@@ -1598,16 +1600,17 @@ button.nav-link.backlog-flash {
         // missing image
         setStatus(`[backlog] fetching new image...`);
 
-        imgContainer.classList.add('bg-danger', 'p-2');
-        imgContainer.style.transition = 'min-height 1s ease';
-        imgContainer.title = `<MISSING>\n${found.image}`;
+        scenePhoto.classList.add('bg-danger', 'p-2');
+        scenePhoto.style.transition = 'min-height 1s ease';
+        scenePhoto.title = `<MISSING>\n${found.image}`;
 
-        const imgLink = imgContainer.appendChild(makeLink(found.image, ''));
+        const imgLink = makeLink(found.image, '');
+        scenePhoto.appendChild(imgLink);
         imgLink.appendChild(img);
 
         /** @param {any} reason */
         const onFailure = (reason) => {
-          setStyles(imgContainer, { minHeight: '0', textAlign: 'center', fontSize: '1.2em', fontWeight: '600' });
+          setStyles(scenePhoto, { minHeight: '0', textAlign: 'center', fontSize: '1.2em', fontWeight: '600' });
           imgLink.prepend(found.image);
           img.classList.add('d-none');
           setStatus(`[backlog] error fetching new image:\n${reason}`);
@@ -1615,7 +1618,7 @@ button.nav-link.backlog-flash {
         newImageBlob.then(
           (blob) => {
             const imgRes = makeImageResolution(img, 'end');
-            imgContainer.prepend(imgRes);
+            scenePhoto.prepend(imgRes);
             img.src = URL.createObjectURL(blob);
             setStatus('');
           },
@@ -2479,17 +2482,19 @@ button.nav-link.backlog-flash {
       if (field === 'image') {
         const image = found[field];
         const imgContainer = document.createElement('div');
+        imgContainer.classList.add('position-relative');
+        setStyles(imgContainer, { border: '2px solid var(--bs-teal)', width: 'fit-content' });
         const imgLink = makeLink(image, '', { color: 'var(--bs-teal)' });
         imgContainer.appendChild(imgLink);
         dd.appendChild(imgContainer);
         const onSuccess = (/** @type {Blob} **/ blob) => {
           const img = document.createElement('img');
-          setStyles(img, { maxHeight: '200px', border: '2px solid var(--bs-teal)' });
+          setStyles(img, { maxHeight: '200px' });
           img.src = URL.createObjectURL(blob);
           imgLink.prepend(img);
 
-          const imgRes = makeImageResolution(img, null);
-          setStyles(imgRes, { margin: '2px' });
+          const imgRes = makeImageResolution(img);
+          imgRes.classList.add('end-0');
           imgContainer.prepend(imgRes);
 
           const set = document.createElement('a');
