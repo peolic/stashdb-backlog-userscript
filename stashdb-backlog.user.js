@@ -2002,6 +2002,7 @@ button.nav-link.backlog-flash {
       // Parse current
       /** @type {HTMLTableRowElement[]} */
       const fingerprintsTableRows = (Array.from(document.querySelectorAll('.scene-fingerprints > table tr')));
+      if (fingerprintsTableRows.length === 0) return;
       const { headers, fingerprints: currentFingerprints } = parseFingerprintTableRows(fingerprintsTableRows);
 
       // Compare
@@ -2534,6 +2535,7 @@ button.nav-link.backlog-flash {
 
         /** @type {HTMLTableRowElement[]} */
         const fingerprintsTableRows = (Array.from(fingerprintsTab.querySelectorAll('table tr')));
+        if (fingerprintsTableRows.length === 0) return;
         const { fingerprints: currentFingerprints } = parseFingerprintTableRows(fingerprintsTableRows);
 
         found[field].forEach((fp, index) => {
