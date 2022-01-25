@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.7
+// @version     1.24.8
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2971,6 +2971,8 @@ button.nav-link.backlog-flash {
       label.innerText = 'This performer has duplicates:';
       hasDuplicates.appendChild(label);
 
+      /** @type {HTMLSpanElement} */
+      let infoSpan;
       (notes || []).forEach((note) => {
         if (/^https?:/.test(note)) {
           const siteName = (new URL(note)).hostname.split(/\./).slice(-2)[0];
@@ -2979,16 +2981,19 @@ button.nav-link.backlog-flash {
           link.title = note;
           hasDuplicates.appendChild(link);
         } else {
-          if (!label.title) {
-            label.append(' 📝');
-            setStyles(label, {
-              textDecoration: 'underline dotted currentColor 2px',
-              cursor: 'help',
-            });
+          if (!infoSpan)
+            infoSpan = hasDuplicates.querySelector('label ~ span');
+          if (!infoSpan) {
+            infoSpan = document.createElement('span');
+            infoSpan.style.marginLeft = '1.75rem';
+            infoSpan.classList.add('fw-normal');
+            label.after(document.createElement('br'), infoSpan);
           }
-          label.title += (label.title ? '\n' : '') + note;
+          infoSpan.innerText += (infoSpan.innerText ? '\n' : '') + note;
         }
       });
+
+      infoSpan.innerText = '📝 ' + infoSpan.innerText;
 
       ids.forEach((dupId) => {
         hasDuplicates.append(document.createElement('br'));
@@ -3115,6 +3120,8 @@ button.nav-link.backlog-flash {
       label.innerText = 'This performer has duplicates:';
       hasDuplicates.appendChild(label);
 
+      /** @type {HTMLSpanElement} */
+      let infoSpan;
       (notes || []).forEach((note) => {
         if (/^https?:/.test(note)) {
           const siteName = (new URL(note)).hostname.split(/\./).slice(-2)[0];
@@ -3124,16 +3131,19 @@ button.nav-link.backlog-flash {
           hasDuplicates.appendChild(link);
           profiles.push(note);
         } else {
-          if (!label.title) {
-            label.append(' 📝');
-            setStyles(label, {
-              textDecoration: 'underline dotted currentColor 2px',
-              cursor: 'help',
-            });
+          if (!infoSpan)
+            infoSpan = hasDuplicates.querySelector('label ~ span');
+          if (!infoSpan) {
+            infoSpan = document.createElement('span');
+            infoSpan.style.marginLeft = '1.5rem';
+            infoSpan.classList.add('fw-normal');
+            label.after(document.createElement('br'), infoSpan);
           }
-          label.title += (label.title ? '\n' : '') + note;
+          infoSpan.innerText += (infoSpan.innerText ? '\n' : '') + note;
         }
       });
+
+      infoSpan.innerText = '📝 ' + infoSpan.innerText;
 
       ids.forEach((dupId) => {
         hasDuplicates.append(document.createElement('br'));
