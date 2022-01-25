@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.6
+// @version     1.24.7
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1102,15 +1102,19 @@ button.nav-link.backlog-flash {
     }, 1500);
   };
 
-  /** @param {string} site */
-  const getLinkBySiteType = (site) =>
+  const getLinks = () =>
     Array.from(document.querySelectorAll('form .URLInput > ul > li > .input-group'))
       .map(({ children }) => ({
         remove: () => /** @type {HTMLButtonElement} */ (children[0]).click(),
         type: /** @type {HTMLSpanElement} */ (children[1]).textContent,
         value: /** @type {HTMLSpanElement} */ (children[2]).textContent,
-      }))
-      .find((l) => l.type === site);
+      }));
+
+  /** @param {string} site */
+  const getLinkBySiteType = (site) => getLinks().find((l) => l.type === site);
+
+  /** @param {string} url */
+  const getLinkByURL = (url) => getLinks().find((l) => l.value === url);
 
   /**
    * @param {string} site
@@ -2129,7 +2133,7 @@ button.nav-link.backlog-flash {
     /**
      * @param {HTMLElement} field
      * @param {string} fieldName
-     * @param {string} value
+     * @param {string | (() => string)} value
      * @param {boolean} [activeTab=false]
      */
     const settableField = (field, fieldName, value, activeTab) => {
@@ -2143,7 +2147,7 @@ button.nav-link.backlog-flash {
       set.innerText = 'set field';
       setStyles(set, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer' });
       set.addEventListener('click', () => {
-        setNativeValue(fieldEl, value);
+        setNativeValue(fieldEl, value instanceof Function ? value() : value);
         if (activeTab) getTabButton(fieldEl).click();
         flashField(fieldEl);
       });
@@ -2614,14 +2618,18 @@ button.nav-link.backlog-flash {
           dd.appendChild(commentElement);
         });
 
-        const editNote = comments
+        const editNote = () => comments
+          // Non-URLs or URLs that have not been added as links
+          .filter((comment) => !/^https?:/.test(comment) || !getLinkByURL(comment))
           .map((comment) => {
             const prefixName = prefixToName(comment);
             return prefixName
               ? `[${prefixName}](${comment}):`
               : comment;
           })
-          .join('\n');
+          .concat(['', '`Backlog`'])
+          .join('\n')
+          .trim();
 
         settableField(dt, 'note', editNote, true);
 
