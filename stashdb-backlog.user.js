@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.5
+// @version     1.24.6
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3540,13 +3540,46 @@ button.nav-link.backlog-flash {
     if (!storedData) return;
 
     /**
+     * @param {HTMLAnchorElement} entityLink
+     * @param {EditTargetType} editEntity
+     */
+    const handleEntityLink = (entityLink, editEntity) => {
+      const { ident, object } = parsePath(entityLink.href);
+      if (!isSupportedObject(object)) return;
+      const type = object.slice(0, -1);
+
+      const found = storedData[object][ident];
+      const changes = dataObjectKeys(found || {});
+      if (Cache.performerScenes(ident).length > 0)
+        changes.push('scenes');
+      if (changes.length === 0)
+        return;
+
+      let backgroundColor = 'var(--bs-warning)';
+      if (changes.length === 1) {
+        if (changes[0] === 'scenes') {
+          backgroundColor = 'var(--bs-green)';
+        }
+      }
+
+      const scenePerformer = object === 'performers' && editEntity === 'scene';
+      setStyles(entityLink, {
+        backgroundColor,
+        padding: scenePerformer ? '0.05rem 0.25rem' : '.2rem',
+        fontWeight: '700',
+        maxWidth: 'max-content',
+      });
+      entityLink.title = `${type} is listed for:\n - ${changes.join('\n - ')}\n(click ${type} for more info)`;
+    };
+
+    /**
      * @template {Element} E
      * @param {E | undefined} v
      * @returns {E[]}
      */
     const makeArray = (v) => Array.isArray(v) ? v : [v].filter(Boolean);
 
-    /** @type {Record<string, (body: HTMLDivElement) => HTMLAnchorElement[]>} */
+    /** @type {Partial<Record<EditOperation, (body: HTMLDivElement) => HTMLAnchorElement[]>>} */
     const targetSelectors = {
       // ModifyEdit
       modify: (body) => makeArray(body.querySelector(':scope > .row:first-child a')),
@@ -3558,43 +3591,28 @@ button.nav-link.backlog-flash {
 
     const cards = /** @type {HTMLDivElement[]} */ (Array.from(document.querySelectorAll(selector)));
     for (const card of cards) {
-      const operation = card.querySelector('.card-header h5').textContent.split(' ')[0];
-      if (!(operation in targetSelectors)) continue;
-
+      const [operation, entity] =
+        /** @type {[EditOperation, EditTargetType]} */
+        (card.querySelector('.card-header h5').textContent.split(' ', 2));
       /** @type {HTMLDivElement} */
       const cardBody = card.querySelector('.card-body');
-      const targetLinks = targetSelectors[operation](cardBody);
-      if (targetLinks.length === 0) {
-        console.error('target link not found', cardBody);
-        continue;
-      }
-      targetLinks.forEach((targetLink) => {
-        const { ident, object } = parsePath(targetLink.href);
-        if (!isSupportedObject(object)) return;
 
-        const found = storedData[object][ident];
-        const changes = dataObjectKeys(found || {});
-        if (Cache.performerScenes(ident).length > 0)
-          changes.push('scenes');
-        if (changes.length === 0)
-          return;
-
-        let backgroundColor = 'var(--bs-warning)';
-        if (changes.length === 1) {
-          if (changes[0] === 'scenes') {
-            backgroundColor = 'var(--bs-green)';
-          }
+      if (operation in targetSelectors) {
+        const targetLinks = targetSelectors[operation](cardBody);
+        if (targetLinks.length === 0) {
+          console.error('target link not found', cardBody);
+          continue;
         }
+        targetLinks.forEach((el) => handleEntityLink(el, entity));
+      }
 
-        setStyles(targetLink, {
-          backgroundColor,
-          padding: '.2rem',
-          fontWeight: '700',
-          maxWidth: 'max-content',
-        });
-        const type = object.slice(0, -1);
-        targetLink.title = `${type} is listed for:\n - ${changes.join('\n - ')}\n(click ${type} for more info)`;
-      });
+      if (entity === 'scene') {
+        /** @type {HTMLAnchorElement[]} */
+        const performerLinks = Array.from(cardBody.querySelectorAll('a.scene-performer'));
+        if (performerLinks.length > 0) {
+          performerLinks.forEach((el) => handleEntityLink(el, entity));
+        }
+      }
     }
 
   } // iEditPage

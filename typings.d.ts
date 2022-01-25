@@ -8,6 +8,18 @@ type AnyObject =
     | "users"
     | "search"
 
+type EditOperation =
+    | "create"
+    | "modify"
+    | "merge"
+    | "destroy"
+
+type EditTargetType =
+    | "performer"
+    | "scene"
+    | "studio"
+    | "tag"
+
 interface LocationData {
     object: AnyObject | null;
     ident: string | null;
