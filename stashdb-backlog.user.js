@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.9
+// @version     1.24.10
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -711,10 +711,13 @@ button.nav-link.backlog-flash {
   /**
    * @template {DataObject} T
    * @param {T} dataObject
-   * @returns {DataObjectKeys<T>[]}
+   * @returns {Exclude<DataObjectKeys<T>, 'comments'>[]}
    */
   function dataObjectKeys(dataObject) {
-    return /** @type {DataObjectKeys<T>[]} */ (Object.keys(dataObject));
+    return (
+      /** @type {Exclude<DataObjectKeys<T>, 'comments'>[]} */
+      (Object.keys(dataObject).filter((key) => key !== 'comments'))
+    );
   }
 
   /**
@@ -2667,7 +2670,7 @@ button.nav-link.backlog-flash {
         if (ddLinks.children.length > 0) {
           const pendingUrl = pendingChanges.querySelector('dd#backlog-pending-url');
           if (pendingUrl) pendingUrl.after(dtLinks, ddLinks);
-          else pendingChanges.append(dtLinks, ddLinks);
+          else dt.before(dtLinks, ddLinks);
         }
 
         return;
