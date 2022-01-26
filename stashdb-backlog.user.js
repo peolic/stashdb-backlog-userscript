@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.13
+// @version     1.24.14
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -173,8 +173,12 @@ async function inject() {
       }
     }
 
-    // Scene cards lists on Studio/Tag pages
-    if ((object === 'studios' || object === 'tags') && ident && !action) {
+    if (object === 'studios' && ident && !action) {
+      return await iStudioPage(ident);
+    }
+
+    // Scene cards lists on Tag pages
+    if (object === 'tags' && ident && !action) {
       return await highlightSceneCards(object);
     }
 
@@ -282,7 +286,8 @@ async function inject() {
     //@ts-expect-error
     GM.addStyle(`
 .performer-backlog:empty,
-.scene-backlog:empty {
+.scene-backlog:empty,
+.studio-backlog:empty {
   display: none;
 }
 
@@ -711,12 +716,12 @@ button.nav-link.backlog-flash {
   /**
    * @template {DataObject} T
    * @param {T} dataObject
-   * @returns {Exclude<DataObjectKeys<T>, 'comments'>[]}
+   * @returns {DataObjectKeys<T>[]}
    */
   function dataObjectKeys(dataObject) {
     return (
-      /** @type {Exclude<DataObjectKeys<T>, 'comments'>[]} */
-      (Object.keys(dataObject).filter((key) => key !== 'comments'))
+      /** @type {DataObjectKeys<T>[]} */
+      (Object.keys(dataObject).filter((key) => key !== 'comments' && key !== 'c_studio'))
     );
   }
 
@@ -1150,6 +1155,43 @@ button.nav-link.backlog-flash {
     const newLink = /** @type {HTMLDivElement} */ (linksContainer.querySelector(':scope > ul > li:last-child > .input-group'));
     flashField(newLink);
   };
+
+  /**
+   * @param {[sceneId: string, data: SceneDataObject][]} list
+   * @param {HTMLOListElement} target
+   */
+  const renderScenesList = (list, target) =>
+    list.forEach(([sceneId, sceneData], idx) => {
+      if (idx > 0 && idx % 10 === 0)
+        target.appendChild(document.createElement('br'));
+
+      const row = document.createElement('li');
+
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.classList.add('me-1');
+
+      const view = makeLink(`/scenes/${sceneId}`, '⭕');
+      view.classList.add('me-1', 'text-decoration-none');
+      view.title = 'View scene';
+
+      const link = makeLink(`/scenes/${sceneId}/edit`, sceneId);
+      link.classList.add('font-monospace', 'text-decoration-underline');
+      link.title = 'Edit scene';
+      link.addEventListener('click', () => check.checked = true);
+      link.addEventListener('auxclick', () => check.checked = true);
+
+      const sep = document.createElement('span');
+      sep.classList.add('mx-2');
+      sep.innerHTML = '&mdash;';
+
+      const keys = dataObjectKeys(sceneData)
+        .map((k) => k === 'performers' ? `${Object.values(sceneData.performers).flat().length}x ${k}` : k)
+        .join(', ');
+
+      row.append(check, view, link, sep, keys);
+      target.appendChild(row);
+    });
 
   /**
    * @template T
@@ -2165,6 +2207,9 @@ button.nav-link.backlog-flash {
       'image', 'fingerprints',
     ];
     sortedKeys(found, keySortOrder).forEach((field) => {
+      if (field === 'c_studio')
+        return;
+
       const dt = document.createElement('dt');
       dt.innerText = field;
       dt.id = `backlog-pending-${field}-title`;
@@ -2246,7 +2291,7 @@ button.nav-link.backlog-flash {
         const ul = document.createElement('ul');
         ul.classList.add('p-0');
         sortedKeys(performers, ['update', 'remove', 'append']).forEach((action) => {
-          performers[action].sort(nameSort).forEach((entry) => {
+          performers[action].slice().sort(nameSort).forEach((entry) => {
             const li = document.createElement('li');
             li.classList.add('d-flex', 'justify-content-between');
             /** @type {HTMLElement} */
@@ -2816,6 +2861,7 @@ button.nav-link.backlog-flash {
           const sceneLinks = document.createElement('ol');
           setStyles(sceneLinks, { paddingLeft: '2rem', fontWeight: 'normal' });
           scenes
+            .slice()
             .sort(([, a], [, b]) => {
               const aName = pName[action](a), bName = pName[action](b);
               if (aName !== null && bName !== null) return aName.localeCompare(bName);
@@ -3250,6 +3296,99 @@ button.nav-link.backlog-flash {
 
   // =====
 
+  /**
+   * @param {string} studioId
+   */
+  async function iStudioPage(studioId) {
+
+    highlightSceneCards('studios');
+
+    const studioInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.studio-title', 2000));
+    if (!studioInfo) {
+      console.error('[backlog] studio info not found');
+      return;
+    }
+
+    const studioName =
+      /** @type {HTMLSpanElement} */
+      (studioInfo.querySelector(':scope > h3 > span'))?.innerText?.trim();
+    const parentName =
+      /** @type {HTMLSpanElement} */
+      (studioInfo.querySelector(':scope > span:last-child a'))?.innerText || null;
+
+    if (!studioName) {
+      console.error('[backlog] studio name not found');
+      return;
+    }
+
+    /** @type {HTMLDivElement} */
+    let backlogDiv = (document.querySelector('.studio-backlog'));
+    if (!backlogDiv) {
+      backlogDiv = document.createElement('div');
+      backlogDiv.classList.add('studio-backlog');
+      setStyles(backlogDiv, {
+        maxWidth: 'max-content',
+        minWidth: 'calc(50% - 15px)',
+        transition: 'background-color .5s',
+      });
+      studioInfo.parentElement.before(backlogDiv);
+      removeHook(backlogDiv, 'scenes', studioId);
+    }
+
+    // Performer scene changes based on cached data
+    (async function sceneChanges() {
+      if (backlogDiv.querySelector('[data-backlog="scene-changes"]')) return;
+
+      try {
+        const storedData = await Cache.getStoredData();
+        if (!storedData) return;
+
+        /** @param {SceneDataObject["c_studio"]} current */
+        const compare = ([name, parent]) =>
+          name.localeCompare(studioName, undefined, { sensitivity: 'base' }) === 0
+          && ((parent && parentName !== null)
+            ? parent.localeCompare(parentName, undefined, { sensitivity: 'base' }) === 0
+            : true);
+
+        const studioScenes = Object.entries(storedData.scenes)
+          .filter(([, scene]) => !!scene.c_studio && compare(scene.c_studio));
+
+        if (studioScenes.length === 0) return;
+
+        const sceneChanges = document.createElement('div');
+        sceneChanges.dataset.backlog = 'scene-changes';
+        sceneChanges.classList.add('mb-1', 'p-1', 'fw-bold');
+        sceneChanges.innerText = 'This studio has scenes with pending changes:';
+
+        const details = document.createElement('details');
+        details.style.marginLeft = '1.5rem';
+        const summary = document.createElement('summary');
+        setStyles(summary, { color: 'tan', width: 'max-content' });
+        summary.innerText = `${studioScenes.length} scene${studioScenes.length === 1 ? '' : 's'}`;
+        details.append(summary);
+
+        const scenesList = document.createElement('ol');
+        setStyles(scenesList, { paddingLeft: '2rem', fontWeight: 'normal' });
+        details.append(scenesList);
+
+        renderScenesList(studioScenes, scenesList);
+
+        sceneChanges.append(details);
+
+        const emoji = document.createElement('span');
+        emoji.classList.add('me-1');
+        emoji.innerText = '🎥';
+        sceneChanges.prepend(emoji);
+        backlogDiv.prepend(sceneChanges);
+      } catch (error) {
+        console.error(error);
+      }
+    })();
+
+  } // iStudioPage
+
+  // =====
+
   async function iHomePage() {
     if (document.querySelector('main > .LoadingIndicator')) {
       await Promise.all([
@@ -3647,7 +3786,7 @@ button.nav-link.backlog-flash {
       }
     }
 
-  } // iEditPage
+  } // iEditCards
 
   async function iBacklogPage() {
     const main = /** @type {HTMLDivElement} */ (await elementReadyIn('.NarrowPage', 200));
@@ -3743,38 +3882,7 @@ button.nav-link.backlog-flash {
         partial: partiallySubmittable,
       })[filter];
 
-      list.forEach(([sceneId, sceneData], i) => {
-        if (i > 0 && i % 10 === 0) {
-          const groupSep = document.createElement('br');
-          scenesList.appendChild(groupSep);
-        }
-        const row = document.createElement('li');
-
-        const check = document.createElement('input');
-        check.type = 'checkbox';
-        check.classList.add('me-1');
-
-        const view = makeLink(`/scenes/${sceneId}`, '⭕');
-        view.classList.add('me-1', 'text-decoration-none');
-        view.title = 'View scene';
-
-        const link = makeLink(`/scenes/${sceneId}/edit`, sceneId);
-        link.classList.add('font-monospace', 'text-decoration-underline');
-        link.title = 'Edit scene';
-        link.addEventListener('click', () => check.checked = true);
-        link.addEventListener('auxclick', () => check.checked = true);
-
-        const sep = document.createElement('span');
-        sep.classList.add('mx-2');
-        sep.innerHTML = '&mdash;';
-
-        const keys = Object.keys(sceneData)
-          .map((k) => k === 'performers' ? `${Object.values(sceneData.performers).flat().length}x ${k}` : k)
-          .join(', ');
-
-        row.append(check, view, link, sep, keys);
-        scenesList.appendChild(row);
-      });
+      renderScenesList(list, scenesList);
     };
 
     subTitle.innerText = 'Filter entries:';

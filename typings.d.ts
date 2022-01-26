@@ -57,6 +57,7 @@ interface SceneDataObject {
     image?: string;
     fingerprints?: SceneFingerprint[];
     comments?: string[];
+    c_studio?: [name: string, parent: string | null];
 }
 
 interface SplitShard {
@@ -103,7 +104,7 @@ type DataObject = DataCache[SupportedObject][string]
 
 type ObjectKeys = {
     performers: keyof PerformerDataObject | "scenes"
-    scenes: keyof SceneDataObject
+    scenes: Exclude<keyof SceneDataObject, "comments" | "c_studio">
 }
 
 type DataObjectKeys<T extends DataObject> =
