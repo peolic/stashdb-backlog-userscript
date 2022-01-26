@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.12
+// @version     1.24.13
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2979,30 +2979,32 @@ button.nav-link.backlog-flash {
       label.innerText = 'This performer has duplicates:';
       hasDuplicates.appendChild(label);
 
-      /** @type {HTMLSpanElement} */
-      let infoSpan;
+      const linksSpan = document.createElement('span');
+
+      const infoSpan = document.createElement('span');
+      setStyles(infoSpan, { marginLeft: '1.75rem', whiteSpace: 'pre-wrap' });
+      infoSpan.classList.add('d-inline-block', 'fw-normal');
+
       (notes || []).forEach((note) => {
         if (/^https?:/.test(note)) {
           const siteName = (new URL(note)).hostname.split(/\./).slice(-2)[0];
           const link = makeLink(note, `[${siteName}]`, { color: 'var(--bs-yellow)' });
           link.classList.add('ms-1');
           link.title = note;
-          hasDuplicates.appendChild(link);
+          linksSpan.appendChild(link);
         } else {
-          if (!infoSpan)
-            infoSpan = hasDuplicates.querySelector('label ~ span');
-          if (!infoSpan) {
-            infoSpan = document.createElement('span');
-            infoSpan.style.marginLeft = '1.75rem';
-            infoSpan.classList.add('fw-normal');
-            label.after(document.createElement('br'), infoSpan);
-          }
-          infoSpan.innerText += (infoSpan.innerText ? '\n' : '') + note;
+          infoSpan.append((infoSpan.textContent ? '\n' : '') + note);
         }
       });
 
-      if (infoSpan)
-        infoSpan.innerText = '📝 ' + infoSpan.innerText;
+      if (linksSpan.textContent) {
+        label.after(linksSpan);
+      }
+
+      if (infoSpan.textContent) {
+        infoSpan.prepend('📝 ');
+        hasDuplicates.append(document.createElement('br'), infoSpan);
+      }
 
       ids.forEach((dupId) => {
         hasDuplicates.append(document.createElement('br'));
@@ -3129,31 +3131,33 @@ button.nav-link.backlog-flash {
       label.innerText = 'This performer has duplicates:';
       hasDuplicates.appendChild(label);
 
-      /** @type {HTMLSpanElement} */
-      let infoSpan;
+      const linksSpan = document.createElement('span');
+
+      const infoSpan = document.createElement('span');
+      setStyles(infoSpan, { marginLeft: '1.75rem', whiteSpace: 'pre-wrap' });
+      infoSpan.classList.add('d-inline-block', 'fw-normal');
+
       (notes || []).forEach((note) => {
         if (/^https?:/.test(note)) {
           const siteName = (new URL(note)).hostname.split(/\./).slice(-2)[0];
           const link = makeLink(note, `[${siteName}]`, { color: 'var(--bs-yellow)' });
           link.classList.add('ms-1');
           link.title = note;
-          hasDuplicates.appendChild(link);
+          linksSpan.appendChild(link);
           profiles.push(note);
         } else {
-          if (!infoSpan)
-            infoSpan = hasDuplicates.querySelector('label ~ span');
-          if (!infoSpan) {
-            infoSpan = document.createElement('span');
-            infoSpan.style.marginLeft = '1.5rem';
-            infoSpan.classList.add('fw-normal');
-            label.after(document.createElement('br'), infoSpan);
-          }
-          infoSpan.innerText += (infoSpan.innerText ? '\n' : '') + note;
+          infoSpan.append((infoSpan.textContent ? '\n' : '') + note);
         }
       });
 
-      if (infoSpan)
-        infoSpan.innerText = '📝 ' + infoSpan.innerText;
+      if (linksSpan.textContent) {
+        label.after(linksSpan);
+      }
+
+      if (infoSpan.textContent) {
+        infoSpan.prepend('📝 ');
+        hasDuplicates.append(document.createElement('br'), infoSpan);
+      }
 
       ids.forEach((dupId) => {
         hasDuplicates.append(document.createElement('br'));
