@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.10
+// @version     1.24.11
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2662,7 +2662,7 @@ button.nav-link.backlog-flash {
           set.addEventListener('click', () => addSiteURL(site, comment, true));
           container.append(set, ':');
           const link = makeLink(comment);
-          link.style.marginLeft = '.5rem';
+          link.classList.add('text-truncate', 'd-block', 'ms-2');
           container.appendChild(link);
           ddLinks.appendChild(container);
         });
@@ -3229,7 +3229,7 @@ button.nav-link.backlog-flash {
         set.addEventListener('click', () => addSiteURL(site, url, true));
         li.append(set, ':');
         const link = makeLink(url);
-        link.style.marginLeft = '.5rem';
+        link.classList.add('d-block', 'ms-4');
         li.appendChild(link);
         list.appendChild(li);
       });
