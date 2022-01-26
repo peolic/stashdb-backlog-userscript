@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.14
+// @version     1.24.15
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3346,9 +3346,10 @@ button.nav-link.backlog-flash {
         /** @param {SceneDataObject["c_studio"]} current */
         const compare = ([name, parent]) =>
           name.localeCompare(studioName, undefined, { sensitivity: 'base' }) === 0
-          && ((parent && parentName !== null)
-            ? parent.localeCompare(parentName, undefined, { sensitivity: 'base' }) === 0
-            : true);
+          && (
+            parent === null
+            || (parentName && parent.localeCompare(parentName, undefined, { sensitivity: 'base' }) === 0)
+          );
 
         const studioScenes = Object.entries(storedData.scenes)
           .filter(([, scene]) => !!scene.c_studio && compare(scene.c_studio));
