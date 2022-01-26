@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.11
+// @version     1.24.12
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2813,8 +2813,8 @@ button.nav-link.backlog-flash {
           setStyles(summary, { color: 'tan', width: 'max-content' });
           summary.innerText = `${actionPrefix[action]} ${scenes.length} scene${scenes.length === 1 ? '' : 's'}`;
           details.append(summary);
-          const sceneLinks = document.createElement('div');
-          setStyles(sceneLinks, { marginLeft: '1.3rem', fontWeight: 'normal' });
+          const sceneLinks = document.createElement('ol');
+          setStyles(sceneLinks, { paddingLeft: '2rem', fontWeight: 'normal' });
           scenes
             .sort(([, a], [, b]) => {
               const aName = pName[action](a), bName = pName[action](b);
@@ -2824,25 +2824,30 @@ button.nav-link.backlog-flash {
               return 0;
             })
             .forEach(([sceneId, entry], idx) => {
-              if (idx > 0) sceneLinks.append(document.createElement('br'));
+              if (idx > 0 && idx % 10 === 0) {
+                const groupSep = document.createElement('br');
+                sceneLinks.appendChild(groupSep);
+              }
+              const changeItem = document.createElement('li');
               const a = makeLink(`/scenes/${sceneId}`, sceneId, {
                 color: 'var(--bs-teal)',
                 fontFamily: 'monospace',
                 fontSize: '16px',
               });
               a.target = '_blank';
-              sceneLinks.append(a);
-              if (action === 'append') sceneLinks.append(` (as ${pName[action](entry)})`);
+              changeItem.append(a);
+              if (action === 'append') changeItem.append(` (as ${pName[action](entry)})`);
               if (action === 'remove') {
                 if (!entry) {
-                  sceneLinks.append(' (unknown target)');
+                  changeItem.append(' (unknown target)');
                 } else {
                   const pLink = entry.id
                     ? makeLink(`/performers/${entry.id}`, pName[action](entry), { color: 'var(--bs-teal)' })
                     : pName[action](entry);
-                  sceneLinks.append(' (target: ', pLink, ')');
+                  changeItem.append(' (target: ', pLink, ')');
                 }
               }
+              sceneLinks.appendChild(changeItem);
             });
           details.append(sceneLinks);
           sceneChanges.append(details);
@@ -3661,8 +3666,12 @@ button.nav-link.backlog-flash {
     subTitle.innerText = 'Loading...';
     scenes.appendChild(subTitle);
 
-    const scenesList = document.createElement('ul');
-    scenesList.classList.add('list-unstyled', 'ps-2');
+    const desc = document.createElement('p');
+    desc.innerText = '';
+    scenes.appendChild(desc);
+
+    const scenesList = document.createElement('ol');
+    // scenesList.classList.add('ps-2');
     scenes.appendChild(scenesList);
 
     window.addEventListener(locationChanged, () => scenes.remove(), { once: true });
@@ -3717,6 +3726,11 @@ button.nav-link.backlog-flash {
         el.classList.toggle('fw-bold', el.dataset.filter === filter);
       });
 
+      desc.innerText = (
+        'The checkbox marks an entry as "seen" but leaving this page will reset that status.'
+        + '\nMarking as "seen" does not do any action.'
+      );
+
       scenesList.innerHTML = '';
 
       const list = ({
@@ -3725,8 +3739,16 @@ button.nav-link.backlog-flash {
         partial: partiallySubmittable,
       })[filter];
 
-      list.forEach(([sceneId, sceneData]) => {
+      list.forEach(([sceneId, sceneData], i) => {
+        if (i > 0 && i % 10 === 0) {
+          const groupSep = document.createElement('br');
+          scenesList.appendChild(groupSep);
+        }
         const row = document.createElement('li');
+
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        check.classList.add('me-1');
 
         const view = makeLink(`/scenes/${sceneId}`, '⭕');
         view.classList.add('me-1', 'text-decoration-none');
@@ -3735,6 +3757,8 @@ button.nav-link.backlog-flash {
         const link = makeLink(`/scenes/${sceneId}/edit`, sceneId);
         link.classList.add('font-monospace', 'text-decoration-underline');
         link.title = 'Edit scene';
+        link.addEventListener('click', () => check.checked = true);
+        link.addEventListener('auxclick', () => check.checked = true);
 
         const sep = document.createElement('span');
         sep.classList.add('mx-2');
@@ -3744,7 +3768,7 @@ button.nav-link.backlog-flash {
           .map((k) => k === 'performers' ? `${Object.values(sceneData.performers).flat().length}x ${k}` : k)
           .join(', ');
 
-        row.append(view, link, sep, keys);
+        row.append(check, view, link, sep, keys);
         scenesList.appendChild(row);
       });
     };
