@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.15
+// @version     1.24.16
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1156,11 +1156,19 @@ button.nav-link.backlog-flash {
     flashField(newLink);
   };
 
+  /** @param {[name: string, parent: string | null]} [studio] */
+  const studioArrayToString = (studio) => {
+    if (!studio) return '';
+    const [name, parent] = studio;
+    return name + (parent ? ` [${parent}]` : '');
+  };
+
   /**
    * @param {[sceneId: string, data: SceneDataObject][]} list
    * @param {HTMLOListElement} target
+   * @param {AnyObject | null} object
    */
-  const renderScenesList = (list, target) =>
+  const renderScenesList = (list, target, object) =>
     list.forEach(([sceneId, sceneData], idx) => {
       if (idx > 0 && idx % 10 === 0)
         target.appendChild(document.createElement('br'));
@@ -1190,6 +1198,13 @@ button.nav-link.backlog-flash {
         .join(', ');
 
       row.append(check, view, link, sep, keys);
+
+      if (object !== 'studios' && sceneData.c_studio) {
+        const studio = document.createElement('span');
+        studio.innerText = studioArrayToString(sceneData.c_studio);
+        row.append(sep.cloneNode(true), studio);
+      }
+
       target.appendChild(row);
     });
 
@@ -2803,24 +2818,25 @@ button.nav-link.backlog-flash {
       if (backlogDiv.querySelector('[data-backlog="scene-changes"]')) return;
 
       try {
-        /** @typedef {[sceneId: string, entry: PerformerEntry]} performerScene */
+        /** @typedef {[sceneId: string, entry: PerformerEntry, studio: string]} performerScene */
         /** @type {{ append: performerScene[], remove: performerScene[] }} */
         const performerScenes = { append: [], remove: [] };
 
         for (const { sceneId, action } of Cache.performerScenes(performerId)) {
           const scene = storedData.scenes[sceneId];
+          const studio = studioArrayToString(scene.c_studio);
 
           const { append, remove } = scene.performers;
           if (action === 'append') {
             const appendEntry = append.find(({ id }) => id === performerId);
-            performerScenes.append.push([sceneId, appendEntry]);
+            performerScenes.append.push([sceneId, appendEntry, studio]);
           } else if (action === 'remove') {
             const removeEntry = remove.find(({ id }) => id === performerId);
             const targetEntry = append.find(({ appearance, name }) => {
               if (appearance) return [appearance, name].includes(removeEntry.name);
               return name.split(/\b/)[0] === removeEntry.name.split(/\b/)[0];
             });
-            performerScenes.remove.push([sceneId, targetEntry]);
+            performerScenes.remove.push([sceneId, targetEntry, studio]);
           }
         }
 
@@ -2859,6 +2875,7 @@ button.nav-link.backlog-flash {
           summary.innerText = `${actionPrefix[action]} ${scenes.length} scene${scenes.length === 1 ? '' : 's'}`;
           details.append(summary);
           const sceneLinks = document.createElement('ol');
+          sceneLinks.classList.add('mb-0');
           setStyles(sceneLinks, { paddingLeft: '2rem', fontWeight: 'normal' });
           scenes
             .slice()
@@ -2869,7 +2886,7 @@ button.nav-link.backlog-flash {
               if (bName === null) return -1;
               return 0;
             })
-            .forEach(([sceneId, entry], idx) => {
+            .forEach(([sceneId, entry, studio], idx) => {
               if (idx > 0 && idx % 10 === 0) {
                 const groupSep = document.createElement('br');
                 sceneLinks.appendChild(groupSep);
@@ -2893,6 +2910,8 @@ button.nav-link.backlog-flash {
                   changeItem.append(' (target: ', pLink, ')');
                 }
               }
+              if (studio)
+                changeItem.append(` - ${studio}`);
               sceneLinks.appendChild(changeItem);
             });
           details.append(sceneLinks);
@@ -3369,10 +3388,11 @@ button.nav-link.backlog-flash {
         details.append(summary);
 
         const scenesList = document.createElement('ol');
+        scenesList.classList.add('mb-0');
         setStyles(scenesList, { paddingLeft: '2rem', fontWeight: 'normal' });
         details.append(scenesList);
 
-        renderScenesList(studioScenes, scenesList);
+        renderScenesList(studioScenes, scenesList, 'studios');
 
         sceneChanges.append(details);
 
@@ -3883,7 +3903,7 @@ button.nav-link.backlog-flash {
         partial: partiallySubmittable,
       })[filter];
 
-      renderScenesList(list, scenesList);
+      renderScenesList(list, scenesList, null);
     };
 
     subTitle.innerText = 'Filter entries:';
