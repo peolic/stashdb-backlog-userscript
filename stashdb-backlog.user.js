@@ -2819,14 +2819,14 @@ button.nav-link.backlog-flash {
 
       try {
         /** @typedef {[sceneId: string, entry: PerformerEntry, studio: string]} performerScene */
-        /** @type {{ append: performerScene[], remove: performerScene[] }} */
-        const performerScenes = { append: [], remove: [] };
+        /** @type {Record<keyof SceneDataObject["performers"], performerScene[]>} */
+        const performerScenes = { append: [], remove: [], update: [] };
 
         for (const { sceneId, action } of Cache.performerScenes(performerId)) {
           const scene = storedData.scenes[sceneId];
           const studio = studioArrayToString(scene.c_studio);
 
-          const { append, remove } = scene.performers;
+          const { append, remove, update } = scene.performers;
           if (action === 'append') {
             const appendEntry = append.find(({ id }) => id === performerId);
             performerScenes.append.push([sceneId, appendEntry, studio]);
@@ -2837,10 +2837,13 @@ button.nav-link.backlog-flash {
               return name.split(/\b/)[0] === removeEntry.name.split(/\b/)[0];
             });
             performerScenes.remove.push([sceneId, targetEntry, studio]);
+          } else if (action === 'update') {
+            const updateEntry = update.find(({ id }) => id === performerId);
+            performerScenes.update.push([sceneId, updateEntry, studio]);
           }
         }
 
-        if (performerScenes.append.length === 0 && performerScenes.remove.length === 0) return;
+        if (Object.values(performerScenes).every((v) => v.length === 0)) return;
 
         const pName = {
           /** @param {PerformerEntry} entry */
@@ -2855,10 +2858,16 @@ button.nav-link.backlog-flash {
             const { name, disambiguation } = entry;
             return name + (disambiguation ? ` (${disambiguation})` : '');
           },
+          /** @param {PerformerEntry} entry */
+          update: (entry) => {
+            if (!entry) return null;
+            return entry.appearance || '""';
+          },
         };
         const actionPrefix = {
           append: '\u{FF0B}', // ＋
           remove: '\u{FF0D}', // －
+          update: '\u{FF5E}', // ～
         };
 
         const sceneChanges = document.createElement('div');
@@ -2867,7 +2876,7 @@ button.nav-link.backlog-flash {
         sceneChanges.innerText = 'This performer has pending scene changes:';
         for (const [actionStr, scenes] of Object.entries(performerScenes)) {
           if (scenes.length === 0) continue;
-          const action = /** @type {'append' | 'remove'} */ (actionStr);
+          const action = /** @type {keyof SceneDataObject["performers"]} */ (actionStr);
           const details = document.createElement('details');
           details.style.marginLeft = '1.5rem';
           const summary = document.createElement('summary');
@@ -2899,8 +2908,9 @@ button.nav-link.backlog-flash {
               });
               a.target = '_blank';
               changeItem.append(a);
-              if (action === 'append') changeItem.append(` (as ${pName[action](entry)})`);
-              if (action === 'remove') {
+              if (action === 'append')
+                changeItem.append(` (as ${pName[action](entry)})`);
+              else if (action === 'remove') {
                 if (!entry) {
                   changeItem.append(' (unknown target)');
                 } else {
@@ -2909,7 +2919,8 @@ button.nav-link.backlog-flash {
                     : pName[action](entry);
                   changeItem.append(' (target: ', pLink, ')');
                 }
-              }
+              } else if (action === 'update')
+                changeItem.append(` (to ${pName[action](entry)})`);
               if (studio)
                 changeItem.append(` - ${studio}`);
               sceneLinks.appendChild(changeItem);
