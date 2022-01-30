@@ -91,6 +91,7 @@ interface PerformerScenes {
 interface BaseCache {
     lastUpdated?: string;
     lastChecked?: string;
+    submitted?: string[];
 }
 
 interface DataCache extends BaseCache {

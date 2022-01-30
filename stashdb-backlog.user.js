@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.17
+// @version     1.24.18
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -624,9 +624,9 @@ button.nav-link.backlog-flash {
         const scenes = /** @type {DataCache['scenes']} */ (await this._getValue(this._SCENES_DATA_KEY));
         const performers = /** @type {DataCache['performers']} */ (await this._getValue(this._PERFORMERS_DATA_KEY));
         const cache = /** @type {BaseCache} */ (await this._getValue(this._DATA_INDEX_KEY));
-        const { lastChecked, lastUpdated } = cache;
+        const { lastChecked, lastUpdated, submitted } = cache;
         /** @type {DataCache} */
-        const dataCache = { scenes, performers, lastChecked, lastUpdated };
+        const dataCache = { scenes, performers, lastChecked, lastUpdated, submitted };
         if (Object.values(scenes).length === 0 && Object.values(performers).length === 0) {
           const legacyCache = /** @type {MutationDataCache} */ (await this._getValue(this._LEGACY_DATA_KEY));
           this._data = await applyDataCacheMigrations(legacyCache);
@@ -730,13 +730,14 @@ button.nav-link.backlog-flash {
    * @returns {Promise<DataCache>}
    */
   async function applyDataCacheMigrations(legacyCache) {
-    const { lastChecked, lastUpdated } = legacyCache;
+    const { lastChecked, lastUpdated, submitted } = legacyCache;
     /** @type {DataCache} */
     const dataCache = {
       scenes: {},
       performers: {},
       lastChecked,
       lastUpdated,
+      submitted,
     };
 
     // `scene/${uuid}` | `performer/${uuid}`
@@ -841,6 +842,17 @@ button.nav-link.backlog-flash {
     const storedData = await Cache.getStoredData();
     const objectCache = storedData[object];
     return objectCache[uuid];
+  }
+
+  /**
+   * @param {SupportedObject} object
+   * @param {string} uuid
+   * @returns {Promise<boolean | null>}
+   */
+  async function isSubmitted(object, uuid) {
+    if (object !== 'scenes') return null;
+    const storedData = await Cache.getStoredData();
+    return (storedData.submitted || []).find((i) => i === uuid) !== undefined;
   }
 
   /**
@@ -2167,6 +2179,26 @@ button.nav-link.backlog-flash {
     const sceneFormTabs = /** @type {HTMLDivElement[]} */ (Array.from(sceneForm.querySelector(':scope > .tab-content').children));
 
     sceneFormTabs.find(tab => tab.id.endsWith('-images')).style.maxWidth = '75%';
+
+    (async function submittedWarning() {
+      if (!(await isSubmitted('scenes', sceneId))) return;
+
+      const editsLink = makeLink(`/scenes/${sceneId}#edits`, 'double-check');
+      editsLink.classList.add('fw-bold', 'text-decoration-underline');
+
+      const warning = document.createElement('h3');
+      warning.classList.add('text-center', 'w-75', 'py-2', 'bg-gradient', 'bg-primary');
+      warning.append(
+        'This entry may have already been submitted, ',
+        document.createElement('br'),
+        'please ',
+        editsLink,
+        ' before submitting another.'
+      );
+
+      sceneForm.prepend(warning);
+      removeHook(warning, 'scenes', sceneId);
+    })();
 
     const pendingChangesContainer = document.createElement('div');
     pendingChangesContainer.classList.add('PendingChanges');
