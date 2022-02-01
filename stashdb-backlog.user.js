@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.18
+// @version     1.24.19
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2191,9 +2191,7 @@ button.nav-link.backlog-flash {
       warning.append(
         'This entry may have already been submitted, ',
         document.createElement('br'),
-        'please ',
-        editsLink,
-        ' before submitting another.'
+        'please ', editsLink, ' before submitting an edit.',
       );
 
       sceneForm.prepend(warning);
@@ -3900,12 +3898,12 @@ button.nav-link.backlog-flash {
     const reduceKey = (result, item) => {
       const [key, value] = item;
       const { comments, duplicates, duplicate_of, ...rest } = value;
-      return Object.keys(rest).filter(submittableKeys).length > 0 ? result.concat([[key, rest]]) : result;
+      return dataObjectKeys(rest).filter(submittableKeys).length > 0 ? result.concat([[key, rest]]) : result;
     };
     /** @param {SceneDataObject} item */
     const sortKey = (item) => {
       const performers = item.performers ? Object.values(item.performers).flat().length - 1 : 0;
-      return Object.keys(item).length + performers;
+      return dataObjectKeys(item).length + performers;
     };
 
     const storedData = await Cache.getStoredData();
