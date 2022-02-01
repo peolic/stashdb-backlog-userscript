@@ -2741,6 +2741,8 @@ button.nav-link.backlog-flash {
             site = 'IAFD';
           } else if (/indexxx\.com\/set\//.test(comment)) {
             site = 'Indexxx';
+          } else if (/data18.com\/content\//.test(comment)) {
+            site = 'DATA18';
           } else {
             return;
           }
@@ -3333,6 +3335,8 @@ button.nav-link.backlog-flash {
           site = 'Indexxx';
         } else if (/thenude\.com\/.*?_\d+.htm/.test(url)) {
           site = 'theNude';
+        } else if (/data18\.com\/pornstars\/.+/.test(url)) {
+          site = 'DATA18';
         } else {
           return;
         }
