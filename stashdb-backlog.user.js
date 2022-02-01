@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.19
+// @version     1.24.20
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2245,6 +2245,10 @@ button.nav-link.backlog-flash {
       field.append(set);
     };
 
+    // if no comments, set empty comment to enable field setter
+    if (!found.comments)
+      found.comments = [];
+
     const keySortOrder = [
       'title', 'date', 'duration',
       'performers', 'studio', 'url',
@@ -2701,13 +2705,15 @@ button.nav-link.backlog-flash {
           return null;
         };
 
-        comments.forEach((comment, index) => {
+        const fauxComment = comments.length === 0 ? [Symbol('Backlog')] : undefined;
+        (fauxComment || comments).forEach((comment, index) => {
           if (index > 0) dd.append(document.createElement('br'));
+          const text = typeof comment === 'string' ? comment : comment.description;
           const commentElement =
-            /^https?:/.test(comment)
-              ? makeLink(comment, null, { color: 'var(--bs-teal)' })
-              : document.createElement('span');
-          commentElement.innerText = prefixToName(comment) || comment;
+            /^https?:/.test(text)
+              ? makeLink(text, null, { color: 'var(--bs-teal)' })
+              : document.createElement(typeof comment === 'string' ? 'span' : 'code');
+          commentElement.innerText = prefixToName(text) || text;
           dd.appendChild(commentElement);
         });
 
