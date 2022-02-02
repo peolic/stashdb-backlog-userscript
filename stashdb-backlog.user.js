@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.22
+// @version     1.24.23
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2886,6 +2886,8 @@ button.nav-link.backlog-flash {
               if (appearance) return [appearance, name].includes(removeEntry.name);
               return name.split(/\b/)[0] === removeEntry.name.split(/\b/)[0];
             });
+            if (removeEntry.status === 'edit' || removeEntry.status === 'merge')
+                targetEntry.status = removeEntry.status;
             performerScenes.remove.push([sceneId, targetEntry, studio]);
           } else if (action === 'update') {
             const updateEntry = update.find(({ id }) => id === performerId);
@@ -2967,7 +2969,9 @@ button.nav-link.backlog-flash {
                   const pLink = entry.id
                     ? makeLink(`/performers/${entry.id}`, pName[action](entry), { color: 'var(--bs-teal)' })
                     : pName[action](entry);
-                  changeItem.append(' (target: ', pLink, ')');
+                  // status is set to the remove entry's status above
+                  const status = entry.status ? `${entry.status} into` : 'target';
+                  changeItem.append(` (${status}: `, pLink, ')');
                 }
               } else if (action === 'update')
                 changeItem.append(` (to ${pName[action](entry)})`);
