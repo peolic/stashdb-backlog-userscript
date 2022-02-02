@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.20
+// @version     1.24.21
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3007,9 +3007,10 @@ button.nav-link.backlog-flash {
         (Array.from(performerInfo.querySelectorAll('h3 > span, h3 > small')))
           .map(e => e.innerText).join(' ');
       if (performerName !== splitItem.name) {
-        const warning = document.createElement('span');
+        const warning = document.createElement('div');
         warning.classList.add('text-warning', 'fw-bold');
-        warning.innerText = `Unexpected performer name. Expected "${splitItem.name}".`;
+        warning.style.marginLeft = '1.75rem';
+        warning.innerText = `Unexpected performer name. Expected "${splitItem.name}"`;
         toSplit.appendChild(warning);
       }
 
@@ -3019,6 +3020,20 @@ button.nav-link.backlog-flash {
         notes.classList.add('fw-normal');
         notes.innerText = splitItem.notes.join('\n');
         toSplit.append(notes);
+      }
+
+      const emoji = document.createElement('span');
+      emoji.classList.add('me-1');
+      emoji.innerText = '🔀';
+      toSplit.prepend(emoji);
+
+      if (splitItem.shards.length === 0) {
+        const noShards = document.createElement('div');
+        setStyles(noShards, { marginLeft: '1.75rem', color: 'tan', width: 'max-content' });
+        noShards.innerText = 'No shards listed.';
+        toSplit.appendChild(noShards);
+        backlogDiv.append(toSplit);
+        return;
       }
 
       const shardsList = document.createElement('details');
@@ -3066,11 +3081,6 @@ button.nav-link.backlog-flash {
         shardsList.appendChild(shardEl);
       });
       toSplit.appendChild(shardsList);
-
-      const emoji = document.createElement('span');
-      emoji.classList.add('me-1');
-      emoji.innerText = '🔀';
-      toSplit.prepend(emoji);
       backlogDiv.append(toSplit);
     })();
 
