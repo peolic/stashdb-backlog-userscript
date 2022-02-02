@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.21
+// @version     1.24.22
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2328,7 +2328,9 @@ button.nav-link.backlog-flash {
             const aliasEl = performerItem.querySelector('input.performer-alias');
             setNativeValue(aliasEl, entry.appearance || '');
             if (entry.appearance) flashField(aliasEl);
+            return;
           }
+          alert('failed to add performer');
         };
 
         /**
@@ -2471,10 +2473,11 @@ button.nav-link.backlog-flash {
                   }
 
                   const buttons = Array.from(replPerformerItem.querySelectorAll('button'));
-                  const changeButton = buttons.find((btn) => btn.innerText === 'Change');
-                  changeButton.click();
+                  buttons
+                    .find((btn) => btn.innerText === 'Change')
+                    ?.click();
 
-                  const searchField = /** @type {HTMLElement} */ (changeButton.nextElementSibling);
+                  const searchField = /** @type {HTMLDivElement} */ (replPerformerItem.querySelector('.SearchField'));
                   const fieldEl = /** @type {HTMLInputElement} */ (searchField.querySelector('input'));
                   setNativeValue(fieldEl, entry.id);
                   const result = /** @type {HTMLDivElement | null} */ (await elementReadyIn('.react-select__option', 2000, searchField));
@@ -2487,6 +2490,15 @@ button.nav-link.backlog-flash {
                     const aliasEl = performerItem.querySelector('input.performer-alias');
                     setNativeValue(aliasEl, entry.appearance || '');
                     flashField(aliasEl);
+                    return;
+                  }
+                  try {
+                    Array.from(replPerformerItem.querySelectorAll('button'))
+                      .find((btn) => btn.innerText === 'Cancel')
+                      .click();
+                  } finally {
+                    const replName = replacement.name + (replacement.disambiguation ? ` [${replacement.disambiguation}]` : '');
+                    alert(`failed to replace performer ${replName} with ${name}`);
                   }
                 });
               }
@@ -3246,6 +3258,7 @@ button.nav-link.backlog-flash {
         setNativeValue(fieldEl, uuid);
         const result = /** @type {HTMLDivElement | null} */ (await elementReadyIn('.react-select__option', 2000, performerSelect));
         if (result) result.click();
+        else alert('failed to add performer');
       };
 
       const hasDuplicates = document.createElement('div');
