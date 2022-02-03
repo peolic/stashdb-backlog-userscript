@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.25
+// @version     1.24.26
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2835,8 +2835,6 @@ button.nav-link.backlog-flash {
     }
 
     (function performerLinks() {
-      if (!isDev) return;
-
       const header = performerInfo.querySelector('.card-header');
       if (header.querySelector('[data-backlog="links"]')) return;
 
@@ -2844,20 +2842,24 @@ button.nav-link.backlog-flash {
       const performerFiber = getReactFiber(performerInfo)?.return?.memoizedProps?.performer;
       if (!performerFiber) return;
 
+      const sortedUrls = performerFiber.urls
+        .slice().sort((a, b) => a.site.name.localeCompare(b.site.name));
+
       const links = document.createElement('div');
       links.classList.add('ms-auto', 'text-end', 'lh-sm');
-      setStyles(links, { flexBasis: '60px' });
+      const pxWidth = Math.ceil(sortedUrls.length / 2) * 20;
+      setStyles(links, { flexBasis: `${pxWidth}px` });
       links.dataset.backlog = 'links';
       header.appendChild(links);
 
-      links.append(...performerFiber.urls.map((url) => {
+      links.append(...sortedUrls.map(({ url, site }) => {
         const icon = document.createElement('img');
         icon.classList.add('SiteLink-icon', 'me-0', 'ms-1');
-        icon.src = url.site.icon;
+        icon.src = site.icon;
         icon.alt = '';
-        const a = makeLink(url.url, '');
+        const a = makeLink(url, '');
         a.classList.add('SiteLink');
-        a.title = url.site.name;
+        a.title = site.name;
         a.appendChild(icon);
         return a;
       }));
