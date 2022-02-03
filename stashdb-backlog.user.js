@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.24
+// @version     1.24.25
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2759,7 +2759,7 @@ button.nav-link.backlog-flash {
             site = 'IAFD';
           } else if (/indexxx\.com\/set\//.test(comment)) {
             site = 'Indexxx';
-          } else if (/data18.com\/content\//.test(comment)) {
+          } else if (/data18.com\/(content|scenes)\//.test(comment)) {
             site = 'DATA18';
           } else {
             return;
