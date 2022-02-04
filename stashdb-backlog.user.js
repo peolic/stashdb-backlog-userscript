@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.26
+// @version     1.24.27
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2223,7 +2223,7 @@ button.nav-link.backlog-flash {
     /**
      * @param {HTMLElement} field
      * @param {string} fieldName
-     * @param {string | (() => string)} value
+     * @param {string | ((current?: string) => string)} value
      * @param {boolean} [activeTab=false]
      */
     const settableField = (field, fieldName, value, activeTab) => {
@@ -2237,7 +2237,7 @@ button.nav-link.backlog-flash {
       set.innerText = 'set field';
       setStyles(set, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer' });
       set.addEventListener('click', () => {
-        setNativeValue(fieldEl, value instanceof Function ? value() : value);
+        setNativeValue(fieldEl, value instanceof Function ? value(fieldEl.value) : value);
         if (activeTab) getTabButton(fieldEl).click();
         flashField(fieldEl);
       });
@@ -2729,7 +2729,10 @@ button.nav-link.backlog-flash {
           dd.appendChild(commentElement);
         });
 
-        const editNote = () => comments
+        /** @param {string} current */
+        const editNote = (current) => [current]
+          .filter(Boolean)
+          .concat(comments)
           // Non-URLs or URLs that have not been added as links
           .filter((comment) => !/^https?:/.test(comment) || !getLinkByURL(comment))
           .map((comment) => {
