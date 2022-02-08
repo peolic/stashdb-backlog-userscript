@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.27
+// @version     1.24.28
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1191,15 +1191,27 @@ button.nav-link.backlog-flash {
       check.type = 'checkbox';
       check.classList.add('me-1');
 
-      const view = makeLink(`/scenes/${sceneId}`, '⭕');
+      const viewURL = `/scenes/${sceneId}`;
+      const view = makeLink(viewURL, '⭕');
       view.classList.add('me-1', 'text-decoration-none');
       view.title = 'View scene';
 
-      const link = makeLink(`/scenes/${sceneId}/edit`, sceneId);
+      const editURL = `${viewURL}/edit`
+      const link = makeLink(editURL, sceneId);
       link.classList.add('font-monospace', 'text-decoration-underline');
       link.title = 'Edit scene';
-      link.addEventListener('click', () => check.checked = true);
-      link.addEventListener('auxclick', () => check.checked = true);
+      /** @param {MouseEvent} event */
+      const editClick = (event) => {
+        check.checked = true;
+        if (reactRouterHistory) {
+          event.preventDefault();
+          event.stopPropagation();
+          reactRouterHistory.push(viewURL);
+          reactRouterHistory.push(editURL);
+        }
+      };
+      link.addEventListener('click', editClick);
+      link.addEventListener('auxclick', () => editClick);
 
       const sep = document.createElement('span');
       sep.classList.add('mx-2');
@@ -3094,7 +3106,13 @@ button.nav-link.backlog-flash {
 
         const links = document.createElement('div');
         (shard.links || []).forEach((url) => {
-          const siteName = (new URL(url)).hostname.split(/\./).slice(-2)[0];
+          const parsed = new URL(url);
+          let siteName = parsed.hostname.split(/\./).slice(-2)[0];
+          if (siteName === 'stashdb') {
+            const obj = parsed.pathname.match(/^\/(.+?)\/.+/)?.[1]?.slice(0, -1);
+            if (obj)
+              siteName += ` ${obj}`;
+          }
           const link = makeLink(url, `[${siteName}]`, { color: 'var(--bs-yellow)' });
           link.classList.add('me-1');
           link.title = url;
