@@ -3580,11 +3580,16 @@ button.nav-link.backlog-flash {
         const performerId = object === 'performers' ? parsePath().ident : null;
         performers.forEach((p, i) => {
           const name = p.performer.name + (p.performer.disambiguation ? ` [${p.performer.disambiguation}]` : '');
-          const pa = makeLink(
-            `/performers/${p.performer.id}`,
-            p.as ? `${p.as} (${name})` : name,
-          )
-          if (performerId && p.performer.id === performerId) pa.classList.add('fw-bold');
+          const label = p.as ? `${p.as} (${name})` : name;
+          /** @type {HTMLAnchorElement | HTMLSpanElement} */
+          let pa;
+          if (performerId && p.performer.id === performerId) {
+            pa = document.createElement('span');
+            pa.innerText = label;
+            pa.classList.add('fw-bold');
+          } else {
+            pa = makeLink(`/performers/${p.performer.id}`, label);
+          }
           if (i > 0) info.append(' | ', pa);
           else info.appendChild(pa);
         });
