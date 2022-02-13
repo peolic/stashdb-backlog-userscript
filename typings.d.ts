@@ -106,7 +106,7 @@ type SupportedObject = Exclude<keyof DataCache, keyof BaseCache>
 type DataObject = DataCache[SupportedObject][string]
 
 type ObjectKeys = {
-    performers: keyof PerformerDataObject | "scenes"
+    performers: Exclude<keyof PerformerDataObject, "name"> | "scenes"
     scenes: Exclude<keyof SceneDataObject, "comments" | "c_studio">
 }
 
