@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.25.1
+// @version     1.25.2
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3226,7 +3226,6 @@ button.nav-link.backlog-flash {
       const performerFiber = getReactFiber(performerInfo)?.return?.memoizedProps?.performer;
 
       const existingURLs = performerFiber?.urls?.map(({ url }) => url) || [];
-      const missingURLs = foundData.urls.filter((url) => !existingURLs.includes(url));
 
       const pendingURLs = document.createElement('div');
       pendingURLs.dataset.backlog = 'urls';
@@ -3249,18 +3248,26 @@ button.nav-link.backlog-flash {
         pendingURLs.append(document.createElement('br'), warning);
       }
 
-      if (missingURLs.length > 0)
-        missingURLs.forEach((url) => {
-          pendingURLs.append(document.createElement('br'));
-          const a = makeLink(url, undefined, { color: 'var(--bs-teal)', marginLeft: '1.75rem' });
-          a.target = '_blank';
-          pendingURLs.append(a);
-        });
-      else
+      if (foundData.urls.every((url) => existingURLs.includes(url))) {
         pendingURLs.append(
           document.createElement('br'),
-          'No remaining pending URLs, mark as done on the backlog sheet.',
+          'All pending URLs have been added, mark as done on the backlog sheet.',
         );
+      }
+
+      foundData.urls.forEach((url) => {
+        pendingURLs.append(document.createElement('br'));
+        const container = document.createElement('span');
+        container.style.marginLeft = '1.75rem';
+        const a = makeLink(url, undefined, { color: 'var(--bs-teal)' });
+        a.target = '_blank';
+        if (existingURLs.includes(url)) {
+          a.classList.add('text-decoration-line-through', 'text-muted');
+          container.prepend('✔ ');
+        }
+        container.appendChild(a);
+        pendingURLs.appendChild(container);
+      });
 
       const emoji = document.createElement('span');
       emoji.classList.add('me-1');
