@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.24.30
+// @version     1.25.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -195,8 +195,11 @@ async function inject() {
         return;
       }
 
-      if (ident && action === 'merge') {
-        return await iPerformerMergePage(ident);
+      if (ident) {
+        if (action === 'edit')
+          return await iPerformerEditPage(ident);
+        if (action === 'merge')
+          return await iPerformerMergePage(ident);
       }
     }
 
@@ -1131,7 +1134,8 @@ button.nav-link.backlog-flash {
       }));
 
   /** @param {string} site */
-  const getLinkBySiteType = (site) => getLinks().find((l) => l.type === site);
+  const getLinkBySiteType = (site) => getLinks()
+    .find((l) => l.type.localeCompare(site, undefined, { sensitivity: 'accent' }) === 0);
 
   /** @param {string} url */
   const getLinkByURL = (url) => getLinks().find((l) => l.value === url);
@@ -1146,18 +1150,19 @@ button.nav-link.backlog-flash {
 
     if (link) {
       if (!replace && link.value === url) {
-        return alert('studio url already correct');
+        return alert(`${site} link already correct`);
       }
       link.remove();
     }
 
     const linksContainer = /** @type {HTMLDivElement} */ (document.querySelector('form .URLInput'));
     const urlInput = linksContainer.querySelector(':scope > .input-group');
-    const typeSelect = /** @type {HTMLSelectElement} */ (urlInput.children[1]);
+    const siteSelect = /** @type {HTMLSelectElement} */ (urlInput.children[1]);
     const inputField = /** @type {HTMLInputElement} */ (urlInput.children[2]);
     const addButton = /** @type {HTMLButtonElement} */ (urlInput.children[3]);
-    const linkTypeStudio = Array.from(typeSelect.options).find((o) => o.text === site).value;
-    setNativeValue(typeSelect, linkTypeStudio);
+    const linkSite = Array.from(siteSelect.options)
+      .find((o) => o.text.localeCompare(site, undefined, { sensitivity: 'accent' }) === 0).value;
+    setNativeValue(siteSelect, linkSite);
     setNativeValue(inputField, url);
     if (addButton.disabled) {
       getTabButton(addButton).click();
@@ -3213,6 +3218,57 @@ button.nav-link.backlog-flash {
       backlogDiv.append(duplicateOf);
     })();
 
+    (function urls() {
+      if (!foundData.urls) return;
+      if (backlogDiv.querySelector('[data-backlog="urls"]')) return;
+
+      /** @type {{ urls: ScenePerformance_URL[] }} */
+      const performerFiber = getReactFiber(performerInfo)?.return?.memoizedProps?.performer;
+
+      const existingURLs = performerFiber?.urls?.map(({ url }) => url) || [];
+      const missingURLs = foundData.urls.filter((url) => !existingURLs.includes(url));
+
+      const pendingURLs = document.createElement('div');
+      pendingURLs.dataset.backlog = 'urls';
+      pendingURLs.classList.add('mb-1', 'p-1');
+
+      const label = document.createElement('span');
+      label.classList.add('fw-bold');
+      label.innerText = 'This performer has pending URLs:';
+      pendingURLs.appendChild(label);
+
+      const expectedName = foundData.name.replace(/\[(?<! )/, '(').replace(/\]$/, ')');
+      const performerName =
+        /** @type {HTMLElement[]} */
+        (Array.from(performerInfo.querySelectorAll('h3 > span, h3 > small')))
+          .map(e => e.innerText).join(' ');
+      if (performerName !== expectedName) {
+        const warning = document.createElement('span');
+        warning.classList.add('text-warning', 'fw-bold');
+        warning.innerText = `Unexpected performer name. Expected "${expectedName}"`;
+        pendingURLs.append(document.createElement('br'), warning);
+      }
+
+      if (missingURLs.length > 0)
+        missingURLs.forEach((url) => {
+          pendingURLs.append(document.createElement('br'));
+          const a = makeLink(url, undefined, { color: 'var(--bs-teal)', marginLeft: '1.75rem' });
+          a.target = '_blank';
+          pendingURLs.append(a);
+        });
+      else
+        pendingURLs.append(
+          document.createElement('br'),
+          'No remaining pending URLs, mark as done on the backlog sheet.',
+        );
+
+      const emoji = document.createElement('span');
+      emoji.classList.add('me-1');
+      emoji.innerText = '🔗';
+      pendingURLs.prepend(emoji);
+      backlogDiv.append(pendingURLs);
+    })();
+
     // const markerDataset = performerInfo.dataset;
     // if (markerDataset.backlogInjected) {
     //   console.debug('[backlog] already injected');
@@ -3220,6 +3276,79 @@ button.nav-link.backlog-flash {
 
     // markerDataset.backlogInjected = 'true';
   } // iPerformerPage
+
+  // =====
+
+  /**
+   * @param {string} performerId
+   */
+  async function iPerformerEditPage(performerId) {
+    const pageTitle = /** @type {HTMLHeadingElement} */ (await elementReadyIn('h3', 1000));
+    if (!pageTitle) return;
+
+    const markerDataset = pageTitle.dataset;
+    if (markerDataset.backlogInjected) {
+      console.debug('[backlog] already injected, skipping');
+      return;
+    } else {
+      markerDataset.backlogInjected = 'true';
+    }
+
+    const found = await getDataFor('performers', performerId);
+    if (!found) return;
+    console.debug('[backlog] found', found);
+
+    const performerForm = /** @type {HTMLFormElement} */ (document.querySelector('.PerformerForm'));
+
+    const pendingChangesContainer = document.createElement('div');
+    pendingChangesContainer.classList.add('PendingChanges');
+    setStyles(pendingChangesContainer, { position: 'absolute', top: '6rem', right: '1vw', width: '24vw' });
+    const pendingChangesTitle = document.createElement('h3');
+    pendingChangesTitle.innerText = 'Backlogged Changes';
+    pendingChangesContainer.appendChild(pendingChangesTitle);
+    const pendingChanges = document.createElement('dl');
+    pendingChangesContainer.appendChild(pendingChanges);
+
+    performerForm.append(pendingChangesContainer);
+
+    const dtLinks = document.createElement('dt');
+    dtLinks.innerText = 'urls';
+    dtLinks.id = `backlog-pending-urls-title`;
+    pendingChanges.appendChild(dtLinks);
+
+    const ddLinks = document.createElement('dd');
+    ddLinks.id = `backlog-pending-urls`;
+    pendingChanges.appendChild(ddLinks);
+
+    /** @type {(() => void)[]} */
+    const addAll = [];
+
+    found.urls.forEach((url) => {
+      const site = (new URL(url)).hostname.replace(/^www\.|\.[a-z]{3}$/ig, '');
+      const container = document.createElement('div');
+      const set = document.createElement('a');
+      set.innerText = `add ${site} link`;
+      set.classList.add('fw-bold');
+      setStyles(set, { color: 'var(--bs-yellow)', cursor: 'pointer' });
+      const addFunc = () => addSiteURL(site, url, true);
+      set.addEventListener('click', addFunc);
+      addAll.push(addFunc);
+      container.append(set, ':');
+      const link = makeLink(url);
+      link.classList.add('text-truncate', 'd-block', 'ms-2');
+      container.appendChild(link);
+      ddLinks.appendChild(container);
+    });
+
+    const set = document.createElement('a');
+    set.innerText = 'add all';
+    setStyles(set, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer' });
+    set.addEventListener('click', () => addAll.forEach((f) => f()));
+    dtLinks.innerText += ':';
+    dtLinks.append(set);
+
+    pendingChanges.append(dtLinks, ddLinks);
+  }
 
   // =====
 

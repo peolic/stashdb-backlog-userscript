@@ -79,6 +79,8 @@ interface PerformerDataObject {
         shards: SplitShard[];
         notes?: string[];
     };
+    urls?: string[];
+    name?: string;
 }
 
 interface PerformerScenes {
