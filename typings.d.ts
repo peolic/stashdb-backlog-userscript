@@ -32,10 +32,13 @@ interface FetchError {
     body: string | null;
 }
 
+type FingerprintAlgorithm = "phash" | "oshash" | "md5";
+
 type SceneFingerprint = {
-    algorithm: string;
+    algorithm: FingerprintAlgorithm;
     hash: string;
     correct_scene_id: string | null;
+    duration?: number;
 }
 
 interface SceneDataObject {
@@ -139,6 +142,14 @@ type FingerprintsColumnIndices = {
     duration: number;
     submissions: number;
 }
+
+type FingerprintsRow = {
+    row: HTMLTableRowElement;
+    algorithm: FingerprintAlgorithm;
+    hash: string;
+    duration: number | null;
+    submissions: number;
+};
 
 //#region https://github.com/stashapp/stash-box/blob/develop/frontend/src/graphql/definitions/Scenes.ts
 interface ScenePerformance_URL {
