@@ -3382,7 +3382,7 @@ button.nav-link.backlog-flash {
         transition: 'background-color .5s',
       });
       const target = performerMerge.querySelector(':scope > .row > .col-6:last-child');
-      target.prepend(backlogDiv);
+      target.append(backlogDiv);
       removeHook(backlogDiv, 'performers', performerId);
 
       performerSelect.addEventListener('mouseover', () => {
@@ -3513,7 +3513,12 @@ button.nav-link.backlog-flash {
     })();
 
     (async function profileUrls() {
+      if (!foundData.duplicates) return;
+
       await elementReady('.PerformerForm', performerMerge);
+
+      const duplicatesDiv = backlogDiv.querySelector('[data-backlog="duplicates"]');
+      duplicatesDiv.remove();
 
       const list = document.createElement('ul');
       setStyles(list, {
@@ -3521,7 +3526,23 @@ button.nav-link.backlog-flash {
         paddingLeft: '0.5rem',
       });
 
-      profiles.forEach((url) => {
+      const urls = foundData.urls || [];
+      urls.forEach((url) => {
+        const site = (new URL(url)).hostname.replace(/^www\.|\.[a-z]{3}$/ig, '');
+        const li = document.createElement('li');
+        const set = document.createElement('a');
+        set.innerText = `add ${site} profile link`;
+        set.classList.add('fw-bold');
+        setStyles(set, { color: 'var(--bs-yellow)', cursor: 'pointer' });
+        set.addEventListener('click', () => addSiteURL(site, url, true));
+        li.append(set, ':');
+        const link = makeLink(url);
+        link.classList.add('text-truncate', 'd-block', 'ms-4');
+        li.appendChild(link);
+        list.appendChild(li);
+      });
+
+      profiles.filter((u) => !urls.includes(u)).forEach((url) => {
         /** @type {string} */
         let site;
         if (/iafd\.com\/person\.rme\/perfid=/.test(url)) {
@@ -3536,7 +3557,6 @@ button.nav-link.backlog-flash {
           return;
         }
         const li = document.createElement('li');
-        li.classList.add('text-truncate');
         const set = document.createElement('a');
         set.innerText = `add ${site} profile link`;
         set.classList.add('fw-bold');
@@ -3544,7 +3564,7 @@ button.nav-link.backlog-flash {
         set.addEventListener('click', () => addSiteURL(site, url, true));
         li.append(set, ':');
         const link = makeLink(url);
-        link.classList.add('d-block', 'ms-4');
+        link.classList.add('text-truncate', 'd-block', 'ms-4');
         li.appendChild(link);
         list.appendChild(li);
       });
