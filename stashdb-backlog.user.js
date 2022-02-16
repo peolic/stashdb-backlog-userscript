@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.25.2
+// @version     1.26.2
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -215,10 +215,16 @@ async function inject() {
       return await highlightSearchResults();
     }
 
-    // Backlog list page
+    // Backlog scenes list page
     //@ts-expect-error
     if (object === 'backlog') {
-      return await iBacklogPage();
+      return await iSceneBacklogPage();
+    }
+
+    // Backlog performers list page
+    //@ts-expect-error
+    if (object === 'pbacklog') {
+      return await iPerformerBacklogPage();
     }
 
     // Home page
@@ -444,8 +450,12 @@ button.nav-link.backlog-flash {
       const versionInfo = block(`userscript version: ${usVersion}`);
       info.append(hr, versionInfo);
 
-      const backlogLink = makeLink('/backlog', 'Backlog Summary Page');
-      info.append(hr.cloneNode(), backlogLink);
+      info.append(
+        hr.cloneNode(),
+        makeLink('/backlog', 'Scene Backlog Summary Page'),
+        hr.cloneNode(),
+        makeLink('/pbacklog', 'Performer Backlog Summary Page'),
+      );
     }
   }
 
@@ -4075,7 +4085,7 @@ button.nav-link.backlog-flash {
 
   } // iEditCards
 
-  async function iBacklogPage() {
+  async function iSceneBacklogPage() {
     const main = /** @type {HTMLDivElement} */ (await elementReadyIn('.NarrowPage', 200));
     if (!main) {
       alert('failed to construct backlog page');
@@ -4083,7 +4093,7 @@ button.nav-link.backlog-flash {
     }
 
     toggleBacklogInfo(false);
-    document.title = `Backlog Summary | ${document.title}`;
+    document.title = `Scene Backlog Summary | ${document.title}`;
 
     const scenes = document.createElement('div');
     main.appendChild(scenes);
@@ -4195,7 +4205,138 @@ button.nav-link.backlog-flash {
     });
 
     renderList(window.location.hash.slice(1) || 'full');
-  } // iBacklogPage
+  } // iSceneBacklogPage
+
+  async function iPerformerBacklogPage() {
+    const main = /** @type {HTMLDivElement} */ (await elementReadyIn('.NarrowPage', 200));
+    if (!main) {
+      alert('failed to construct backlog page');
+      return;
+    }
+
+    toggleBacklogInfo(false);
+    document.title = `Performer Backlog Summary | ${document.title}`;
+
+    const performers = document.createElement('div');
+    main.appendChild(performers);
+
+    const performersHeader = document.createElement('h3');
+    performersHeader.innerText = 'Performers';
+    performers.appendChild(performersHeader);
+
+    const subTitle = document.createElement('h5');
+    subTitle.innerText = 'Loading...';
+    performers.appendChild(subTitle);
+
+    const desc = document.createElement('p');
+    desc.innerText = '';
+    performers.appendChild(desc);
+
+    const performersList = document.createElement('ol');
+    // performersList.classList.add('ps-2');
+    performers.appendChild(performersList);
+
+    window.addEventListener(locationChanged, () => performers.remove(), { once: true });
+
+    await wait(0);
+
+    /** @type {(keyof PerformerDataObject)[]} */
+    const unsubmittableKeys = ['name'];
+    /** @param {string} key */
+    const submittableKeys = (key) => !(unsubmittableKeys).includes(/** @type {keyof PerformerDataObject} */ (key));
+
+    /** @typedef {[string, PerformerDataObject]} PerformerEntriesItem */
+
+    /**
+     * @param {PerformerEntriesItem[]} result
+     * @param {PerformerEntriesItem} item
+     */
+    const reduceKey = (result, item) => {
+      const [key, value] = item;
+      const { ...rest } = value;
+      return dataObjectKeys(rest).filter(submittableKeys).length > 0 ? result.concat([[key, rest]]) : result;
+    };
+    /** @param {PerformerDataObject} item */
+    const sortKey = (item) => {
+      return item.name || item.split?.name || dataObjectKeys(item).length;
+    };
+
+    const storedData = await Cache.getStoredData();
+    const sortedPerformers =
+      Object.entries(storedData.performers)
+        .reduce(reduceKey, [])
+        .sort((a, b) => {
+          const aKey = sortKey(a[1]);
+          const bKey = sortKey(b[1]);
+          if (typeof bKey === 'string' && typeof aKey === 'string')
+            return aKey.localeCompare(bKey, undefined, { sensitivity: 'accent' });
+          if (typeof bKey === 'number' && typeof aKey === 'number')
+            return bKey - aKey;
+          if (typeof aKey === 'string')
+            return -1;
+          if (typeof bKey === 'string')
+            return 1;
+          return 0;
+        });
+
+    desc.innerText = (
+      'The checkbox marks an entry as "seen" but leaving this page will reset that status.'
+      + '\nMarking as "seen" does not do any action.'
+    );
+
+    subTitle.innerText = (
+      'Note: There is currently no automated check for submitted entries or completed entries.'
+      + '\nSome entries need to be merged and/or split, take extra cake with those.'
+    );
+
+    sortedPerformers.forEach(([performerId, performerData], idx) => {
+      if (idx > 0 && idx % 10 === 0)
+        performersList.appendChild(document.createElement('br'));
+
+      const row = document.createElement('li');
+
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.classList.add('me-1');
+
+      const viewURL = `/performers/${performerId}`;
+      const view = makeLink(viewURL, '⭕');
+      view.classList.add('me-1', 'text-decoration-none');
+      view.title = 'View performer';
+
+      const editURL = !performerData.duplicates ? `${viewURL}/edit` : `${viewURL}/merge`;
+      const name = [performerData.name, performerData.split?.name].find((n) => !!n);
+      const link = makeLink(editURL, name || performerId);
+      if (!name)
+        link.classList.add('font-monospace');
+      link.classList.add('text-decoration-underline');
+      link.title = 'Edit scene';
+      /** @param {MouseEvent} event */
+      const editClick = (event) => {
+        check.checked = true;
+        if (!event.ctrlKey && reactRouterHistory) {
+          event.preventDefault();
+          event.stopPropagation();
+          reactRouterHistory.push(viewURL);
+          reactRouterHistory.push(editURL);
+        }
+      };
+      link.addEventListener('click', editClick);
+      link.addEventListener('auxclick', () => editClick);
+
+      const sep = document.createElement('span');
+      sep.classList.add('mx-2');
+      sep.innerHTML = '&mdash;';
+
+      const keys = dataObjectKeys(performerData)
+        .map((k) => k === 'urls' || k === 'duplicates' ? `${Object.values(performerData[k]).length}x ${k}` : k)
+        .join(', ');
+
+      row.append(check, view, link, sep, keys);
+
+      performersList.appendChild(row);
+    });
+  } // iPerformerBacklogPage
 }
 
 // Based on: https://dirask.com/posts/JavaScript-on-location-changed-event-on-url-changed-event-DKeyZj
