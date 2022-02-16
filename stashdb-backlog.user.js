@@ -1201,14 +1201,14 @@ button.nav-link.backlog-flash {
       view.classList.add('me-1', 'text-decoration-none');
       view.title = 'View scene';
 
-      const editURL = `${viewURL}/edit`
+      const editURL = `${viewURL}/edit`;
       const link = makeLink(editURL, sceneId);
       link.classList.add('font-monospace', 'text-decoration-underline');
       link.title = 'Edit scene';
       /** @param {MouseEvent} event */
       const editClick = (event) => {
         check.checked = true;
-        if (reactRouterHistory) {
+        if (!event.ctrlKey && reactRouterHistory) {
           event.preventDefault();
           event.stopPropagation();
           reactRouterHistory.push(viewURL);
