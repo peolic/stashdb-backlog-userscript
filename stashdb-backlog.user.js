@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.3
+// @version     1.26.4
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1234,18 +1234,9 @@ button.nav-link.backlog-flash {
       const link = makeLink(editURL, sceneId);
       link.classList.add('font-monospace', 'text-decoration-underline');
       link.title = 'Edit scene';
-      /** @param {MouseEvent} event */
-      const editClick = (event) => {
-        check.checked = true;
-        if (!event.ctrlKey && reactRouterHistory) {
-          event.preventDefault();
-          event.stopPropagation();
-          reactRouterHistory.push(viewURL);
-          reactRouterHistory.push(editURL);
-        }
-      };
+      const editClick = () => check.checked = true;
       link.addEventListener('click', editClick);
-      link.addEventListener('auxclick', () => editClick);
+      link.addEventListener('auxclick', editClick);
 
       const sep = document.createElement('span');
       sep.classList.add('mx-2');
@@ -4361,18 +4352,9 @@ button.nav-link.backlog-flash {
         link.classList.add('font-monospace');
       link.classList.add('text-decoration-underline');
       link.title = 'Edit scene';
-      /** @param {MouseEvent} event */
-      const editClick = (event) => {
-        check.checked = true;
-        if (!event.ctrlKey && reactRouterHistory) {
-          event.preventDefault();
-          event.stopPropagation();
-          reactRouterHistory.push(viewURL);
-          reactRouterHistory.push(editURL);
-        }
-      };
+      const editClick = () => check.checked = true;
       link.addEventListener('click', editClick);
-      link.addEventListener('auxclick', () => editClick);
+      link.addEventListener('auxclick', editClick);
 
       const sep = document.createElement('span');
       sep.classList.add('mx-2');
