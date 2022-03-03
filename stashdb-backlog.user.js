@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.4
+// @version     1.26.5
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3353,7 +3353,7 @@ button.nav-link.backlog-flash {
     }
 
     const found = await getDataFor('performers', performerId);
-    if (!found) return;
+    if (!found || !found.urls) return;
     console.debug('[backlog] found', found);
 
     const performerForm = /** @type {HTMLFormElement} */ (document.querySelector('.PerformerForm'));
