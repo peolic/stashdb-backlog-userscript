@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.5
+// @version     1.26.6
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2172,9 +2172,13 @@ button.nav-link.backlog-flash {
       const notFound = found.fingerprints.length - exactMatches;
 
       if (exactMatches || durationsFound || notFound) {
+        const fpInfoWrapper = document.createElement('div');
+        fpInfoWrapper.dataset.backlog = 'fingerprints';
+        fpInfoWrapper.classList.add('position-relative');
+
         const fpInfo = document.createElement('div');
-        fpInfo.dataset.backlog = 'fingerprints';
-        fpInfo.classList.add('float-end', 'd-flex', 'flex-column');
+        fpInfo.classList.add('position-absolute', 'end-0', 'd-flex', 'flex-column');
+        fpInfoWrapper.appendChild(fpInfo);
 
         const backlogSheetId = '357846927'; // Fingerprints
         const quickViewLink = makeLink(
@@ -2196,29 +2200,44 @@ button.nav-link.backlog-flash {
         backlogInfo.append(sheetLink, ' (', quickViewLink, ')');
         fpInfo.append(backlogInfo);
 
-        const makeElement = (/** @type {string[]} */ ...content) => {
+        const makeNode = (/** @type {string} */ content) => {
+          const b = document.createElement('b');
+          b.classList.add('ms-2');
+          b.innerText = content;
+          return b;
+        };
+
+        const makeElement = (/** @type {(string | Node)[]} */ ...content) => {
           const span = document.createElement('span');
           span.classList.add('d-flex', 'justify-content-between');
-          content.forEach((c) => {
-            const b = document.createElement('b');
-            b.classList.add('ms-2');
-            b.innerText = c;
-            span.appendChild(b);
-          });
+          span.append(...content.map((c) => c instanceof Node ? c : makeNode(c)))
           return span;
         };
 
-        if (durationsFound)
-          fpInfo.appendChild(makeElement('Reported fingerprints by duration:', `${durationsFound} \u{2139}`))
-            .style.color = 'var(--bs-blue)';
-        if (exactMatches)
-          fpInfo.appendChild(makeElement('Reported incorrect fingerprints:', `${exactMatches} \u{2139}`))
-            .classList.add('text-warning');
+        if (exactMatches) {
+          const el = makeElement('Incorrect fingerprints:');
+          el.classList.add('text-warning');
+          const count = document.createElement('b');
+          count.classList.add('ms-2');
+          el.appendChild(count);
+          const countExact = document.createElement('span');
+          countExact.innerText = `${exactMatches}`;
+          count.append(countExact);
+          if (durationsFound) {
+            const countDuration = document.createElement('span');
+            countDuration.style.color = 'var(--bs-blue)';
+            countDuration.innerText = ` +⌚${durationsFound}`;
+            countDuration.title = 'Fingerprints by duration';
+            count.append(countDuration);
+          }
+          count.append(' \u{2139}');
+          fpInfo.appendChild(el);
+        }
         if (notFound)
-          fpInfo.appendChild(makeElement('Missing reported fingerprints:', `${notFound} ⚠`))
+          fpInfo.appendChild(makeElement('Missing fingerprints:', `${notFound} ⚠`))
             .classList.add('text-danger');
-        sceneInfo.parentElement.querySelector('ul.nav[role="tablist"]').before(fpInfo);
-        removeHook(fpInfo, 'scenes', sceneId);
+        sceneInfo.parentElement.querySelector('ul.nav[role="tablist"]').before(fpInfoWrapper);
+        removeHook(fpInfoWrapper, 'scenes', sceneId);
       }
     })();
 
