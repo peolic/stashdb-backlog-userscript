@@ -2180,15 +2180,15 @@ button.nav-link.backlog-flash {
         const quickViewLink = makeLink(
           backlogQuickViewURL(
             backlogSheetId,
-            `select B,G,H,I,J,K where F="${sceneId}" label B "Done", H "Hash", I "✨Correct Scene ID"`,
+            `select B,G,H,I,J,K,L where F="${sceneId}" label B "Done", G "Algorithm", H "Hash", I "Correct Scene ID"`,
           ),
           'quick view',
-          { color: 'var(--bs-teal)' },
+          { color: 'var(--bs-cyan)' },
         );
         const sheetLink = makeLink(
           `${backlogSpreadsheet}/edit#gid=${backlogSheetId}`,
           'Fingerprints backlog sheet',
-          { color: 'var(--bs-red)' },
+          { color: 'var(--bs-teal)' },
         );
 
         const backlogInfo = document.createElement('span');
