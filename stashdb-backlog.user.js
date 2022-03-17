@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.7
+// @version     1.26.8
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3788,7 +3788,7 @@ button.nav-link.backlog-flash {
       if (changes[0] === 'duplicate_of' || changes[0] === 'duplicates') {
         return `${style} var(--bs-pink)`;
       }
-      if (changes[0] === 'fingerprints') {
+      if (changes[0] === 'fingerprints' || changes[0] === 'urls') {
         return `${style} var(--bs-cyan)`;
       }
       if (changes[0] === 'scenes') {
@@ -4108,6 +4108,9 @@ button.nav-link.backlog-flash {
       if (changes.length === 1) {
         if (changes[0] === 'scenes') {
           backgroundColor = 'var(--bs-green)';
+        }
+        if (changes[0] === 'fingerprints' || changes[0] === 'urls') {
+          backgroundColor = 'var(--bs-indigo)';
         }
       }
 
