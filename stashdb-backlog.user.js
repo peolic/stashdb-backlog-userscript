@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.8
+// @version     1.26.9
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -4131,14 +4131,22 @@ button.nav-link.backlog-flash {
      */
     const makeArray = (v) => Array.isArray(v) ? v : [v].filter(Boolean);
 
-    /** @type {Partial<Record<EditOperation, (body: HTMLDivElement) => HTMLAnchorElement[]>>} */
-    const targetSelectors = {
-      // ModifyEdit
-      modify: (body) => makeArray(body.querySelector(':scope > .row:first-child a')),
-      // MergeEdit (sources / target)
-      merge: (body) => Array.from(body.querySelectorAll(':scope > .row:first-child .row:nth-child(-n+2) a')),
-      // DestroyEdit
-      destroy: (body) => makeArray(body.querySelector(':scope > .row:first-child a')),
+    /**
+     * @param {EditOperation} operation
+     * @param {HTMLDivElement} body
+     * @returns {HTMLAnchorElement[]}
+     */
+    const selectTargetLinks = (operation, body) => {
+      switch (operation) {
+        case 'create':
+        case 'modify':
+        case 'destroy':
+          return makeArray(body.querySelector(':scope > .row:first-child a'));
+        case 'merge':
+          return Array.from(body.querySelectorAll(':scope > .row:first-child .row:nth-child(-n+2) a'));
+        default:
+          return [];
+      }
     };
 
     const cards = /** @type {HTMLDivElement[]} */ (Array.from(document.querySelectorAll(selector)));
@@ -4149,14 +4157,13 @@ button.nav-link.backlog-flash {
       /** @type {HTMLDivElement} */
       const cardBody = card.querySelector('.card-body');
 
-      if (operation in targetSelectors) {
-        const targetLinks = targetSelectors[operation](cardBody);
-        if (targetLinks.length === 0) {
-          console.error('target link not found', cardBody);
-          continue;
-        }
-        targetLinks.forEach((el) => handleEntityLink(el, entity));
+      const targetLinks = selectTargetLinks(operation, cardBody);
+      if (targetLinks.length === 0) {
+        if (operation !== 'create')
+          console.error(`${operation} edit target link(s) not found`, cardBody);
+        continue;
       }
+      targetLinks.forEach((el) => handleEntityLink(el, entity));
 
       if (entity === 'scene') {
         /** @type {HTMLAnchorElement[]} */
