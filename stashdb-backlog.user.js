@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.10
+// @version     1.26.11
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -559,10 +559,14 @@ button.nav-link.backlog-flash {
   async function request(url, responseType) {
     const response = await new Promise((resolve, reject) => {
       console.debug(`[backlog] requesting ${responseType}: ${url}`);
+      const headers = responseType === 'json'
+        ? {'Cache-Control': 'no-cache, no-store, max-age=0'}
+        : undefined;
       //@ts-expect-error
       GM.xmlHttpRequest({
         method: 'GET',
         url,
+        headers,
         responseType,
         anonymous: true,
         timeout: 10000,
@@ -1950,7 +1954,7 @@ button.nav-link.backlog-flash {
             }
             return pending;
           }, /** @type {{ first: string, status?: string, pa: HTMLAnchorElement }[]} */ ([]));
-        const matchedToRemove = (
+        const matchedToRemove = !entry.id && (
           pendingRemoval.find(({ first }) => [entry.appearance, entry.name].includes(first))
           || pendingRemoval.find(({ first }) => entry.name.split(/\b/)[0] == first.split(/\b/)[0])
         );
@@ -2531,7 +2535,7 @@ button.nav-link.backlog-flash {
                 info.append(document.createElement('br'), uuid);
 
                 // Attempt to find a performer-to-remove with the same name
-                const replacement = (
+                const replacement = !entry.id && (
                   performers.remove.find((toRemove) => [entry.appearance, entry.name].includes(toRemove.appearance || toRemove.name))
                   || performers.remove.find((toRemove) => entry.name.split(/\b/)[0] == (toRemove.appearance || toRemove.name).split(/\b/)[0])
                 );
@@ -2995,12 +2999,13 @@ button.nav-link.backlog-flash {
             performerScenes.append.push([sceneId, appendEntry, studio]);
           } else if (action === 'remove') {
             const removeEntry = remove.find(({ id }) => id === performerId);
-            const targetEntry = append.find(({ appearance, name }) => {
+            const targetEntry = append.find(({ id, appearance, name }) => {
+              if (id) return false;
               if (appearance) return [appearance, name].includes(removeEntry.name);
               return name.split(/\b/)[0] === removeEntry.name.split(/\b/)[0];
             });
-            if (removeEntry.status === 'edit' || removeEntry.status === 'merge')
-                targetEntry.status = removeEntry.status;
+            if (targetEntry && (removeEntry.status === 'edit' || removeEntry.status === 'merge'))
+              targetEntry.status = removeEntry.status;
             performerScenes.remove.push([sceneId, targetEntry, studio]);
           } else if (action === 'update') {
             const updateEntry = update.find(({ id }) => id === performerId);
