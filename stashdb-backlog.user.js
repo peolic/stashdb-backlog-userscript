@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.11
+// @version     1.26.12
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1954,7 +1954,7 @@ button.nav-link.backlog-flash {
             }
             return pending;
           }, /** @type {{ first: string, status?: string, pa: HTMLAnchorElement }[]} */ ([]));
-        const matchedToRemove = !entry.id && (
+        const matchedToRemove = (
           pendingRemoval.find(({ first }) => [entry.appearance, entry.name].includes(first))
           || pendingRemoval.find(({ first }) => entry.name.split(/\b/)[0] == first.split(/\b/)[0])
         );
@@ -2535,7 +2535,7 @@ button.nav-link.backlog-flash {
                 info.append(document.createElement('br'), uuid);
 
                 // Attempt to find a performer-to-remove with the same name
-                const replacement = !entry.id && (
+                const replacement = (
                   performers.remove.find((toRemove) => [entry.appearance, entry.name].includes(toRemove.appearance || toRemove.name))
                   || performers.remove.find((toRemove) => entry.name.split(/\b/)[0] == (toRemove.appearance || toRemove.name).split(/\b/)[0])
                 );
@@ -2999,12 +2999,11 @@ button.nav-link.backlog-flash {
             performerScenes.append.push([sceneId, appendEntry, studio]);
           } else if (action === 'remove') {
             const removeEntry = remove.find(({ id }) => id === performerId);
-            const targetEntry = append.find(({ id, appearance, name }) => {
-              if (id) return false;
+            const targetEntry = append.find(({ appearance, name }) => {
               if (appearance) return [appearance, name].includes(removeEntry.name);
               return name.split(/\b/)[0] === removeEntry.name.split(/\b/)[0];
             });
-            if (targetEntry && (removeEntry.status === 'edit' || removeEntry.status === 'merge'))
+            if (removeEntry.status === 'edit' || removeEntry.status === 'merge')
               targetEntry.status = removeEntry.status;
             performerScenes.remove.push([sceneId, targetEntry, studio]);
           } else if (action === 'update') {
