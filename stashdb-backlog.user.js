@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.12
+// @version     1.26.13
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3886,7 +3886,8 @@ button.nav-link.backlog-flash {
 
   async function highlightPerformerCards() {
     const selector = '.PerformerCard';
-    if (!await elementReadyIn(selector, 2000)) {
+    const isLoading = !!document.querySelector('.LoadingIndicator');
+    if (!await elementReadyIn(selector, isLoading ? 5000 : 2000)) {
       console.debug('[backlog] no performer cards found, skipping');
       return;
     }
@@ -3917,7 +3918,8 @@ button.nav-link.backlog-flash {
 
   async function highlightSearchResults() {
     const selector = 'a.SearchPage-scene, a.SearchPage-performer';
-    if (!await elementReadyIn(selector, 2000)) {
+    const isLoading = !!document.querySelector('.LoadingIndicator');
+    if (!await elementReadyIn(selector, isLoading ? 5000 : 2000)) {
       console.debug('[backlog] no scene/performer search results found, skipping');
       return;
     }
@@ -4087,7 +4089,8 @@ button.nav-link.backlog-flash {
 
   async function iEditCards() {
     const selector = '.EditCard';
-    if (!await elementReadyIn(selector, 1000)) return;
+    const isLoading = !!document.querySelector('.LoadingIndicator');
+    if (!await elementReadyIn(selector, isLoading ? 5000 : 2000)) return;
 
     const storedData = await Cache.getStoredData();
     if (!storedData) return;
