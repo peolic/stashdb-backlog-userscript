@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.13
+// @version     1.26.14
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -309,7 +309,7 @@ async function inject() {
 }
 
 .backlog-fingerprint-duration {
-  background-color: var(--bs-blue);
+  background-color: #4691ff;
 }
 
 /* https://codepen.io/zachhanding/pen/MKyVPq */
@@ -2250,7 +2250,7 @@ button.nav-link.backlog-flash {
           count.append(countExact);
           if (durationsFound) {
             const countDuration = document.createElement('span');
-            countDuration.style.color = 'var(--bs-blue)';
+            countDuration.style.color = '#4691ff';
             countDuration.innerText = ` +⌚${durationsFound}`;
             countDuration.title = 'Fingerprints by duration';
             count.append(countDuration);
