@@ -317,15 +317,15 @@ async function inject() {
 
 /* https://codepen.io/zachhanding/pen/MKyVPq */
 .line-clamp {
-	display: block;
-	display: -webkit-box;
-	-webkit-box-orient: vertical;
-	position: relative;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	padding: 0 !important;
-	-webkit-line-clamp: var(--line-clamp);
- 	max-height: calc(1em * var(--bs-body-line-height) * var(--line-clamp));
+  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  position: relative;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 !important;
+  -webkit-line-clamp: var(--line-clamp);
+  max-height: calc(1em * var(--bs-body-line-height) * var(--line-clamp));
 }
 
 input.backlog-flash,
