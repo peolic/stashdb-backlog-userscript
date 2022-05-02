@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.15
+// @version     1.26.16
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -127,6 +127,8 @@ async function inject() {
   })();
 
   let isDev = false;
+  /** @type {Settings} */
+  let settings;
 
   async function dispatcher(init=false) {
     const loc = parsePath();
@@ -142,6 +144,7 @@ async function inject() {
     if (document.querySelector('.LoginPrompt')) return;
 
     isDev = devUsernames.includes(await getUser());
+    settings = await Cache.getSettings();
 
     setUpStatusDiv();
     setUpInfo();
@@ -458,7 +461,20 @@ button.nav-link.backlog-flash {
       const versionInfo = block(`userscript version: ${usVersion}`);
       info.append(hr, versionInfo);
 
+      const toggleSceneCardPerformers = makeLink('#', 'Toggle scene card performers');
+      setStyles(toggleSceneCardPerformers, {
+        cursor: 'pointer',
+        color: settings.sceneCardPerformers ? 'var(--bs-success)' : 'var(--bs-danger)',
+      });
+      toggleSceneCardPerformers.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const newState = await Cache.toggleSetting('sceneCardPerformers');
+        toggleSceneCardPerformers.style.color = newState ? 'var(--bs-success)' : 'var(--bs-danger)';
+      });
+
       info.append(
+        toggleSceneCardPerformers,
         hr.cloneNode(),
         makeLink('/backlog', 'Scene Backlog Summary Page'),
         hr.cloneNode(),
@@ -633,10 +649,31 @@ button.nav-link.backlog-flash {
   }
 
   class Cache {
+    static _SETTINGS_KEY = 'settings';
     static _DATA_INDEX_KEY = 'stashdb_backlog_index';
     static _SCENES_DATA_KEY = 'stashdb_backlog_scenes';
     static _PERFORMERS_DATA_KEY = 'stashdb_backlog_performers';
     static _LEGACY_DATA_KEY = 'stashdb_backlog';
+
+    /** @type {Settings | null} */
+    static _settings = null;
+
+    static async getSettings(invalidate = false) {
+      if (!this._settings || invalidate) {
+        this._settings = /** @type {Settings} */ (await this._getValue(this._SETTINGS_KEY));
+      }
+      return this._settings;
+    }
+
+    /**
+     * @param {keyof Settings} name
+     * @returns {Promise<boolean>} */
+    static async toggleSetting(name) {
+      if (!this._settings) await this.getSettings();
+      this._settings[name] = !this._settings[name];
+      await this._setValue(this._SETTINGS_KEY, this._settings);
+      return this._settings[name];
+    }
 
     /** @type {DataCache | null} */
     static _data = null;
@@ -3817,7 +3854,7 @@ button.nav-link.backlog-flash {
 
     /** @param {HTMLDivElement} card */
     const appendScenePerformers = (card) => {
-      if (!isDev) return;
+      if (!(isDev || settings.sceneCardPerformers)) return;
 
       /** @type {ScenePerformance} */
       const data = getReactFiber(card)?.return?.return?.memoizedProps?.performance;
@@ -3968,7 +4005,7 @@ button.nav-link.backlog-flash {
    * @param {string} sceneId
    */
   async function sceneCardHighlightChanges(card, changes, sceneId) {
-    if (!isDev) return;
+    if (!(isDev || settings.sceneCardHighlightChanges)) return;
 
     const parent = /** @type {HTMLDivElement | HTMLAnchorElement} */ (card.parentElement);
     const isSearchCard = parent.classList.contains('SearchPage-scene');

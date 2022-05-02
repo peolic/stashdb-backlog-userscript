@@ -1,3 +1,8 @@
+interface Settings {
+    sceneCardPerformers: boolean;
+    sceneCardHighlightChanges: boolean;
+}
+
 type AnyObject =
     | "scenes"
     | "performers"
