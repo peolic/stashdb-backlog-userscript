@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.16
+// @version     1.26.17
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -4134,6 +4134,27 @@ button.nav-link.backlog-flash {
     if (!storedData) return;
 
     /**
+     * @param {string} editUrl
+     * @param {string[]} urls
+     */
+    const editPendingScenes = (editUrl, urls) =>
+      Object.values(storedData.scenes).filter(({ performers }) =>
+        performers?.append.some(({ status, status_url, notes }) => {
+          // by edit url
+          if (status === 'c' && status_url === editUrl)
+            return true;
+          // by urls
+          if (status === 'new') {
+            const backlogUrls = (notes || []).filter((u) => /https?:\/\//.test(u));
+            if (status_url)
+              backlogUrls.splice(0, 0, status_url);
+            return urls.some((url) => backlogUrls.includes(url));
+          }
+          return false;
+        })
+      );
+
+    /**
      * @param {HTMLAnchorElement} entityLink
      * @param {EditTargetType} editEntity
      */
@@ -4196,11 +4217,25 @@ button.nav-link.backlog-flash {
 
     const cards = /** @type {HTMLDivElement[]} */ (Array.from(document.querySelectorAll(selector)));
     for (const card of cards) {
+      /** @type {HTMLHeadingElement} */
+      const cardHeading = card.querySelector('.card-header h5');
       const [operation, entity] =
         /** @type {[EditOperation, EditTargetType]} */
-        (card.querySelector('.card-header h5').textContent.split(' ', 2));
+        (cardHeading.textContent.split(' ', 2));
       /** @type {HTMLDivElement} */
       const cardBody = card.querySelector('.card-body');
+
+      if (operation === 'create' && entity === 'performer') {
+        const editUrl = cardHeading.closest('a').href;
+        const urls = /** @type {HTMLAnchorElement[]} */
+          (Array.from(card.querySelectorAll('.SiteLink + a'))).map((a) => a.href);
+
+        const scenes = editPendingScenes(editUrl, urls);
+        if (scenes.length > 0) {
+          cardHeading.style.backgroundColor = 'var(--bs-success)';
+          cardHeading.title = `has ${scenes.length} pending scene${scenes.length !== 1 ? 's' : ''}`;
+        }
+      }
 
       const targetLinks = selectTargetLinks(operation, cardBody);
       if (targetLinks.length === 0 && operation !== 'create') {
