@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.18
+// @version     1.26.19
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -4138,7 +4138,7 @@ button.nav-link.backlog-flash {
      * @param {string[]} urls
      */
     const editPendingScenes = (editUrl, urls) =>
-      Object.values(storedData.scenes).filter(({ performers }) =>
+      Object.entries(storedData.scenes).filter(([, { performers }]) =>
         performers?.append.some(({ status, status_url, notes }) => {
           // by edit url
           if (status === 'c' && status_url === editUrl)
@@ -4215,6 +4215,7 @@ button.nav-link.backlog-flash {
       }
     };
 
+    const isEditsList = !!document.querySelector('ul.pagination');
     const cards = /** @type {HTMLDivElement[]} */ (Array.from(document.querySelectorAll(selector)));
     for (const card of cards) {
       /** @type {HTMLHeadingElement} */
@@ -4232,8 +4233,21 @@ button.nav-link.backlog-flash {
 
         const scenes = editPendingScenes(editUrl, urls);
         if (scenes.length > 0) {
-          cardHeading.style.backgroundColor = 'var(--bs-success)';
-          cardHeading.title = `has ${scenes.length} pending scene${scenes.length !== 1 ? 's' : ''}`;
+          const pendingScenes = `Performer has ${scenes.length} pending scene${scenes.length !== 1 ? 's' : ''}`;
+          if (isEditsList) {
+            cardHeading.style.backgroundColor = 'var(--bs-success)';
+            cardHeading.title = pendingScenes;
+          } else {
+            const header = document.createElement('h3');
+            header.innerText = `Backlog: ${pendingScenes}`;
+
+            const scenesList = document.createElement('ol');
+            setStyles(scenesList, { paddingLeft: '2rem', fontWeight: 'normal' });
+
+            cardBody.prepend(header, scenesList);
+
+            renderScenesList(scenes, scenesList, 'edits');
+          }
         }
       }
 
