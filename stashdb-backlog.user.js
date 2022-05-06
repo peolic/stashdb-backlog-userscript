@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.19
+// @version     1.26.20
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -4301,6 +4301,53 @@ button.nav-link.backlog-flash {
 
     await wait(0);
 
+    const storedData = await Cache.getStoredData();
+
+    const allPerformerNames = Object.values(storedData.scenes).reduce((result, entry) => {
+      if (!entry.performers)
+        return result;
+
+      entry.performers.append.forEach((p) => {
+        const name = p.name + (p.disambiguation ? ` [${p.disambiguation}]` : '');
+        if (!result.includes(name))
+          result.push(name);
+      });
+      return result;
+    }, []);
+
+    /** @type {string | null} */
+    let performerFilter = null;
+    const performerFilterRow = document.createElement('div');
+    performerFilterRow.classList.add('d-flex', 'my-1');
+
+    const performerFilterLabel = document.createElement('label');
+    performerFilterLabel.innerText = 'Filter by performer name:';
+    performerFilterLabel.classList.add('me-2', 'fw-bold');
+    performerFilterRow.appendChild(performerFilterLabel);
+
+    const performerFilterSelect = document.createElement('select');
+    performerFilterRow.appendChild(performerFilterSelect);
+
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.innerText = '[No filter]';
+    performerFilterSelect.append(opt);
+
+    allPerformerNames
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'accent' }))
+      .forEach((name) => {
+        const opt = document.createElement('option');
+        opt.value = opt.innerText = name;
+        performerFilterSelect.append(opt);
+      });
+
+    subTitle.after(performerFilterRow);
+
+    performerFilterSelect.addEventListener('change', () => {
+      performerFilter = performerFilterSelect.options[performerFilterSelect.selectedIndex].value || null;
+      renderList(performerFilter ? '' : 'full');
+    });
+
     /** @type {(keyof SceneDataObject)[]} */
     const unsubmittableKeys = ['fingerprints'];
     /** @param {string} key */
@@ -4323,7 +4370,6 @@ button.nav-link.backlog-flash {
       return dataObjectKeys(item).length + performers;
     };
 
-    const storedData = await Cache.getStoredData();
     const sortedScenes =
       Object.entries(storedData.scenes)
         .reduce(reduceKey, [])
@@ -4342,12 +4388,27 @@ button.nav-link.backlog-flash {
 
     const fullySubmittable = sortedScenes.filter((entry) => !partiallySubmittable.includes(entry));
 
+    const scenesForPerformerFilter = () =>
+      sortedScenes.filter((entry) => {
+        if (!entry[1].performers)
+          return false;
+
+        return entry[1].performers.append.some(
+          (p) => performerFilter.localeCompare(
+            p.name + (p.disambiguation ? ` [${p.disambiguation}]` : ''),
+            undefined,
+            { sensitivity: 'accent' }
+          ) === 0
+        );
+      });
+
     /** @param {string} filter */
     const renderList = (filter) => {
       /** @type {NodeListOf<HTMLAnchorElement>} */
       (subTitle.querySelectorAll('a[data-filter]')).forEach((el) => {
         el.classList.toggle('fw-bold', el.dataset.filter === filter);
       });
+      subTitle.classList.toggle('d-none', !!performerFilter);
 
       desc.innerText = (
         'The checkbox marks an entry as "seen" but leaving this page will reset that status.'
@@ -4356,11 +4417,13 @@ button.nav-link.backlog-flash {
 
       scenesList.innerHTML = '';
 
-      const list = ({
-        all: sortedScenes,
-        full: fullySubmittable,
-        partial: partiallySubmittable,
-      })[filter];
+      const list = performerFilter
+        ? scenesForPerformerFilter()
+        : ({
+          all: sortedScenes,
+          full: fullySubmittable,
+          partial: partiallySubmittable,
+        })[filter];
 
       renderScenesList(list, scenesList, null);
     };
