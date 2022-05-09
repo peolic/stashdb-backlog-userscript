@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.20
+// @version     1.26.21
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1293,6 +1293,61 @@ button.nav-link.backlog-flash {
         const studio = document.createElement('span');
         studio.innerText = studioArrayToString(sceneData.c_studio);
         row.append(sep.cloneNode(true), studio);
+      }
+
+      target.appendChild(row);
+    });
+
+  /**
+   * @param {[performerId: string, data: PerformerDataObject][]} list
+   * @param {HTMLOListElement} target
+   * @param {AnyObject | null} object
+   */
+  const renderPerformersList = (list, target, object) =>
+    list.forEach(([performerId, performerData], idx) => {
+      if (idx > 0 && idx % 10 === 0)
+        target.appendChild(document.createElement('br'));
+
+      const row = document.createElement('li');
+
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.classList.add('me-1');
+      row.append(check);
+
+      const viewURL = `/performers/${performerId}`;
+      if (object !== 'edits') {
+        const view = makeLink(viewURL, '⭕');
+        view.classList.add('me-1', 'text-decoration-none');
+        view.title = 'View performer';
+        row.append(view);
+      }
+
+      const mainURL = object !== 'edits'
+        ? (!performerData.duplicates ? `${viewURL}/edit` : `${viewURL}/merge`)
+        : viewURL;
+      const name = [performerData.name, performerData.split?.name].find((n) => !!n);
+      const link = makeLink(mainURL, name || performerId);
+      if (!name)
+        link.classList.add('font-monospace');
+      link.classList.add('text-decoration-underline');
+      link.title = 'Edit scene';
+      const mainClick = () => check.checked = true;
+      link.addEventListener('click', mainClick);
+      link.addEventListener('auxclick', mainClick);
+
+      row.append(link);
+
+      if (object !== 'edits') {
+        const sep = document.createElement('span');
+        sep.classList.add('mx-2');
+        sep.innerHTML = '&mdash;';
+
+        const keys = dataObjectKeys(performerData)
+          .map((k) => k === 'urls' || k === 'duplicates' ? `${Object.values(performerData[k]).length}x ${k}` : k)
+          .join(', ');
+
+        row.append(sep, keys);
       }
 
       target.appendChild(row);
@@ -4134,6 +4189,16 @@ button.nav-link.backlog-flash {
     if (!storedData) return;
 
     /**
+     * @param {string[]} urls
+     */
+    const editPerformerShards = (urls) =>
+      Object.entries(storedData.performers).filter(([, { split }]) =>
+        split?.shards.some(({ links }) =>
+          links ? urls.some((url) => links.includes(url)) : false
+        )
+      );
+
+    /**
      * @param {string} editUrl
      * @param {string[]} urls
      */
@@ -4231,12 +4296,31 @@ button.nav-link.backlog-flash {
         const urls = /** @type {HTMLAnchorElement[]} */
           (Array.from(card.querySelectorAll('.SiteLink + a'))).map((a) => a.href);
 
+        const performerShards = editPerformerShards(urls);
+        if (performerShards.length > 0) {
+          const title = `Performer is listed as a shard for ${performerShards.length} performer${performerShards.length !== 1 ? 's' : ''} to split up`;
+          if (isEditsList) {
+            cardHeading.style.backgroundColor = 'var(--bs-success)';
+            cardHeading.title = title;
+          } else {
+            const header = document.createElement('h3');
+            header.innerText = `Backlog: ${title}`;
+
+            const performersList = document.createElement('ol');
+            setStyles(performersList, { paddingLeft: '2rem', fontWeight: 'normal' });
+
+            cardBody.prepend(header, performersList);
+
+            renderPerformersList(performerShards, performersList, 'edits');
+          }
+        }
+
         const scenes = editPendingScenes(editUrl, urls);
         if (scenes.length > 0) {
           const pendingScenes = `Performer has ${scenes.length} pending scene${scenes.length !== 1 ? 's' : ''}`;
           if (isEditsList) {
             cardHeading.style.backgroundColor = 'var(--bs-success)';
-            cardHeading.title = pendingScenes;
+            cardHeading.title = (cardHeading.title ? `\n${cardHeading.title}` : '') + pendingScenes;
           } else {
             const header = document.createElement('h3');
             header.innerText = `Backlog: ${pendingScenes}`;
@@ -4535,44 +4619,7 @@ button.nav-link.backlog-flash {
       + '\nSome entries need to be merged and/or split, take extra cake with those.'
     );
 
-    sortedPerformers.forEach(([performerId, performerData], idx) => {
-      if (idx > 0 && idx % 10 === 0)
-        performersList.appendChild(document.createElement('br'));
-
-      const row = document.createElement('li');
-
-      const check = document.createElement('input');
-      check.type = 'checkbox';
-      check.classList.add('me-1');
-
-      const viewURL = `/performers/${performerId}`;
-      const view = makeLink(viewURL, '⭕');
-      view.classList.add('me-1', 'text-decoration-none');
-      view.title = 'View performer';
-
-      const editURL = !performerData.duplicates ? `${viewURL}/edit` : `${viewURL}/merge`;
-      const name = [performerData.name, performerData.split?.name].find((n) => !!n);
-      const link = makeLink(editURL, name || performerId);
-      if (!name)
-        link.classList.add('font-monospace');
-      link.classList.add('text-decoration-underline');
-      link.title = 'Edit scene';
-      const editClick = () => check.checked = true;
-      link.addEventListener('click', editClick);
-      link.addEventListener('auxclick', editClick);
-
-      const sep = document.createElement('span');
-      sep.classList.add('mx-2');
-      sep.innerHTML = '&mdash;';
-
-      const keys = dataObjectKeys(performerData)
-        .map((k) => k === 'urls' || k === 'duplicates' ? `${Object.values(performerData[k]).length}x ${k}` : k)
-        .join(', ');
-
-      row.append(check, view, link, sep, keys);
-
-      performersList.appendChild(row);
-    });
+    renderPerformersList(sortedPerformers, performersList, null);
   } // iPerformerBacklogPage
 }
 
