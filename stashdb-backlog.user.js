@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.21
+// @version     1.26.22
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2271,6 +2271,7 @@ button.nav-link.backlog-flash {
         const fpInfoWrapper = document.createElement('div');
         fpInfoWrapper.dataset.backlog = 'fingerprints';
         fpInfoWrapper.classList.add('position-relative');
+        fpInfoWrapper.style.top = '22px';
 
         const fpInfo = document.createElement('div');
         fpInfo.classList.add('position-absolute', 'end-0', 'd-flex', 'flex-column');
