@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.23
+// @version     1.26.24
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3009,6 +3009,38 @@ button.nav-link.backlog-flash {
     const performerInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.PerformerInfo', 1000));
     if (!performerInfo) return;
 
+    (function performerLinks() {
+      const header = performerInfo.querySelector('.card-header');
+      if (header.querySelector('[data-backlog="links"]')) return;
+
+      /** @type {{ urls: ScenePerformance_URL[] }} */
+      const performerFiber = getReactFiber(performerInfo)?.return?.memoizedProps?.performer;
+      if (!performerFiber) return;
+
+      const sortedUrls = performerFiber.urls
+        .slice().sort((a, b) => a.site.name.localeCompare(b.site.name));
+
+      const links = document.createElement('div');
+      links.classList.add('ms-auto', 'mt-auto', 'text-end', 'lh-sm');
+      const pxWidth = Math.ceil(sortedUrls.length / 2) * 1.25;
+      setStyles(links, { flexBasis: `${pxWidth}em`, marginRight: '-.5em' });
+      links.dataset.backlog = 'links';
+      header.appendChild(links);
+      removeHook(links, 'performers', performerId);
+
+      links.append(...sortedUrls.map(({ url, site }) => {
+        const icon = document.createElement('img');
+        icon.classList.add('SiteLink-icon', 'me-0', 'ms-1');
+        icon.src = site.icon;
+        icon.alt = '';
+        const a = makeLink(url, '');
+        a.classList.add('SiteLink');
+        a.title = site.name;
+        a.appendChild(icon);
+        return a;
+      }));
+    })();
+
     const storedData = await Cache.getStoredData();
     if (!storedData) return;
 
@@ -3041,38 +3073,6 @@ button.nav-link.backlog-flash {
         });
       }
     }
-
-    (function performerLinks() {
-      const header = performerInfo.querySelector('.card-header');
-      if (header.querySelector('[data-backlog="links"]')) return;
-
-      /** @type {{ urls: ScenePerformance_URL[] }} */
-      const performerFiber = getReactFiber(performerInfo)?.return?.memoizedProps?.performer;
-      if (!performerFiber) return;
-
-      const sortedUrls = performerFiber.urls
-        .slice().sort((a, b) => a.site.name.localeCompare(b.site.name));
-
-      const links = document.createElement('div');
-      links.classList.add('ms-auto', 'mt-auto', 'text-end', 'lh-sm');
-      const pxWidth = Math.ceil(sortedUrls.length / 2) * 1.25;
-      setStyles(links, { flexBasis: `${pxWidth}em`, marginRight: '-.5em' });
-      links.dataset.backlog = 'links';
-      header.appendChild(links);
-      removeHook(links, 'performers', performerId);
-
-      links.append(...sortedUrls.map(({ url, site }) => {
-        const icon = document.createElement('img');
-        icon.classList.add('SiteLink-icon', 'me-0', 'ms-1');
-        icon.src = site.icon;
-        icon.alt = '';
-        const a = makeLink(url, '');
-        a.classList.add('SiteLink');
-        a.title = site.name;
-        a.appendChild(icon);
-        return a;
-      }));
-    })();
 
     // Performer scene changes based on cached data
     (function sceneChanges() {
