@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.24
+// @version     1.26.25
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3769,14 +3769,13 @@ button.nav-link.backlog-flash {
    * @param {string} studioId
    */
   async function iStudioPage(studioId) {
-
-    highlightSceneCards('studios');
-
     const studioInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.studio-title', 2000));
     if (!studioInfo) {
       console.error('[backlog] studio info not found');
       return;
     }
+
+    highlightSceneCards('studios');
 
     const studioName =
       /** @type {HTMLSpanElement} */
