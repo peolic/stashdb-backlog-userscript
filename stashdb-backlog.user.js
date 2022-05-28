@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.26.25
+// @version     1.27.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -4305,10 +4305,10 @@ button.nav-link.backlog-flash {
       }
 
       const scenePerformer = object === 'performers' && editEntity === 'scene';
+      entityLink.classList.add('fw-bold', 'd-inline-block');
       setStyles(entityLink, {
         backgroundColor,
         padding: scenePerformer ? '0.05rem 0.25rem' : '.2rem',
-        fontWeight: '700',
         maxWidth: 'max-content',
       });
       entityLink.title = `${type} is listed for:\n - ${changes.join('\n - ')}\n(click ${type} for more info)`;
