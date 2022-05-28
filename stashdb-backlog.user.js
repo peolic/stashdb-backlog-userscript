@@ -3240,6 +3240,31 @@ button.nav-link.backlog-flash {
       }
     })();
 
+    (function shards() {
+      const performerShards = Object.entries(storedData.performers).filter(([id, { split }]) =>
+        id !== performerId && split?.shards.some(({ id: shardId, links }) =>
+          shardId === id || (links ? performerUrls.some((url) => links.includes(url)) : false)
+        )
+      );
+
+      if (performerShards.length === 0)
+        return;
+
+      if (backlogDiv.querySelector('[data-backlog="shards"]')) return;
+      const hasShards = document.createElement('div');
+      hasShards.dataset.backlog = 'shards';
+      hasShards.classList.add('mb-1', 'p-1', 'fw-bold');
+      hasShards.append(`✂ Performer is listed as a shard for ${performerShards.length} performer${
+        performerShards.length !== 1 ? 's' : ''} to split up:`);
+
+      const performersList = document.createElement('ol');
+      setStyles(performersList, { paddingLeft: '2rem', fontWeight: 'normal' });
+      renderPerformersList(performerShards, performersList, 'edits');
+
+      hasShards.append(performersList);
+      backlogDiv.append(hasShards);
+    })();
+
     const foundData = await getDataFor('performers', performerId);
     if (!foundData) return;
     console.debug('[backlog] found', foundData);
@@ -4332,7 +4357,8 @@ button.nav-link.backlog-flash {
 
         const performerShards = editPerformerShards(urls);
         if (performerShards.length > 0) {
-          const title = `Performer is listed as a shard for ${performerShards.length} performer${performerShards.length !== 1 ? 's' : ''} to split up`;
+          const title = `✂ Performer is listed as a shard for ${performerShards.length} performer${
+            performerShards.length !== 1 ? 's' : ''} to split up:`;
           if (isEditsList) {
             cardHeading.style.backgroundColor = 'var(--bs-success)';
             cardHeading.title = title;
