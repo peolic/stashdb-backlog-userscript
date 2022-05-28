@@ -3009,6 +3009,9 @@ button.nav-link.backlog-flash {
     const performerInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.PerformerInfo', 1000));
     if (!performerInfo) return;
 
+    /** @type {string[]} */
+    let performerUrls;
+
     (function performerLinks() {
       const header = performerInfo.querySelector('.card-header');
       if (header.querySelector('[data-backlog="links"]')) return;
@@ -3016,6 +3019,8 @@ button.nav-link.backlog-flash {
       /** @type {{ urls: ScenePerformance_URL[] }} */
       const performerFiber = getReactFiber(performerInfo)?.return?.memoizedProps?.performer;
       if (!performerFiber) return;
+
+      performerUrls = performerFiber.urls.map((u) => u.url);
 
       const sortedUrls = performerFiber.urls
         .slice().sort((a, b) => a.site.name.localeCompare(b.site.name));
@@ -3082,6 +3087,8 @@ button.nav-link.backlog-flash {
         /** @typedef {[sceneId: string, entry: PerformerEntry, studio: string]} performerScene */
         /** @type {Record<keyof SceneDataObject["performers"], performerScene[]>} */
         const performerScenes = { append: [], remove: [], update: [] };
+        /** @type {{ [sceneId: string]: null }} */
+        const sceneIds = {};
 
         for (const { sceneId, action } of Cache.performerScenes(performerId)) {
           const scene = storedData.scenes[sceneId];
@@ -3091,6 +3098,7 @@ button.nav-link.backlog-flash {
           if (action === 'append') {
             const appendEntry = append.find(({ id }) => id === performerId);
             performerScenes.append.push([sceneId, appendEntry, studio]);
+            sceneIds[sceneId] = null;
           } else if (action === 'remove') {
             const removeEntry = remove.find(({ id }) => id === performerId);
             const targetEntry = append.find(({ appearance, name }) => {
@@ -3100,10 +3108,36 @@ button.nav-link.backlog-flash {
             if (targetEntry && (removeEntry.status === 'edit' || removeEntry.status === 'merge'))
               targetEntry.status = removeEntry.status;
             performerScenes.remove.push([sceneId, targetEntry, studio]);
+            sceneIds[sceneId] = null;
           } else if (action === 'update') {
             const updateEntry = update.find(({ id }) => id === performerId);
             performerScenes.update.push([sceneId, updateEntry, studio]);
+            sceneIds[sceneId] = null;
           }
+        }
+
+        // Pending scenes by URLs
+        if (performerUrls) {
+          Object.entries(storedData.scenes).forEach(([sceneId, { performers, c_studio }]) => {
+            if (sceneIds[sceneId])
+              return;
+
+            const appendEntry = performers?.append.find((entry) => {
+              if (entry.status !== 'new')
+                return false;
+              const backlogUrls = (entry.notes || []).filter((u) => /https?:\/\//.test(u));
+              if (entry.status_url)
+                backlogUrls.splice(0, 0, entry.status_url);
+              return performerUrls.some((url) => backlogUrls.includes(url));
+            });
+
+            if (!appendEntry)
+              return;
+
+            const studio = studioArrayToString(c_studio);
+            performerScenes.append.push([sceneId, appendEntry, studio]);
+            sceneIds[sceneId] = null;
+          });
         }
 
         if (Object.values(performerScenes).every((v) => v.length === 0)) return;
