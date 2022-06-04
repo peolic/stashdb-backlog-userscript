@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.27.3
+// @version     1.27.4
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3011,18 +3011,16 @@ button.nav-link.backlog-flash {
     const performerInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.PerformerInfo', 1000));
     if (!performerInfo) return;
 
-    /** @type {string[]} */
-    let performerUrls;
+    /** @type {{ urls: ScenePerformance_URL[] }} */
+    const performerFiber = getReactFiber(performerInfo)?.return?.memoizedProps?.performer;
+    /** @type {string[] | undefined} */
+    const performerUrls = performerFiber?.urls.map((u) => u.url);
 
     (function performerLinks() {
       const header = performerInfo.querySelector('.card-header');
       if (header.querySelector('[data-backlog="links"]')) return;
 
-      /** @type {{ urls: ScenePerformance_URL[] }} */
-      const performerFiber = getReactFiber(performerInfo)?.return?.memoizedProps?.performer;
       if (!performerFiber) return;
-
-      performerUrls = performerFiber.urls.map((u) => u.url);
 
       const sortedUrls = performerFiber.urls
         .slice().sort((a, b) => a.site.name.localeCompare(b.site.name));
@@ -3472,10 +3470,7 @@ button.nav-link.backlog-flash {
       if (!foundData.urls) return;
       if (backlogDiv.querySelector('[data-backlog="urls"]')) return;
 
-      /** @type {{ urls: ScenePerformance_URL[] }} */
-      const performerFiber = getReactFiber(performerInfo)?.return?.memoizedProps?.performer;
-
-      const existingURLs = performerFiber?.urls?.map(({ url }) => url) || [];
+      const existingURLs = performerUrls ?? [];
 
       const pendingURLs = document.createElement('div');
       pendingURLs.dataset.backlog = 'urls';
