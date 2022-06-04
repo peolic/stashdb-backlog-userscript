@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.27.2
+// @version     1.27.3
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -4356,6 +4356,8 @@ button.nav-link.backlog-flash {
         const editUrl = cardHeading.closest('a').href;
         const urls = /** @type {HTMLAnchorElement[]} */
           (Array.from(card.querySelectorAll('.SiteLink + a'))).map((a) => a.href);
+        /** @type {HTMLDivElement[]} */ (Array.from(card.querySelectorAll('.EditComment > .card-body')))
+          .forEach((cEl) => urls.push(...(cEl.textContent.match(/(https?:\/\/[^\s]+)/g) ?? [])), []);
 
         const performerShards = editPerformerShards(urls);
         if (performerShards.length > 0) {
