@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.27.4
+// @version     1.27.5
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3241,10 +3241,18 @@ button.nav-link.backlog-flash {
     })();
 
     (function shards() {
+      const performerFullURL = `${window.location.origin}/performers/${performerId}`;
       const performerShards = Object.entries(storedData.performers).filter(([id, { split }]) =>
-        id !== performerId && split?.shards.some(({ id: shardId, links }) =>
-          shardId === performerId || (links ? performerUrls.some((url) => links.includes(url)) : false)
-        )
+        id !== performerId && split?.shards.some(({ id: shardId, links }) => (
+          // shard id is currently viewed performer
+          shardId === performerId ||
+          !!links && (
+            // any performer url listed in shard links?
+            performerUrls.some((url) => links.includes(url)) ||
+            // current performer url listed in shard links? (additional performers)
+            links.some((link) => link.startsWith(performerFullURL))
+          )
+        ))
       );
 
       if (performerShards.length === 0)
@@ -4250,7 +4258,7 @@ button.nav-link.backlog-flash {
     const editPerformerShards = (urls) =>
       Object.entries(storedData.performers).filter(([, { split }]) =>
         split?.shards.some(({ links }) =>
-          links ? urls.some((url) => links.includes(url)) : false
+          !!links && urls.some((url) => links.includes(url))
         )
       );
 
@@ -4351,7 +4359,8 @@ button.nav-link.backlog-flash {
         const editUrl = cardHeading.closest('a').href;
         const urls = /** @type {HTMLAnchorElement[]} */
           (Array.from(card.querySelectorAll('.SiteLink + a'))).map((a) => a.href);
-        /** @type {HTMLDivElement[]} */ (Array.from(card.querySelectorAll('.EditComment > .card-body')))
+        /** @type {HTMLDivElement[]} */
+        (Array.from(card.querySelectorAll('.EditComment > .card-body')))
           .forEach((cEl) => urls.push(...(cEl.textContent.match(/(https?:\/\/[^\s]+)/g) ?? [])), []);
 
         const performerShards = editPerformerShards(urls);
