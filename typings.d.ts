@@ -58,6 +58,7 @@ interface SceneDataObject {
         update?: PerformerEntry[];
     };
     studio?: [id: string, name: string];
+    code?: string;
     url?: string;
     details?: string;
     director?: string;

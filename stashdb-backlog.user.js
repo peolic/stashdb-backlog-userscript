@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.27.6
+// @version     1.27.7
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2143,6 +2143,34 @@ button.nav-link.backlog-flash {
       }
     })();
 
+    (function code() {
+      if (!found.code) return;
+      if (markerDataset.backlogInjected) return;
+
+      /** @type {HTMLDivElement | null} */
+      let code = (sceneFooter.querySelector(':scope > div:last-of-type'));
+      if (!code || !/^Code:/.test(code.innerText)) {
+        const newCode = document.createElement('b');
+        newCode.innerText = found.code;
+        code = document.createElement('div');
+        code.append('<MISSING>', ' Studio Code: ', newCode);
+        code.title = '<MISSING> Studio Code';
+        code.classList.add('ms-3', 'bg-danger', 'p-1', 'my-auto');
+        sceneFooter.append(code);
+      } else {
+        const currentCode = code.innerText.match(/^Code: (.+)$/)[1];
+        if (found.code === currentCode) {
+          code.classList.add('bg-warning', 'p-1');
+          code.prepend('<already correct> ');
+          code.title = makeAlreadyCorrectTitle('correct');
+        } else {
+          code.classList.add('bg-primary', 'p-1');
+          code.append(` \u{22D9} ${found.code}`);
+          code.title = `<pending> Studio Code\n${found.code}`;
+        }
+      }
+    })();
+
     (function details() {
       if (!found.details) return;
       if (markerDataset.backlogInjected) return;
@@ -2461,7 +2489,7 @@ button.nav-link.backlog-flash {
 
     const keySortOrder = [
       'title', 'date', 'duration',
-      'performers', 'studio', 'url',
+      'performers', 'studio', 'code', 'url',
       'details', 'director', 'tags',
       'image', 'fingerprints',
     ];
@@ -2770,6 +2798,14 @@ button.nav-link.backlog-flash {
         });
         dt.innerText += ':';
         dt.append(set);
+        return;
+      }
+
+      if (field === 'code') {
+        const code = found[field];
+        dd.innerText = code;
+        dd.style.userSelect = 'all';
+        settableField(dt, field, code);
         return;
       }
 
