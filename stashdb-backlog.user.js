@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.27.7
+// @version     1.27.8
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3353,6 +3353,25 @@ button.nav-link.backlog-flash {
         notes.classList.add('fw-normal');
         notes.innerText = splitItem.notes.join('\n');
         toSplit.append(notes);
+      }
+
+      if (splitItem.links) {
+        const links = document.createElement('div');
+        links.style.marginLeft = '1.75rem';
+        splitItem.links.forEach((url) => {
+          const parsed = new URL(url);
+          let siteName = parsed.hostname.split(/\./).slice(-2)[0];
+          if (siteName === 'stashdb') {
+            const obj = parsed.pathname.match(/^\/(.+?)\/.+/)?.[1]?.slice(0, -1);
+            if (obj)
+              siteName += ` ${obj}`;
+          }
+          const link = makeLink(url, `[${siteName}]`, { color: 'var(--bs-yellow)' });
+          link.classList.add('me-1');
+          link.title = url;
+          links.appendChild(link);
+        });
+        toSplit.append(links);
       }
 
       const emoji = document.createElement('span');

@@ -87,6 +87,7 @@ interface PerformerDataObject {
         name: string;
         shards: SplitShard[];
         notes?: string[];
+        links?: string[];
     };
     urls?: string[];
     name?: string;
