@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.27.9
+// @version     1.27.10
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -35,7 +35,7 @@ async function inject() {
 
   const urlRegex = new RegExp(
     String.raw`(?:/([a-z]+)`
-      + String.raw`(?:/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[\w\d.-]+)`
+      + String.raw`(?:/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[\w\d. -]+)`
         + String.raw`(?:/([a-z]+)`
         + String.raw`)?`
       + String.raw`)?`
@@ -58,7 +58,7 @@ async function inject() {
 
     if (!pathname) return result;
 
-    const match = urlRegex.exec(pathname);
+    const match = urlRegex.exec(decodeURIComponent(pathname));
     if (!match || match.length === 0) return result;
 
     result.object = /** @type {AnyObject} */ (match[1]) || null;
