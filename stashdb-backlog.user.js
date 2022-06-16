@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.27.8
+// @version     1.27.9
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1477,7 +1477,8 @@ button.nav-link.backlog-flash {
       }
     }
 
-    const sceneDesc = /** @type {HTMLDivElement} */ (document.querySelector('.scene-description'));
+    /** @type {HTMLDivElement} */
+    const sceneDescTab = (document.querySelector('div#scene-tabs-tabpane-description'));
 
     const makeAlreadyCorrectTitle = (/** @type {string} */ status='correct', /** @type {string} */ field='') =>
       `<already ${status}>${field ? ` ${field}`: ''}\nshould mark the entry on the backlog sheet as completed`;
@@ -2127,7 +2128,7 @@ button.nav-link.backlog-flash {
         director = document.createElement('div');
         director.append('<MISSING>', ' Director: ', newDirector);
         director.title = '<MISSING> Director';
-        director.classList.add('ms-3', 'bg-danger', 'p-1', 'my-auto');
+        director.classList.add('ms-3', 'bg-success', 'p-1', 'my-auto');
         sceneFooter.append(director);
       } else {
         const currentDirector = director.innerText.match(/^Director: (.+)$/)[1];
@@ -2155,7 +2156,7 @@ button.nav-link.backlog-flash {
         code = document.createElement('div');
         code.append('<MISSING>', ' Studio Code: ', newCode);
         code.title = '<MISSING> Studio Code';
-        code.classList.add('ms-3', 'bg-danger', 'p-1', 'my-auto');
+        code.classList.add('ms-3', 'bg-success', 'p-1', 'my-auto');
         sceneFooter.append(code);
       } else {
         const currentCode = code.innerText.match(/^Code: (.+)$/)[1];
@@ -2176,7 +2177,7 @@ button.nav-link.backlog-flash {
       if (markerDataset.backlogInjected) return;
 
       /** @type {HTMLDivElement} */
-      const desc = (sceneDesc.querySelector(':scope > h4 + div'));
+      const desc = (sceneDescTab.querySelector('.scene-description > h4 + div'));
       const currentDetails = desc.textContent;
       if (!currentDetails) {
         desc.classList.add('bg-success', 'p-1');
@@ -2209,10 +2210,10 @@ button.nav-link.backlog-flash {
       if (markerDataset.backlogInjected) return;
 
       /** @type {HTMLAnchorElement} */
-      const studioUrl = (sceneDesc.querySelector(':scope > div:last-of-type > a'));
+      const studioUrl = (sceneDescTab.querySelector(':scope > div:last-of-type > a'));
       const currentURL = studioUrl?.getAttribute('href');
       if (!studioUrl) {
-        const missing = sceneDesc.appendChild(document.createElement('div'));
+        const missing = sceneDescTab.appendChild(document.createElement('div'));
         const missingLabel = missing.appendChild(document.createElement('b'));
         missingLabel.classList.add('me-2');
         missingLabel.innerText = 'Studio URL:';
