@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.27.10
+// @version     1.28.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3279,8 +3279,12 @@ button.nav-link.backlog-flash {
 
     (function shards() {
       const performerFullURL = `${window.location.origin}/performers/${performerId}`;
-      const performerShards = Object.entries(storedData.performers).filter(([id, { split }]) =>
-        id !== performerId && split?.shards.some(({ id: shardId, links }) => (
+
+      /** @type {string[]} */
+      const possibleLinks = [];
+      const performerShards = Object.entries(storedData.performers).filter(([id, { split }]) => {
+        if (id === performerId || !split) return false;
+        const matchedShard = split.shards.find(({ id: shardId, links }) => (
           // shard id is currently viewed performer
           shardId === performerId ||
           !!links && (
@@ -3289,8 +3293,17 @@ button.nav-link.backlog-flash {
             // current performer url listed in shard links? (additional performers)
             links.some((link) => link.startsWith(performerFullURL))
           )
-        ))
-      );
+        ));
+        if (matchedShard?.links) {
+          const newLinks = matchedShard.links
+            .filter((link) => !performerUrls.includes(link) && link !== performerFullURL);
+          newLinks.forEach((newLink) => {
+            if (!possibleLinks.includes(newLink))
+              possibleLinks.push(newLink);
+          });
+        }
+        return !!matchedShard;
+      });
 
       if (performerShards.length === 0)
         return;
@@ -3298,16 +3311,49 @@ button.nav-link.backlog-flash {
       if (backlogDiv.querySelector('[data-backlog="shards"]')) return;
       const hasShards = document.createElement('div');
       hasShards.dataset.backlog = 'shards';
-      hasShards.classList.add('mb-1', 'p-1', 'fw-bold');
-      hasShards.append(`✂ Performer is listed as a shard for ${performerShards.length} performer${
-        performerShards.length !== 1 ? 's' : ''} to split up:`);
+      hasShards.classList.add('mb-1', 'p-1');
+
+      const label = document.createElement('span');
+      label.classList.add('fw-bold');
+      label.innerText = `✂ Performer is listed as a shard for ${performerShards.length} performer${
+        performerShards.length !== 1 ? 's' : ''} to split up:`;
+      hasShards.appendChild(label);
 
       const performersList = document.createElement('ol');
-      setStyles(performersList, { paddingLeft: '2rem', fontWeight: 'normal' });
+      setStyles(performersList, { paddingLeft: '2rem' });
       renderPerformersList(performerShards, performersList, 'edits');
 
       hasShards.append(performersList);
+
       backlogDiv.append(hasShards);
+
+      (function possibleLinksFromShards() {
+        if (possibleLinks.length === 0) return;
+        const linksFromShards = document.createElement('div');
+
+        const label = document.createElement('span');
+        label.classList.add('fw-bold');
+        label.innerText = 'Possible links for this performer (sourced from shards):';
+        linksFromShards.appendChild(label);
+
+        possibleLinks.forEach((url) => {
+          linksFromShards.append(document.createElement('br'));
+          const container = document.createElement('span');
+          container.style.marginLeft = '1.75rem';
+          const a = makeLink(url, undefined, { color: 'var(--bs-teal)' });
+          a.target = '_blank';
+          container.appendChild(a);
+          linksFromShards.appendChild(container);
+        });
+
+        const emoji = document.createElement('span');
+        emoji.classList.add('me-1');
+        emoji.innerText = '🔗';
+        linksFromShards.prepend(emoji);
+
+        hasShards.append(linksFromShards);
+      })();
+
     })();
 
     const foundData = await getDataFor('performers', performerId);
