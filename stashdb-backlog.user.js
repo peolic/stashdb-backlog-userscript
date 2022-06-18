@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.28.1
+// @version     1.28.2
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1299,6 +1299,27 @@ button.nav-link.backlog-flash {
 
       target.appendChild(row);
     });
+
+  /** @param {string} url */
+  const getSiteName = (url) => {
+    const parsed = new URL(url);
+    let siteName = parsed.hostname.split(/\./).slice(-2)[0];
+    if (siteName === 'stashdb') {
+      const obj = parsed.pathname.match(/^\/(.+?)\/.+/)?.[1]?.slice(0, -1);
+      if (obj)
+        siteName += ` ${obj}`;
+    }
+    if (siteName === 'archive') {
+      const archived = parsed.pathname.match(/\/(http:.+$)/)?.[1];
+      if (archived) {
+        const actual = new URL(archived);
+        siteName = `${actual.hostname.split(/\./).slice(-2)[0]}`;
+      } else {
+        siteName = 'web archive';
+      }
+    }
+    return siteName;
+  };
 
   /**
    * @param {[performerId: string, data: PerformerDataObject][]} list
@@ -3412,14 +3433,7 @@ button.nav-link.backlog-flash {
         const links = document.createElement('div');
         links.style.marginLeft = '1.75rem';
         splitItem.links.forEach((url) => {
-          const parsed = new URL(url);
-          let siteName = parsed.hostname.split(/\./).slice(-2)[0];
-          if (siteName === 'stashdb') {
-            const obj = parsed.pathname.match(/^\/(.+?)\/.+/)?.[1]?.slice(0, -1);
-            if (obj)
-              siteName += ` ${obj}`;
-          }
-          const link = makeLink(url, `[${siteName}]`, { color: 'var(--bs-yellow)' });
+          const link = makeLink(url, `[${getSiteName(url)}]`, { color: 'var(--bs-yellow)' });
           link.classList.add('me-1');
           link.title = url;
           links.appendChild(link);
@@ -3475,14 +3489,7 @@ button.nav-link.backlog-flash {
 
         const links = document.createElement('div');
         (shard.links || []).forEach((url) => {
-          const parsed = new URL(url);
-          let siteName = parsed.hostname.split(/\./).slice(-2)[0];
-          if (siteName === 'stashdb') {
-            const obj = parsed.pathname.match(/^\/(.+?)\/.+/)?.[1]?.slice(0, -1);
-            if (obj)
-              siteName += ` ${obj}`;
-          }
-          const link = makeLink(url, `[${siteName}]`, { color: 'var(--bs-yellow)' });
+          const link = makeLink(url, `[${getSiteName(url)}]`, { color: 'var(--bs-yellow)' });
           link.classList.add('me-1');
           link.title = url;
           links.appendChild(link);
