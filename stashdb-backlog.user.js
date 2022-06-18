@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.28.0
+// @version     1.28.1
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3277,9 +3277,12 @@ button.nav-link.backlog-flash {
       }
     })();
 
+    const foundData = await getDataFor('performers', performerId);
+
     (function shards() {
       const performerFullURL = `${window.location.origin}/performers/${performerId}`;
 
+      const pendingLinks = foundData?.urls || [];
       /** @type {string[]} */
       const possibleLinks = [];
       const performerShards = Object.entries(storedData.performers).filter(([id, { split }]) => {
@@ -3296,7 +3299,11 @@ button.nav-link.backlog-flash {
         ));
         if (matchedShard?.links) {
           const newLinks = matchedShard.links
-            .filter((link) => !performerUrls.includes(link) && link !== performerFullURL);
+            .filter((link) => (
+              !performerUrls.includes(link) // is new link
+              && !pendingLinks.includes(link) // is not backlogged
+              && link !== performerFullURL // is not a link to current performer
+            ));
           newLinks.forEach((newLink) => {
             if (!possibleLinks.includes(newLink))
               possibleLinks.push(newLink);
@@ -3356,7 +3363,6 @@ button.nav-link.backlog-flash {
 
     })();
 
-    const foundData = await getDataFor('performers', performerId);
     if (!foundData) return;
     console.debug('[backlog] found', foundData);
 
