@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.28.2
+// @version     1.28.3
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1250,6 +1250,44 @@ button.nav-link.backlog-flash {
     if (!studio) return '';
     const [name, parent] = studio;
     return name + (parent ? ` [${parent}]` : '');
+  };
+
+  /**
+   * @param {string} text
+   * @returns {HTMLElement[]}
+   */
+  const strikethroughTextElements = (text) => {
+    if (!text.includes('\u{0002}')) {
+      const s = document.createElement('span');
+      s.innerText = text;
+      return [s];
+    }
+
+    /** @type {HTMLElement[]} */
+    const out = [];
+    let i = 0;
+
+    while (i < text.length) {
+      const del = text[i] === '\u{0002}';
+      let start, end;
+      if (del) {
+        start = i + 1;
+        end = text.indexOf('\u{0003}', i);
+        i = end + 1;
+      } else {
+        start = i;
+        end = text.indexOf('\u{0002}', i);
+        if (end === -1)
+          end = text.length;
+        i = end;
+      }
+
+      const s = document.createElement(del ? 's' : 'span');
+      s.innerText = text.slice(start, end);
+      out.push(s);
+    }
+
+    return out;
   };
 
   /**
@@ -3425,7 +3463,7 @@ button.nav-link.backlog-flash {
         const notes = document.createElement('div');
         notes.style.marginLeft = '1.75rem';
         notes.classList.add('fw-normal');
-        notes.innerText = splitItem.notes.join('\n');
+        notes.append(...strikethroughTextElements(splitItem.notes.join('\n')));
         toSplit.append(notes);
       }
 
@@ -3479,7 +3517,7 @@ button.nav-link.backlog-flash {
         if (shard.text || shard.notes) {
           const notes = (shard.text ? [shard.text] : []).concat(shard.notes || []).join('\n');
           const text = document.createElement('span');
-          text.innerText = `: ${notes}`;
+          text.append(...strikethroughTextElements(`: ${notes}`));
           text.classList.add('fw-normal');
           shardEl.appendChild(text);
         }
