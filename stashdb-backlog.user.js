@@ -1291,7 +1291,7 @@ button.nav-link.backlog-flash {
   };
 
   /**
-   * @param {[sceneId: string, data: SceneDataObject][]} list
+   * @param {SceneEntriesItem[]} list
    * @param {HTMLOListElement} target
    * @param {AnyObject | null} object
    */
@@ -1360,7 +1360,7 @@ button.nav-link.backlog-flash {
   };
 
   /**
-   * @param {[performerId: string, data: PerformerDataObject][]} list
+   * @param {PerformerEntriesItem[]} list
    * @param {HTMLOListElement} target
    * @param {AnyObject | null} object
    */
@@ -4658,8 +4658,6 @@ button.nav-link.backlog-flash {
     /** @param {string} key */
     const submittableKeys = (key) => !(unsubmittableKeys).includes(/** @type {keyof SceneDataObject} */ (key));
 
-    /** @typedef {[string, SceneDataObject]} SceneEntriesItem */
-
     /**
      * @param {SceneEntriesItem[]} result
      * @param {SceneEntriesItem} item
@@ -4795,8 +4793,6 @@ button.nav-link.backlog-flash {
     const unsubmittableKeys = ['name'];
     /** @param {string} key */
     const submittableKeys = (key) => !(unsubmittableKeys).includes(/** @type {keyof PerformerDataObject} */ (key));
-
-    /** @typedef {[string, PerformerDataObject]} PerformerEntriesItem */
 
     /**
      * @param {PerformerEntriesItem[]} result

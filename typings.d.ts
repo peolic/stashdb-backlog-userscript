@@ -156,7 +156,11 @@ type FingerprintsRow = {
     hash: string;
     duration: number | null;
     submissions: number;
-};
+}
+
+type SceneEntriesItem = [id: string, data: SceneDataObject]
+type PerformerEntriesItem = [id: string, data: PerformerDataObject]
+
 
 //#region https://github.com/stashapp/stash-box/blob/develop/frontend/src/graphql/definitions/Scenes.ts
 interface ScenePerformance_URL {
