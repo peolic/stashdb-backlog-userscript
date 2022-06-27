@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.28.3
+// @version     1.28.4
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1290,6 +1290,13 @@ button.nav-link.backlog-flash {
     return out;
   };
 
+  const makeSep = () => {
+    const sep = document.createElement('span');
+    sep.classList.add('mx-2');
+    sep.innerHTML = '&mdash;';
+    return sep;
+  };
+
   /**
    * @param {SceneEntriesItem[]} list
    * @param {HTMLOListElement} target
@@ -1319,20 +1326,16 @@ button.nav-link.backlog-flash {
       link.addEventListener('click', editClick);
       link.addEventListener('auxclick', editClick);
 
-      const sep = document.createElement('span');
-      sep.classList.add('mx-2');
-      sep.innerHTML = '&mdash;';
-
       const keys = dataObjectKeys(sceneData)
         .map((k) => k === 'performers' ? `${Object.values(sceneData.performers).flat().length}x ${k}` : k)
         .join(', ');
 
-      row.append(check, view, link, sep, keys);
+      row.append(check, view, link, makeSep(), keys);
 
       if (object !== 'studios' && sceneData.c_studio) {
         const studio = document.createElement('span');
         studio.innerText = studioArrayToString(sceneData.c_studio);
-        row.append(sep.cloneNode(true), studio);
+        row.append(makeSep(), studio);
       }
 
       target.appendChild(row);
@@ -1362,9 +1365,10 @@ button.nav-link.backlog-flash {
   /**
    * @param {PerformerEntriesItem[]} list
    * @param {HTMLOListElement} target
-   * @param {AnyObject | null} object
+   * @param {'shards'} [custom]
+   * @param {ShardIndexMap} [customData]
    */
-  const renderPerformersList = (list, target, object) =>
+  const renderPerformersList = (list, target, custom, customData) =>
     list.forEach(([performerId, performerData], idx) => {
       if (idx > 0 && idx % 10 === 0)
         target.appendChild(document.createElement('br'));
@@ -1377,14 +1381,14 @@ button.nav-link.backlog-flash {
       row.append(check);
 
       const viewURL = `/performers/${performerId}`;
-      if (object !== 'edits') {
+      if (!custom) {
         const view = makeLink(viewURL, '⭕');
         view.classList.add('me-1', 'text-decoration-none');
         view.title = 'View performer';
         row.append(view);
       }
 
-      const mainURL = object !== 'edits'
+      const mainURL = !custom
         ? (!performerData.duplicates ? `${viewURL}/edit` : `${viewURL}/merge`)
         : viewURL;
       const name = [performerData.name, performerData.split?.name].find((n) => !!n);
@@ -1399,16 +1403,16 @@ button.nav-link.backlog-flash {
 
       row.append(link);
 
-      if (object !== 'edits') {
-        const sep = document.createElement('span');
-        sep.classList.add('mx-2');
-        sep.innerHTML = '&mdash;';
-
+      if (!custom) {
         const keys = dataObjectKeys(performerData)
           .map((k) => k === 'urls' || k === 'duplicates' ? `${Object.values(performerData[k]).length}x ${k}` : k)
           .join(', ');
 
-        row.append(sep, keys);
+        row.append(makeSep(), keys);
+      } else if (custom === 'shards' && customData?.[performerId] !== undefined) {
+        const shardNumber = `shard #${customData[performerId] + 1}`;
+
+        row.append(makeSep(), shardNumber);
       }
 
       target.appendChild(row);
@@ -3344,6 +3348,10 @@ button.nav-link.backlog-flash {
       const pendingLinks = foundData?.urls || [];
       /** @type {string[]} */
       const possibleLinks = [];
+
+      /** @type {ShardIndexMap} */
+      const shardIndexMap = {};
+
       const performerShards = Object.entries(storedData.performers).filter(([id, { split }]) => {
         if (id === performerId || !split) return false;
         const matchedShard = split.shards.find(({ id: shardId, links }) => (
@@ -3368,6 +3376,10 @@ button.nav-link.backlog-flash {
               possibleLinks.push(newLink);
           });
         }
+        // Store shard index for matching later
+        if (matchedShard && !shardIndexMap[id])
+          shardIndexMap[id] = split.shards.indexOf(matchedShard);
+
         return !!matchedShard;
       });
 
@@ -3387,7 +3399,7 @@ button.nav-link.backlog-flash {
 
       const performersList = document.createElement('ol');
       setStyles(performersList, { paddingLeft: '2rem' });
-      renderPerformersList(performerShards, performersList, 'edits');
+      renderPerformersList(performerShards, performersList, 'shards', shardIndexMap);
 
       hasShards.append(performersList);
 
@@ -3493,16 +3505,19 @@ button.nav-link.backlog-flash {
         return;
       }
 
-      const shardsList = document.createElement('details');
-      shardsList.style.marginLeft = '1.5rem';
+      const shardsDetails = document.createElement('details');
+      shardsDetails.style.marginLeft = '1.5rem';
       const summary = document.createElement('summary');
       setStyles(summary, { color: 'tan', width: 'max-content' });
       summary.innerText = `${splitItem.shards.length} shard${splitItem.shards.length === 1 ? '' : 's'}`;
-      shardsList.append(summary);
+      shardsDetails.append(summary);
+
+      const shardsList = document.createElement('ol');
+      setStyles(shardsList, { padding: '0', margin: '0 0 0 2rem' });
+      shardsDetails.append(shardsList);
 
       splitItem.shards.forEach((shard) => {
         const shardEl = document.createElement('li');
-        shardEl.style.marginLeft = '2rem';
 
         let shardName;
         if (shard.id) {
@@ -3536,7 +3551,7 @@ button.nav-link.backlog-flash {
 
         shardsList.appendChild(shardEl);
       });
-      toSplit.appendChild(shardsList);
+      toSplit.appendChild(shardsDetails);
       backlogDiv.append(toSplit);
     })();
 
@@ -4407,13 +4422,24 @@ button.nav-link.backlog-flash {
 
     /**
      * @param {string[]} urls
+     * @returns {[PerformerEntriesItem[], ShardIndexMap]}
      */
-    const editPerformerShards = (urls) =>
-      Object.entries(storedData.performers).filter(([, { split }]) =>
-        split?.shards.some(({ links }) =>
+    const editPerformerShards = (urls) => {
+      /** @type {ShardIndexMap} */
+      const shardIndexMap = {};
+
+      const shards = Object.entries(storedData.performers).filter(([id, { split }]) => {
+        if (!split) return false;
+        const index = split.shards.findIndex(({ links }) =>
           !!links && urls.some((url) => links.includes(url))
-        )
-      );
+        );
+        // Store shard index for matching later
+        if (index !== -1 && !shardIndexMap[id])
+          shardIndexMap[id] = index;
+        return index !== -1;
+      });
+      return [shards, shardIndexMap];
+    };
 
     /**
      * @param {string} editUrl
@@ -4516,7 +4542,7 @@ button.nav-link.backlog-flash {
         (Array.from(card.querySelectorAll('.EditComment > .card-body')))
           .forEach((cEl) => urls.push(...(cEl.textContent.match(/(https?:\/\/[^\s]+)/g) ?? [])), []);
 
-        const performerShards = editPerformerShards(urls);
+        const [performerShards, shardIndexMap] = editPerformerShards(urls);
         if (performerShards.length > 0) {
           const title = `✂ Performer is listed as a shard for ${performerShards.length} performer${
             performerShards.length !== 1 ? 's' : ''} to split up:`;
@@ -4532,7 +4558,7 @@ button.nav-link.backlog-flash {
 
             cardBody.prepend(header, performersList);
 
-            renderPerformersList(performerShards, performersList, 'edits');
+            renderPerformersList(performerShards, performersList, 'shards', shardIndexMap);
           }
         }
 
@@ -4836,7 +4862,7 @@ button.nav-link.backlog-flash {
       + '\nSome entries need to be merged and/or split, take extra cake with those.'
     );
 
-    renderPerformersList(sortedPerformers, performersList, null);
+    renderPerformersList(sortedPerformers, performersList);
   } // iPerformerBacklogPage
 }
 
