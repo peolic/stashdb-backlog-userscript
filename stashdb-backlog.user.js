@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.28.4
+// @version     1.28.5
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1405,7 +1405,18 @@ button.nav-link.backlog-flash {
 
       if (!custom) {
         const keys = dataObjectKeys(performerData)
-          .map((k) => k === 'urls' || k === 'duplicates' ? `${Object.values(performerData[k]).length}x ${k}` : k)
+          .map((k) => {
+            switch (k) {
+              case 'urls':
+              case 'duplicates':
+                return `${Object.values(performerData[k]).length}x ${k}`;
+              case 'split':
+                const { shards } = performerData[k];
+                return shards.length > 0 ? `${shards.length}x shards` : k;
+              default:
+                return k;
+            }
+          })
           .join(', ');
 
         row.append(makeSep(), keys);
@@ -3117,6 +3128,9 @@ button.nav-link.backlog-flash {
     const performerUrls = performerFiber?.urls.map((u) => u.url);
 
     (function performerLinks() {
+      // Don't show if native links exist (#439)
+      if (performerInfo.querySelector('.card + .float-end')) return;
+
       const header = performerInfo.querySelector('.card-header');
       if (header.querySelector('[data-backlog="links"]')) return;
 
