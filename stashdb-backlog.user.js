@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.28.6
+// @version     1.28.7
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3380,6 +3380,8 @@ button.nav-link.backlog-flash {
             links.some((link) => link.startsWith(performerFullURL))
           )
         ));
+        if (matchedShard?.id && matchedShard.id !== performerId)
+          possibleLinks.push(`${window.location.origin}/performers/${matchedShard.id}`);
         if (matchedShard?.links) {
           const newLinks = matchedShard.links
             .filter((link) => (
