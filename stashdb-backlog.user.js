@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.28.7
+// @version     1.28.8
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1367,8 +1367,8 @@ button.nav-link.backlog-flash {
   /**
    * @param {PerformerEntriesItem[]} list
    * @param {HTMLOListElement} target
-   * @param {'shards'} [custom]
-   * @param {ShardIndexMap} [customData]
+   * @param {'fragments'} [custom]
+   * @param {FragmentIndexMap} [customData]
    */
   const renderPerformersList = (list, target, custom, customData) =>
     list.forEach(([performerId, performerData], idx) => {
@@ -1413,8 +1413,8 @@ button.nav-link.backlog-flash {
               case 'duplicates':
                 return `${Object.values(performerData[k]).length}x ${k}`;
               case 'split':
-                const { shards } = performerData[k];
-                return shards.length > 0 ? `${shards.length}x shards` : k;
+                const { shards: fragments } = performerData[k];
+                return fragments.length > 0 ? `${fragments.length}x fragments` : k;
               default:
                 return k;
             }
@@ -1422,10 +1422,10 @@ button.nav-link.backlog-flash {
           .join(', ');
 
         row.append(makeSep(), keys);
-      } else if (custom === 'shards' && customData?.[performerId] !== undefined) {
-        const shardNumber = `shard #${customData[performerId] + 1}`;
+      } else if (custom === 'fragments' && customData?.[performerId] !== undefined) {
+        const fragmentNumber = `fragment #${customData[performerId] + 1}`;
 
-        row.append(makeSep(), shardNumber);
+        row.append(makeSep(), fragmentNumber);
       }
 
       target.appendChild(row);
@@ -3358,32 +3358,33 @@ button.nav-link.backlog-flash {
 
     const foundData = await getDataFor('performers', performerId);
 
-    (function shards() {
+    (function fragments() {
       const performerFullURL = `${window.location.origin}/performers/${performerId}`;
 
       const pendingLinks = foundData?.urls || [];
       /** @type {string[]} */
       const possibleLinks = [];
 
-      /** @type {ShardIndexMap} */
-      const shardIndexMap = {};
+      /** @type {FragmentIndexMap} */
+      const fragmentIndexMap = {};
 
-      const performerShards = Object.entries(storedData.performers).filter(([id, { split }]) => {
+      const performerFragments = Object.entries(storedData.performers).filter(([id, { split }]) => {
         if (id === performerId || !split) return false;
-        const matchedShard = split.shards.find(({ id: shardId, links }) => (
-          // shard id is currently viewed performer
-          shardId === performerId ||
+        const { shards: fragments } = split;
+        const matchedFragment = fragments.find(({ id: fragmentId, links }) => (
+          // fragment id is currently viewed performer
+          fragmentId === performerId ||
           !!links && (
-            // any performer url listed in shard links?
+            // any performer url listed in fragment links?
             performerUrls.some((url) => links.includes(url)) ||
-            // current performer url listed in shard links? (additional performers)
+            // current performer url listed in fragment links? (additional performers)
             links.some((link) => link.startsWith(performerFullURL))
           )
         ));
-        if (matchedShard?.id && matchedShard.id !== performerId)
-          possibleLinks.push(`${window.location.origin}/performers/${matchedShard.id}`);
-        if (matchedShard?.links) {
-          const newLinks = matchedShard.links
+        if (matchedFragment?.id && matchedFragment.id !== performerId)
+          possibleLinks.push(`${window.location.origin}/performers/${matchedFragment.id}`);
+        if (matchedFragment?.links) {
+          const newLinks = matchedFragment.links
             .filter((link) => (
               !performerUrls.includes(link) // is new link
               && !pendingLinks.includes(link) // is not backlogged
@@ -3394,60 +3395,60 @@ button.nav-link.backlog-flash {
               possibleLinks.push(newLink);
           });
         }
-        // Store shard index for matching later
-        if (matchedShard && !shardIndexMap[id])
-          shardIndexMap[id] = split.shards.indexOf(matchedShard);
+        // Store fragment index for matching later
+        if (matchedFragment && !fragmentIndexMap[id])
+          fragmentIndexMap[id] = fragments.indexOf(matchedFragment);
 
-        return !!matchedShard;
+        return !!matchedFragment;
       });
 
-      if (performerShards.length === 0)
+      if (performerFragments.length === 0)
         return;
 
-      if (backlogDiv.querySelector('[data-backlog="shards"]')) return;
-      const hasShards = document.createElement('div');
-      hasShards.dataset.backlog = 'shards';
-      hasShards.classList.add('mb-1', 'p-1');
+      if (backlogDiv.querySelector('[data-backlog="fragments"]')) return;
+      const hasFragments = document.createElement('div');
+      hasFragments.dataset.backlog = 'fragments';
+      hasFragments.classList.add('mb-1', 'p-1');
 
       const label = document.createElement('span');
       label.classList.add('fw-bold');
-      label.innerText = `✂ Performer is listed as a shard for ${performerShards.length} performer${
-        performerShards.length !== 1 ? 's' : ''} to split up:`;
-      hasShards.appendChild(label);
+      label.innerText = `✂ Performer is listed as a fragment for ${performerFragments.length} performer${
+        performerFragments.length !== 1 ? 's' : ''} to split up:`;
+      hasFragments.appendChild(label);
 
       const performersList = document.createElement('ol');
       setStyles(performersList, { paddingLeft: '2rem' });
-      renderPerformersList(performerShards, performersList, 'shards', shardIndexMap);
+      renderPerformersList(performerFragments, performersList, 'fragments', fragmentIndexMap);
 
-      hasShards.append(performersList);
+      hasFragments.append(performersList);
 
-      backlogDiv.append(hasShards);
+      backlogDiv.append(hasFragments);
 
-      (function possibleLinksFromShards() {
+      (function possibleLinksFromFragments() {
         if (possibleLinks.length === 0) return;
-        const linksFromShards = document.createElement('div');
+        const linksFromFragments = document.createElement('div');
 
         const label = document.createElement('span');
         label.classList.add('fw-bold');
-        label.innerText = 'Possible links for this performer (sourced from shards):';
-        linksFromShards.appendChild(label);
+        label.innerText = 'Possible links for this performer (sourced from fragments):';
+        linksFromFragments.appendChild(label);
 
         possibleLinks.forEach((url) => {
-          linksFromShards.append(document.createElement('br'));
+          linksFromFragments.append(document.createElement('br'));
           const container = document.createElement('span');
           container.style.marginLeft = '1.75rem';
           const a = makeLink(url, undefined, { color: 'var(--bs-teal)' });
           a.target = '_blank';
           container.appendChild(a);
-          linksFromShards.appendChild(container);
+          linksFromFragments.appendChild(container);
         });
 
         const emoji = document.createElement('span');
         emoji.classList.add('me-1');
         emoji.innerText = '🔗';
-        linksFromShards.prepend(emoji);
+        linksFromFragments.prepend(emoji);
 
-        hasShards.append(linksFromShards);
+        hasFragments.append(linksFromFragments);
       })();
 
     })();
@@ -3464,6 +3465,7 @@ button.nav-link.backlog-flash {
       if (!foundData.split) return;
       if (backlogDiv.querySelector('[data-backlog="split"]')) return;
       const splitItem = foundData.split;
+      const { shards: fragments } = splitItem;
 
       const toSplit = document.createElement('div');
       toSplit.dataset.backlog = 'split';
@@ -3514,62 +3516,62 @@ button.nav-link.backlog-flash {
       emoji.innerText = '🔀';
       toSplit.prepend(emoji);
 
-      if (splitItem.shards.length === 0) {
-        const noShards = document.createElement('div');
-        setStyles(noShards, { marginLeft: '1.75rem', color: 'tan', width: 'max-content' });
-        noShards.innerText = 'No shards listed.';
-        toSplit.appendChild(noShards);
+      if (fragments.length === 0) {
+        const noFragments = document.createElement('div');
+        setStyles(noFragments, { marginLeft: '1.75rem', color: 'tan', width: 'max-content' });
+        noFragments.innerText = 'No fragments listed.';
+        toSplit.appendChild(noFragments);
         backlogDiv.append(toSplit);
         return;
       }
 
-      const shardsDetails = document.createElement('details');
-      shardsDetails.style.marginLeft = '1.5rem';
+      const fragmentsDetails = document.createElement('details');
+      fragmentsDetails.style.marginLeft = '1.5rem';
       const summary = document.createElement('summary');
       setStyles(summary, { color: 'tan', width: 'max-content' });
-      summary.innerText = `${splitItem.shards.length} shard${splitItem.shards.length === 1 ? '' : 's'}`;
-      shardsDetails.append(summary);
+      summary.innerText = `${fragments.length} fragment${fragments.length === 1 ? '' : 's'}`;
+      fragmentsDetails.append(summary);
 
-      const shardsList = document.createElement('ol');
-      setStyles(shardsList, { padding: '0', margin: '0 0 0 2rem' });
-      shardsDetails.append(shardsList);
+      const fragmentsList = document.createElement('ol');
+      setStyles(fragmentsList, { padding: '0', margin: '0 0 0 2rem' });
+      fragmentsDetails.append(fragmentsList);
 
-      splitItem.shards.forEach((shard) => {
-        const shardEl = document.createElement('li');
+      fragments.forEach((fragment) => {
+        const fragmentEl = document.createElement('li');
 
-        let shardName;
-        if (shard.id) {
-          shardName = makeLink(`/performers/${shard.id}`, shard.name, { color: 'var(--bs-teal)' });
-          shardName.target = '_blank';
+        let fragmentName;
+        if (fragment.id) {
+          fragmentName = makeLink(`/performers/${fragment.id}`, fragment.name, { color: 'var(--bs-teal)' });
+          fragmentName.target = '_blank';
         } else {
-          shardName = document.createElement('span');
-          shardName.innerText = shard.name;
+          fragmentName = document.createElement('span');
+          fragmentName.innerText = fragment.name;
         }
-        shardEl.appendChild(shardName);
+        fragmentEl.appendChild(fragmentName);
 
-        if (shard.text || shard.notes) {
-          const notes = (shard.text ? [shard.text] : []).concat(shard.notes || []).join('\n');
+        if (fragment.text || fragment.notes) {
+          const notes = (fragment.text ? [fragment.text] : []).concat(fragment.notes || []).join('\n');
           const text = document.createElement('span');
           text.append(...strikethroughTextElements(`: ${notes}`));
           text.classList.add('fw-normal');
-          shardEl.appendChild(text);
+          fragmentEl.appendChild(text);
         }
 
-        if (shard.id && isMarkedForSplit(shard.id))
-          shardEl.append(' 🔀 needs to be split up');
+        if (fragment.id && isMarkedForSplit(fragment.id))
+          fragmentEl.append(' 🔀 needs to be split up');
 
         const links = document.createElement('div');
-        (shard.links || []).forEach((url) => {
+        (fragment.links || []).forEach((url) => {
           const link = makeLink(url, `[${getSiteName(url)}]`, { color: 'var(--bs-yellow)' });
           link.classList.add('me-1');
           link.title = url;
           links.appendChild(link);
         });
-        shardEl.appendChild(links);
+        fragmentEl.appendChild(links);
 
-        shardsList.appendChild(shardEl);
+        fragmentsList.appendChild(fragmentEl);
       });
-      toSplit.appendChild(shardsDetails);
+      toSplit.appendChild(fragmentsDetails);
       backlogDiv.append(toSplit);
     })();
 
@@ -4440,23 +4442,24 @@ button.nav-link.backlog-flash {
 
     /**
      * @param {string[]} urls
-     * @returns {[PerformerEntriesItem[], ShardIndexMap]}
+     * @returns {[PerformerEntriesItem[], FragmentIndexMap]}
      */
-    const editPerformerShards = (urls) => {
-      /** @type {ShardIndexMap} */
-      const shardIndexMap = {};
+    const editPerformerFragments = (urls) => {
+      /** @type {FragmentIndexMap} */
+      const fragmentIndexMap = {};
 
-      const shards = Object.entries(storedData.performers).filter(([id, { split }]) => {
+      const fragments = Object.entries(storedData.performers).filter(([id, { split }]) => {
         if (!split) return false;
-        const index = split.shards.findIndex(({ links }) =>
+        const { shards: fragments } = split;
+        const index = fragments.findIndex(({ links }) =>
           !!links && urls.some((url) => links.includes(url))
         );
-        // Store shard index for matching later
-        if (index !== -1 && !shardIndexMap[id])
-          shardIndexMap[id] = index;
+        // Store fragment index for matching later
+        if (index !== -1 && !fragmentIndexMap[id])
+          fragmentIndexMap[id] = index;
         return index !== -1;
       });
-      return [shards, shardIndexMap];
+      return [fragments, fragmentIndexMap];
     };
 
     /**
@@ -4560,10 +4563,10 @@ button.nav-link.backlog-flash {
         (Array.from(card.querySelectorAll('.EditComment > .card-body')))
           .forEach((cEl) => urls.push(...(cEl.textContent.match(/(https?:\/\/[^\s]+)/g) ?? [])), []);
 
-        const [performerShards, shardIndexMap] = editPerformerShards(urls);
-        if (performerShards.length > 0) {
-          const title = `✂ Performer is listed as a shard for ${performerShards.length} performer${
-            performerShards.length !== 1 ? 's' : ''} to split up:`;
+        const [performerFragments, fragmentIndexMap] = editPerformerFragments(urls);
+        if (performerFragments.length > 0) {
+          const title = `✂ Performer is listed as a fragment for ${performerFragments.length} performer${
+            performerFragments.length !== 1 ? 's' : ''} to split up:`;
           if (isEditsList) {
             cardHeading.style.backgroundColor = 'var(--bs-success)';
             cardHeading.title = title;
@@ -4576,7 +4579,7 @@ button.nav-link.backlog-flash {
 
             cardBody.prepend(header, performersList);
 
-            renderPerformersList(performerShards, performersList, 'shards', shardIndexMap);
+            renderPerformersList(performerFragments, performersList, 'fragments', fragmentIndexMap);
           }
         }
 

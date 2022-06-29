@@ -69,7 +69,7 @@ interface SceneDataObject {
     c_studio?: [name: string, parent: string | null];
 }
 
-interface SplitShard {
+interface SplitFragment {
     id: string | null;
     name: string;
     text?: string;
@@ -85,7 +85,7 @@ interface PerformerDataObject {
     duplicate_of?: string;
     split?: {
         name: string;
-        shards: SplitShard[];
+        shards: SplitFragment[];
         notes?: string[];
         links?: string[];
     };
@@ -161,7 +161,7 @@ type FingerprintsRow = {
 type SceneEntriesItem = [id: string, data: SceneDataObject]
 type PerformerEntriesItem = [id: string, data: PerformerDataObject]
 
-type ShardIndexMap = { [performerId: string]: number }
+type FragmentIndexMap = { [performerId: string]: number }
 
 
 //#region https://github.com/stashapp/stash-box/blob/develop/frontend/src/graphql/definitions/Scenes.ts
