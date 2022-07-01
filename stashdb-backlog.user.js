@@ -3131,7 +3131,11 @@ button.nav-link.backlog-flash {
 
     (function performerLinks() {
       // Don't show if native links exist (#439)
-      if (performerInfo.querySelector('.card + .float-end')) return;
+      const nativeLinks = performerInfo.querySelector('.card + .float-end');
+      if (nativeLinks) {
+        if (isDev) nativeLinks.classList.add('d-none');
+        else return;
+      }
 
       const header = performerInfo.querySelector('.card-header');
       if (header.querySelector('[data-backlog="links"]')) return;
@@ -3151,11 +3155,11 @@ button.nav-link.backlog-flash {
 
       links.append(...sortedUrls.map(({ url, site }) => {
         const icon = document.createElement('img');
-        icon.classList.add('SiteLink-icon', 'me-0', 'ms-1');
+        icon.classList.add('SiteLink-icon', 'mx-0');
         icon.src = site.icon;
         icon.alt = '';
         const a = makeLink(url, '');
-        a.classList.add('SiteLink');
+        a.classList.add('SiteLink', 'me-0', 'ms-1');
         a.title = site.name;
         a.appendChild(icon);
         return a;
