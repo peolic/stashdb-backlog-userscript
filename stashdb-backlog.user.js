@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.28.8
+// @version     1.28.9
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3385,8 +3385,11 @@ button.nav-link.backlog-flash {
             links.some((link) => link.startsWith(performerFullURL))
           )
         ));
-        if (matchedFragment?.id && matchedFragment.id !== performerId)
-          possibleLinks.push(`${window.location.origin}/performers/${matchedFragment.id}`);
+        if (matchedFragment?.id && matchedFragment.id !== performerId) {
+          const fragmentPerformerURL = `${window.location.origin}/performers/${matchedFragment.id}`;
+          if (!possibleLinks.includes(fragmentPerformerURL))
+            possibleLinks.push(fragmentPerformerURL);
+        }
         if (matchedFragment?.links) {
           const newLinks = matchedFragment.links
             .filter((link) => (
