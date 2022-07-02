@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.28.9
+// @version     1.28.10
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -4562,6 +4562,20 @@ button.nav-link.backlog-flash {
       /** @type {HTMLDivElement} */
       const cardBody = card.querySelector('.card-body');
 
+      const targetLinks = selectTargetLinks(operation, cardBody);
+      if (targetLinks.length === 0 && operation !== 'create') {
+        console.error(`${operation} edit target link(s) not found`, cardBody);
+      }
+      targetLinks.forEach((el) => handleEntityLink(el, entity));
+
+      if (entity === 'scene') {
+        /** @type {HTMLAnchorElement[]} */
+        const performerLinks = Array.from(cardBody.querySelectorAll('.ListChangeRow-Performers a'));
+        if (performerLinks.length > 0) {
+          performerLinks.forEach((el) => handleEntityLink(el, entity));
+        }
+      }
+
       if (entity === 'performer' && operation !== 'destroy') {
         const editUrl = cardHeading.closest('a').href;
         const urls = /** @type {HTMLAnchorElement[]} */
@@ -4607,20 +4621,6 @@ button.nav-link.backlog-flash {
 
             renderScenesList(scenes, scenesList, 'edits');
           }
-        }
-      }
-
-      const targetLinks = selectTargetLinks(operation, cardBody);
-      if (targetLinks.length === 0 && operation !== 'create') {
-        console.error(`${operation} edit target link(s) not found`, cardBody);
-      }
-      targetLinks.forEach((el) => handleEntityLink(el, entity));
-
-      if (entity === 'scene') {
-        /** @type {HTMLAnchorElement[]} */
-        const performerLinks = Array.from(cardBody.querySelectorAll('.ListChangeRow-Performers a'));
-        if (performerLinks.length > 0) {
-          performerLinks.forEach((el) => handleEntityLink(el, entity));
         }
       }
     }
