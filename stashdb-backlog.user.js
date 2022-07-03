@@ -794,14 +794,17 @@ button.nav-link.backlog-flash {
    * @returns {Promise<DataCache>}
    */
   async function applyDataCacheMigrations(legacyCache) {
-    const { lastChecked, lastUpdated, submitted } = legacyCache;
+    const { lastChecked, lastUpdated, submitted: legacySubmitted } = legacyCache;
     /** @type {DataCache} */
     const dataCache = {
       scenes: {},
       performers: {},
       lastChecked,
       lastUpdated,
-      submitted,
+      submitted: {
+        scenes: legacySubmitted && Array.isArray(legacySubmitted) ? legacySubmitted : [],
+        performers: [],
+      },
     };
 
     // `scene/${uuid}` | `performer/${uuid}`
@@ -916,7 +919,7 @@ button.nav-link.backlog-flash {
   async function isSubmitted(object, uuid) {
     if (object !== 'scenes') return null;
     const storedData = await Cache.getStoredData();
-    return (storedData.submitted || []).find((i) => i === uuid) !== undefined;
+    return storedData.submitted[object].find((i) => i === uuid) !== undefined;
   }
 
   /**

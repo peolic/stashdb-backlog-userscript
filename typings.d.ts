@@ -103,7 +103,7 @@ interface PerformerScenes {
 interface BaseCache {
     lastUpdated?: string;
     lastChecked?: string;
-    submitted?: string[];
+    submitted: { [key in SupportedObject]: string[]; };
 }
 
 interface DataCache extends BaseCache {
@@ -125,7 +125,8 @@ type DataObjectKeys<T extends DataObject> =
     T extends SceneDataObject ? ObjectKeys["scenes"] :
     never;
 
-type MutationDataCache = BaseCache & {
+type MutationDataCache = Omit<BaseCache, "submitted"> & {
+    submitted?: string[] | BaseCache["submitted"];
     [cacheKey: string]: DataObject;
 }
 
