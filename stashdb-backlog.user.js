@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.28.10
+// @version     1.29.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -150,6 +150,11 @@ async function inject() {
 
     setUpStatusDiv();
     setUpInfo();
+
+    // Ensure data is populated
+    if (!await Cache.getStoredData(true)) {
+      return setStatus('[backlog] failed to ensure cache data', 10000);
+    }
 
     if (init) {
       console.log('[backlog] init');
@@ -351,7 +356,7 @@ button.nav-link.backlog-flash {
    * @param {string} text
    * @param {number} [resetAfter] in milliseconds
    */
-  async function setStatus(text, resetAfter) {
+  function setStatus(text, resetAfter) {
     /** @type {HTMLDivElement} */
     const statusDiv = (document.querySelector('div#backlogStatus'));
     statusDiv.innerText = text;
@@ -412,7 +417,7 @@ button.nav-link.backlog-flash {
   }
 
   /** @param {boolean} [newState] */
-  async function toggleBacklogInfo(newState) {
+  function toggleBacklogInfo(newState) {
     const info = /** @type {HTMLDivElement} */ (document.querySelector('#root nav > .backlog-info > div'));
 
     if (newState === undefined) {
@@ -420,14 +425,14 @@ button.nav-link.backlog-flash {
     }
 
     if (newState) {
-      await updateInfo();
+      updateInfo();
       info.style.display = '';
     } else {
       info.style.display = 'none';
     }
   }
 
-  async function updateInfo() {
+  function updateInfo() {
     const info = /** @type {HTMLDivElement} */ (document.querySelector('#root nav > .backlog-info > div'));
 
     /**
@@ -444,11 +449,10 @@ button.nav-link.backlog-flash {
     info.innerHTML = '';
     info.append(block('backlog data last updated:'));
 
-    const storedData = await Cache.getStoredData();
-    if (!storedData.lastUpdated) {
+    const { lastUpdated } = Cache.data;
+    if (!lastUpdated) {
       info.append(block('?', 'd-inline-block'));
     } else {
-      const { lastUpdated } = storedData;
       const ago = humanRelativeDate(new Date(lastUpdated));
       info.append(
         block(ago, 'd-inline-block', 'me-1'),
@@ -703,9 +707,9 @@ button.nav-link.backlog-flash {
     }
     static async setData(/** @type {DataCache} */ data) {
       const { scenes, performers, ...cache } = data;
-      this._setValue(this._SCENES_DATA_KEY, scenes);
-      this._setValue(this._PERFORMERS_DATA_KEY, performers);
-      this._setValue(this._DATA_INDEX_KEY, cache);
+      await this._setValue(this._SCENES_DATA_KEY, scenes);
+      await this._setValue(this._PERFORMERS_DATA_KEY, performers);
+      await this._setValue(this._DATA_INDEX_KEY, cache);
       this._data = data;
     }
     static async clearData() {
@@ -732,6 +736,11 @@ button.nav-link.backlog-flash {
         }
       }
       return result;
+    }
+
+    static get data() {
+      if (!this._data) throw new Error('Unexpected: null data');
+      return Object.freeze(this._data);
     }
 
     /**
@@ -863,15 +872,14 @@ button.nav-link.backlog-flash {
   }
 
   async function updateBacklogData(forceCheck=false) {
-    const storedData = await Cache.getStoredData();
-    let updateData = shouldFetch(storedData, 1);
+    let updateData = shouldFetch(Cache.data, 1);
     if (!dev && (forceCheck || updateData)) {
       try {
         // Only fetch if there really was an update
         setStatus(`[backlog] checking for updates`);
         const lastUpdated = await getDataLastUpdatedDate();
         if (lastUpdated) {
-          updateData = shouldFetch(storedData, lastUpdated);
+          updateData = shouldFetch(Cache.data, lastUpdated);
           console.debug(
             `[backlog] latest remote update: ${formatDate(lastUpdated)}`
             + ` - updating: ${updateData}`
@@ -884,8 +892,8 @@ button.nav-link.backlog-flash {
         return 'ERROR';
       } finally {
         // Store the last-checked timestamp as to not spam GitHub API
-        storedData.lastChecked = new Date().toISOString();
-        await Cache.setData(storedData);
+        const newData = { ...Cache.data, lastChecked: new Date().toISOString() };
+        await Cache.setData(newData);
       }
     }
 
@@ -903,23 +911,20 @@ button.nav-link.backlog-flash {
    * @template {string} I
    * @param {T} object
    * @param {I} uuid
-   * @returns {Promise<DataCache[T][I] | null>}
+   * @returns {DataCache[T][I] | null}
    */
-  async function getDataFor(object, uuid) {
-    const storedData = await Cache.getStoredData();
-    const objectCache = storedData[object];
-    return objectCache[uuid];
+  function getDataFor(object, uuid) {
+    return Cache.data[object][uuid];
   }
 
   /**
    * @param {SupportedObject} object
    * @param {string} uuid
-   * @returns {Promise<boolean | null>}
+   * @returns {boolean | null}
    */
-  async function isSubmitted(object, uuid) {
+  function isSubmitted(object, uuid) {
     if (object !== 'scenes') return null;
-    const storedData = await Cache.getStoredData();
-    return storedData.submitted[object].find((i) => i === uuid) !== undefined;
+    return Cache.data.submitted[object].find((i) => i === uuid) !== undefined;
   }
 
   /**
@@ -934,7 +939,7 @@ button.nav-link.backlog-flash {
    * @param {Blob} blob
    * @returns {Promise<string>}
    */
-  async function blobAsDataURI(blob) {
+  function blobAsDataURI(blob) {
     const reader = new FileReader();
     reader.readAsDataURL(blob);
     return new Promise((resolve) => {
@@ -1220,7 +1225,7 @@ button.nav-link.backlog-flash {
    * @param {string} url
    * @param {boolean} [replace=false]
    */
-  const addSiteURL = async (site, url, replace = false) => {
+  const addSiteURL = (site, url, replace = false) => {
     const link = getLinkBySiteType(site);
 
     if (link) {
@@ -1538,7 +1543,7 @@ button.nav-link.backlog-flash {
       console.debug('[backlog] already injected');
     }
 
-    const found = await getDataFor('scenes', sceneId);
+    const found = getDataFor('scenes', sceneId);
     if (!found) return;
     console.debug('[backlog] found', found);
 
@@ -2489,7 +2494,7 @@ button.nav-link.backlog-flash {
       markerDataset.backlogInjected = 'true';
     }
 
-    const found = await getDataFor('scenes', sceneId);
+    const found = getDataFor('scenes', sceneId);
     if (!found) return;
     console.debug('[backlog] found', found);
 
@@ -2498,8 +2503,8 @@ button.nav-link.backlog-flash {
 
     sceneFormTabs.find(tab => tab.id.endsWith('-images')).style.maxWidth = '75%';
 
-    (async function submittedWarning() {
-      if (!(await isSubmitted('scenes', sceneId))) return;
+    (function submittedWarning() {
+      if (!isSubmitted('scenes', sceneId)) return;
 
       const editsLink = makeLink(`/scenes/${sceneId}#edits`, 'double-check');
       editsLink.classList.add('fw-bold', 'text-decoration-underline');
@@ -3169,9 +3174,6 @@ button.nav-link.backlog-flash {
       }));
     })();
 
-    const storedData = await Cache.getStoredData();
-    if (!storedData) return;
-
     highlightSceneCards('performers');
 
     /** @type {HTMLDivElement} */
@@ -3214,7 +3216,7 @@ button.nav-link.backlog-flash {
         const sceneIds = {};
 
         for (const { sceneId, action } of Cache.performerScenes(performerId)) {
-          const scene = storedData.scenes[sceneId];
+          const scene = Cache.data.scenes[sceneId];
           const studio = studioArrayToString(scene.c_studio);
 
           const { append, remove, update } = scene.performers;
@@ -3241,7 +3243,7 @@ button.nav-link.backlog-flash {
 
         // Pending scenes by URLs
         if (performerUrls) {
-          Object.entries(storedData.scenes).forEach(([sceneId, { performers, c_studio }]) => {
+          Object.entries(Cache.data.scenes).forEach(([sceneId, { performers, c_studio }]) => {
             if (sceneIds[sceneId])
               return;
 
@@ -3363,7 +3365,7 @@ button.nav-link.backlog-flash {
       }
     })();
 
-    const foundData = await getDataFor('performers', performerId);
+    const foundData = getDataFor('performers', performerId);
 
     (function fragments() {
       const performerFullURL = `${window.location.origin}/performers/${performerId}`;
@@ -3375,7 +3377,7 @@ button.nav-link.backlog-flash {
       /** @type {FragmentIndexMap} */
       const fragmentIndexMap = {};
 
-      const performerFragments = Object.entries(storedData.performers).filter(([id, { split }]) => {
+      const performerFragments = Object.entries(Cache.data.performers).filter(([id, { split }]) => {
         if (id === performerId || !split) return false;
         const { shards: fragments } = split;
         const matchedFragment = fragments.find(({ id: fragmentId, links }) => (
@@ -3467,7 +3469,7 @@ button.nav-link.backlog-flash {
     console.debug('[backlog] found', foundData);
 
     const isMarkedForSplit = (/** @type {string} */ uuid) => {
-      const dataEntry = storedData.performers[uuid];
+      const dataEntry = Cache.data.performers[uuid];
       return dataEntry && !!dataEntry.split;
     };
 
@@ -3752,7 +3754,7 @@ button.nav-link.backlog-flash {
       markerDataset.backlogInjected = 'true';
     }
 
-    const found = await getDataFor('performers', performerId);
+    const found = getDataFor('performers', performerId);
     if (!found || !found.urls) return;
     console.debug('[backlog] found', found);
 
@@ -3819,9 +3821,6 @@ button.nav-link.backlog-flash {
 
     const performerSelect = /** @type {HTMLDivElement} */ (performerMerge.querySelector('.PerformerSelect'));
 
-    const storedData = await Cache.getStoredData();
-    if (!storedData) return;
-
     /** @type {HTMLDivElement} */
     let backlogDiv = (document.querySelector('.performer-backlog'));
     if (!backlogDiv) {
@@ -3844,12 +3843,12 @@ button.nav-link.backlog-flash {
       });
     }
 
-    const foundData = await getDataFor('performers', performerId);
+    const foundData = getDataFor('performers', performerId);
     if (!foundData) return;
     console.debug('[backlog] found', foundData);
 
     const isMarkedForSplit = (/** @type {string} */ uuid) => {
-      const dataEntry = storedData.performers[uuid];
+      const dataEntry = Cache.data.performers[uuid];
       return dataEntry && !!dataEntry.split;
     };
 
@@ -4066,13 +4065,10 @@ button.nav-link.backlog-flash {
     }
 
     // Performer scene changes based on cached data
-    (async function sceneChanges() {
+    (function sceneChanges() {
       if (backlogDiv.querySelector('[data-backlog="scene-changes"]')) return;
 
       try {
-        const storedData = await Cache.getStoredData();
-        if (!storedData) return;
-
         /** @param {SceneDataObject["c_studio"]} current */
         const compare = ([name, parent]) =>
           name.localeCompare(studioName, undefined, { sensitivity: 'base' }) === 0
@@ -4081,7 +4077,7 @@ button.nav-link.backlog-flash {
             || (parentName && parent.localeCompare(parentName, undefined, { sensitivity: 'base' }) === 0)
           );
 
-        const studioScenes = Object.entries(storedData.scenes)
+        const studioScenes = Object.entries(Cache.data.scenes)
           .filter(([, scene]) => !!scene.c_studio && compare(scene.c_studio));
 
         if (studioScenes.length === 0) return;
@@ -4166,9 +4162,6 @@ button.nav-link.backlog-flash {
       return;
     }
 
-    const storedData = await Cache.getStoredData();
-    if (!storedData) return;
-
     /** @param {HTMLDivElement} card */
     const appendScenePerformers = (card) => {
       if (!(isDev || settings.sceneCardPerformers)) return;
@@ -4203,7 +4196,7 @@ button.nav-link.backlog-flash {
       }
     };
 
-    const highlight = async () => {
+    const highlight = () => {
       /** @type {HTMLDivElement[]} */
       (Array.from(document.querySelectorAll(selector))).forEach((card) => {
         const markerDataset = card.dataset;
@@ -4213,7 +4206,7 @@ button.nav-link.backlog-flash {
         appendScenePerformers(card);
 
         const sceneId = parsePath(card.querySelector('a').href).ident;
-        const found = storedData.scenes[sceneId];
+        const found = Cache.data.scenes[sceneId];
         if (!found) return;
         card.classList.add('backlog-highlight');
         const changes = dataObjectKeys(found);
@@ -4234,7 +4227,7 @@ button.nav-link.backlog-flash {
         console.debug('[backlog] detected change in performers studios selector, re-highlighting scene cards');
         await elementReadyIn('.LoadingIndicator', 100);
         if (!await elementReadyIn(selector, 2000)) return;
-        await highlight();
+        highlight();
       }).observe(studioSelectorValue, { childList: true, subtree: true });
     }
   }
@@ -4247,9 +4240,6 @@ button.nav-link.backlog-flash {
       return;
     }
 
-    const storedData = await Cache.getStoredData();
-    if (!storedData) return;
-
     /** @type {HTMLDivElement[]} */
     (Array.from(document.querySelectorAll(selector))).forEach((card) => {
       const markerDataset = card.dataset;
@@ -4257,7 +4247,7 @@ button.nav-link.backlog-flash {
       else markerDataset.backlogInjected = 'true';
 
       const performerId = parsePath(card.querySelector('a').href).ident;
-      const found = storedData.performers[performerId];
+      const found = Cache.data.performers[performerId];
       const changes = dataObjectKeys(found || {});
       if (Cache.performerScenes(performerId).length > 0)
         changes.push('scenes');
@@ -4279,9 +4269,6 @@ button.nav-link.backlog-flash {
       return;
     }
 
-    const storedData = await Cache.getStoredData();
-    if (!storedData) return;
-
     /** @type {HTMLAnchorElement[]} */
     (Array.from(document.querySelectorAll(selector))).forEach((cardLink) => {
       const markerDataset = cardLink.dataset;
@@ -4291,7 +4278,7 @@ button.nav-link.backlog-flash {
       const { object, ident: uuid } = parsePath(cardLink.href);
       if (!isSupportedObject(object)) return;
 
-      const found = storedData[object][uuid];
+      const found = getDataFor(object, uuid);
       const changes = dataObjectKeys(found || {});
       if (object === 'performers') {
         if (Cache.performerScenes(uuid).length > 0)
@@ -4321,7 +4308,7 @@ button.nav-link.backlog-flash {
    * @param {ObjectKeys["scenes"][]} changes
    * @param {string} sceneId
    */
-  async function sceneCardHighlightChanges(card, changes, sceneId) {
+  function sceneCardHighlightChanges(card, changes, sceneId) {
     if (!(isDev || settings.sceneCardHighlightChanges)) return;
 
     const parent = /** @type {HTMLDivElement | HTMLAnchorElement} */ (card.parentElement);
@@ -4423,7 +4410,7 @@ button.nav-link.backlog-flash {
 
         const { object, ident: performerId } = parsePath();
         if (object === 'performers' && performerId) {
-          const { performers } = await getDataFor('scenes', sceneId);
+          const { performers } = getDataFor('scenes', sceneId);
           const thisPerformer = Object.values(performers).flat().find((p) => p.id === performerId);
           if (!thisPerformer) {
             icon.style.color = '';
@@ -4447,9 +4434,6 @@ button.nav-link.backlog-flash {
     const isLoading = !!document.querySelector('.LoadingIndicator');
     if (!await elementReadyIn(selector, isLoading ? 5000 : 2000)) return;
 
-    const storedData = await Cache.getStoredData();
-    if (!storedData) return;
-
     /**
      * @param {string[]} urls
      * @returns {[PerformerEntriesItem[], FragmentIndexMap]}
@@ -4458,7 +4442,7 @@ button.nav-link.backlog-flash {
       /** @type {FragmentIndexMap} */
       const fragmentIndexMap = {};
 
-      const fragments = Object.entries(storedData.performers).filter(([id, { split }]) => {
+      const fragments = Object.entries(Cache.data.performers).filter(([id, { split }]) => {
         if (!split) return false;
         const { shards: fragments } = split;
         const index = fragments.findIndex(({ links }) =>
@@ -4477,7 +4461,7 @@ button.nav-link.backlog-flash {
      * @param {string[]} urls
      */
     const editPendingScenes = (editUrl, urls) =>
-      Object.entries(storedData.scenes).filter(([, { performers }]) =>
+      Object.entries(Cache.data.scenes).filter(([, { performers }]) =>
         performers?.append.some(({ status, status_url, notes }) => {
           // by edit url
           if (status === 'c' && status_url === editUrl)
@@ -4502,7 +4486,7 @@ button.nav-link.backlog-flash {
       if (!isSupportedObject(object)) return;
       const type = object.slice(0, -1);
 
-      const found = storedData[object][ident];
+      const found = getDataFor(object, ident);
       const changes = dataObjectKeys(found || {});
       if (Cache.performerScenes(ident).length > 0)
         changes.push('scenes');
@@ -4663,9 +4647,7 @@ button.nav-link.backlog-flash {
 
     await wait(0);
 
-    const storedData = await Cache.getStoredData();
-
-    const allPerformerNames = Object.values(storedData.scenes).reduce((result, entry) => {
+    const allPerformerNames = Object.values(Cache.data.scenes).reduce((result, entry) => {
       if (!entry.performers)
         return result;
 
@@ -4731,7 +4713,7 @@ button.nav-link.backlog-flash {
     };
 
     const sortedScenes =
-      Object.entries(storedData.scenes)
+      Object.entries(Cache.data.scenes)
         .reduce(reduceKey, [])
         .sort((a, b) => sortKey(b[1]) - sortKey(a[1]));
 
@@ -4865,9 +4847,8 @@ button.nav-link.backlog-flash {
       return item.name || item.split?.name || dataObjectKeys(item).length;
     };
 
-    const storedData = await Cache.getStoredData();
     const sortedPerformers =
-      Object.entries(storedData.performers)
+      Object.entries(Cache.data.performers)
         .reduce(reduceKey, [])
         .sort((a, b) => {
           const aKey = sortKey(a[1]);
