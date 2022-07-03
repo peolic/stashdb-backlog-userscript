@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.29.0
+// @version     1.30.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1373,6 +1373,71 @@ button.nav-link.backlog-flash {
   };
 
   /**
+   * @param {{ performerId?: string; urls: string[]; }} data
+   * @returns {{
+   *   performerFragments: PerformerEntriesItem[];
+   *   fragmentIndexMap: FragmentIndexMap;
+   *   possibleLinks: string[];
+   * }}
+   */
+  const getPerformerFragments = ({ performerId, urls }) => {
+    /** @type {FragmentIndexMap} */
+    const fragmentIndexMap = {};
+
+    /** @type {string[]} */
+    const possibleLinks = [];
+
+    const performerFullURL = `${window.location.origin}/performers/${performerId}`;
+    const performerFragments = Object.entries(Cache.data.performers).filter(([id, { split }]) => {
+      if ((performerId && id === performerId) || !split) return false;
+      const { shards: fragments } = split;
+      const matchedFragments = fragments.filter(({ id: fragmentId, links }) => (
+        // fragment id is currently viewed performer
+        (performerId && fragmentId === performerId) ||
+        !!links && (
+          // any performer url listed in fragment links?
+          urls.some((url) => links.includes(url)) ||
+          // current performer url listed in fragment links? (additional performers)
+          links.some((link) => link.startsWith(performerFullURL))
+        )
+      ));
+
+      matchedFragments.forEach((matchedFragment) => {
+        if (matchedFragment.id && performerId && matchedFragment.id !== performerId) {
+          const fragmentPerformerURL = `${window.location.origin}/performers/${matchedFragment.id}`;
+          if (!possibleLinks.includes(fragmentPerformerURL))
+            possibleLinks.push(fragmentPerformerURL);
+        }
+        if (matchedFragment.links) {
+          const newLinks = matchedFragment.links
+            .filter((link) => (
+              !urls.includes(link) // is new link
+              && link !== performerFullURL // is not a link to current performer
+            ));
+          newLinks.forEach((newLink) => {
+            if (!possibleLinks.includes(newLink))
+              possibleLinks.push(newLink);
+          });
+        }
+        // Store fragment index for matching later
+        const fragmentIndex = fragments.indexOf(matchedFragment);
+        if (!fragmentIndexMap[id])
+          fragmentIndexMap[id] = [fragmentIndex];
+        else if (!fragmentIndexMap[id].includes(fragmentIndex))
+          fragmentIndexMap[id].push(fragmentIndex);
+      })
+
+      return matchedFragments.length > 0;
+    });
+
+    return {
+      performerFragments,
+      fragmentIndexMap,
+      possibleLinks,
+    };
+  };
+
+  /**
    * @param {PerformerEntriesItem[]} list
    * @param {HTMLOListElement} target
    * @param {'fragments'} [custom]
@@ -1431,9 +1496,8 @@ button.nav-link.backlog-flash {
 
         row.append(makeSep(), keys);
       } else if (custom === 'fragments' && customData?.[performerId] !== undefined) {
-        const fragmentNumber = `fragment #${customData[performerId] + 1}`;
-
-        row.append(makeSep(), fragmentNumber);
+        const fragmentNumbers = customData[performerId].map((index) => `fragment #${index + 1}`).join(', ');
+        row.append(makeSep(), fragmentNumbers);
       }
 
       target.appendChild(row);
@@ -3368,51 +3432,9 @@ button.nav-link.backlog-flash {
     const foundData = getDataFor('performers', performerId);
 
     (function fragments() {
-      const performerFullURL = `${window.location.origin}/performers/${performerId}`;
-
-      const pendingLinks = foundData?.urls || [];
-      /** @type {string[]} */
-      const possibleLinks = [];
-
-      /** @type {FragmentIndexMap} */
-      const fragmentIndexMap = {};
-
-      const performerFragments = Object.entries(Cache.data.performers).filter(([id, { split }]) => {
-        if (id === performerId || !split) return false;
-        const { shards: fragments } = split;
-        const matchedFragment = fragments.find(({ id: fragmentId, links }) => (
-          // fragment id is currently viewed performer
-          fragmentId === performerId ||
-          !!links && (
-            // any performer url listed in fragment links?
-            performerUrls.some((url) => links.includes(url)) ||
-            // current performer url listed in fragment links? (additional performers)
-            links.some((link) => link.startsWith(performerFullURL))
-          )
-        ));
-        if (matchedFragment?.id && matchedFragment.id !== performerId) {
-          const fragmentPerformerURL = `${window.location.origin}/performers/${matchedFragment.id}`;
-          if (!possibleLinks.includes(fragmentPerformerURL))
-            possibleLinks.push(fragmentPerformerURL);
-        }
-        if (matchedFragment?.links) {
-          const newLinks = matchedFragment.links
-            .filter((link) => (
-              !performerUrls.includes(link) // is new link
-              && !pendingLinks.includes(link) // is not backlogged
-              && link !== performerFullURL // is not a link to current performer
-            ));
-          newLinks.forEach((newLink) => {
-            if (!possibleLinks.includes(newLink))
-              possibleLinks.push(newLink);
-          });
-        }
-        // Store fragment index for matching later
-        if (matchedFragment && !fragmentIndexMap[id])
-          fragmentIndexMap[id] = fragments.indexOf(matchedFragment);
-
-        return !!matchedFragment;
-      });
+      // merge current links with backlogged links
+      const urls = performerUrls.concat(foundData?.urls || []);
+      const { performerFragments, fragmentIndexMap, possibleLinks } = getPerformerFragments({ performerId, urls });
 
       if (performerFragments.length === 0)
         return;
@@ -4251,6 +4273,12 @@ button.nav-link.backlog-flash {
       const changes = dataObjectKeys(found || {});
       if (Cache.performerScenes(performerId).length > 0)
         changes.push('scenes');
+      /** @type {{ urls: ScenePerformance_URL[] }} */
+      const performerFiber = getReactFiber(card)?.return?.return?.memoizedProps?.performer;
+      const urls = performerFiber?.urls.map((u) => u.url) || [];
+      const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId, urls });
+      if (Object.keys(fragments).length > 0)
+        changes.push('fragments');
       if (changes.length === 0)
         return;
       card.style.outline = getHighlightStyle('performers', changes);
@@ -4283,6 +4311,13 @@ button.nav-link.backlog-flash {
       if (object === 'performers') {
         if (Cache.performerScenes(uuid).length > 0)
           changes.push('scenes');
+
+        /** @type {{ urls: ScenePerformance_URL[] }} */
+        const performerFiber = getReactFiber(cardLink)?.return?.return?.return?.return?.memoizedProps?.performer;
+        const urls = performerFiber?.urls.map((u) => u.url) || [];
+        const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: uuid, urls });
+        if (Object.keys(fragments).length > 0)
+          changes.push('fragments');
       }
 
       if (changes.length === 0)
@@ -4435,28 +4470,6 @@ button.nav-link.backlog-flash {
     if (!await elementReadyIn(selector, isLoading ? 5000 : 2000)) return;
 
     /**
-     * @param {string[]} urls
-     * @returns {[PerformerEntriesItem[], FragmentIndexMap]}
-     */
-    const editPerformerFragments = (urls) => {
-      /** @type {FragmentIndexMap} */
-      const fragmentIndexMap = {};
-
-      const fragments = Object.entries(Cache.data.performers).filter(([id, { split }]) => {
-        if (!split) return false;
-        const { shards: fragments } = split;
-        const index = fragments.findIndex(({ links }) =>
-          !!links && urls.some((url) => links.includes(url))
-        );
-        // Store fragment index for matching later
-        if (index !== -1 && !fragmentIndexMap[id])
-          fragmentIndexMap[id] = index;
-        return index !== -1;
-      });
-      return [fragments, fragmentIndexMap];
-    };
-
-    /**
      * @param {string} editUrl
      * @param {string[]} urls
      */
@@ -4488,8 +4501,28 @@ button.nav-link.backlog-flash {
 
       const found = getDataFor(object, ident);
       const changes = dataObjectKeys(found || {});
-      if (Cache.performerScenes(ident).length > 0)
-        changes.push('scenes');
+
+      if (object === 'performers') {
+        if (Cache.performerScenes(ident).length > 0)
+          changes.push('scenes');
+
+        /** @type {string[]} */
+        const urls = (() => {
+          /** @type {HTMLDivElement} */
+          const changeRow = entityLink.closest('.ListChangeRow-Performers');
+          if (!changeRow) return [];
+          const { added, removed } = getReactFiber(changeRow)?.return?.return?.memoizedProps;
+          const performerFiber =
+            /** @type {{ performer: { id: string; urls: ScenePerformance_URL[] } }[]} */
+            (added || removed || [])
+              .map(({ performer }) => performer).find(({ id }) => id === ident);
+          return performerFiber?.urls?.map((u) => u.url) || [];
+        })();
+        const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: ident, urls });
+        if (Object.keys(fragments).length > 0)
+          changes.push('fragments');
+      }
+
       if (changes.length === 0)
         return;
 
@@ -4571,8 +4604,10 @@ button.nav-link.backlog-flash {
         (Array.from(card.querySelectorAll('.EditComment > .card-body')))
           .forEach((cEl) => urls.push(...(cEl.textContent.match(/(https?:\/\/[^\s]+)/g) ?? [])), []);
 
-        const [performerFragments, fragmentIndexMap] = editPerformerFragments(urls);
-        if (performerFragments.length > 0) {
+        (function fragments() {
+          const { performerFragments, fragmentIndexMap } = getPerformerFragments({ urls });
+          if (performerFragments.length === 0) return;
+
           const title = `✂ Performer is listed as a fragment for ${performerFragments.length} performer${
             performerFragments.length !== 1 ? 's' : ''} to split up:`;
           if (isEditsList) {
@@ -4589,7 +4624,7 @@ button.nav-link.backlog-flash {
 
             renderPerformersList(performerFragments, performersList, 'fragments', fragmentIndexMap);
           }
-        }
+        })();
 
         const scenes = editPendingScenes(editUrl, urls);
         if (scenes.length > 0) {

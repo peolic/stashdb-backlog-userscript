@@ -116,7 +116,7 @@ type SupportedObject = Exclude<keyof DataCache, keyof BaseCache>
 type DataObject = DataCache[SupportedObject][string]
 
 type ObjectKeys = {
-    performers: Exclude<keyof PerformerDataObject, "name"> | "scenes"
+    performers: Exclude<keyof PerformerDataObject, "name"> | "scenes" | "fragments"
     scenes: Exclude<keyof SceneDataObject, "comments" | "c_studio">
 }
 
@@ -162,7 +162,7 @@ type FingerprintsRow = {
 type SceneEntriesItem = [id: string, data: SceneDataObject]
 type PerformerEntriesItem = [id: string, data: PerformerDataObject]
 
-type FragmentIndexMap = { [performerId: string]: number }
+type FragmentIndexMap = { [performerId: string]: number[] }
 
 
 //#region https://github.com/stashapp/stash-box/blob/develop/frontend/src/graphql/definitions/Scenes.ts
