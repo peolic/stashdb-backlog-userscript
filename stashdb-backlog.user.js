@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.30.1
+// @version     1.31.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -235,6 +235,12 @@ async function inject() {
     //@ts-expect-error
     if (object === 'pbacklog') {
       return await iPerformerBacklogPage();
+    }
+
+    // Fragments list page
+    //@ts-expect-error
+    if (object === 'pfragments') {
+      return await iPerformerFragmentsPage();
     }
 
     // Home page
@@ -485,6 +491,8 @@ button.nav-link.backlog-flash {
         makeLink('/backlog', 'Scene Backlog Summary Page'),
         hr.cloneNode(),
         makeLink('/pbacklog', 'Performer Backlog Summary Page'),
+        hr.cloneNode(),
+        makeLink('/pfragments', 'Performer Fragments Seach Page'),
       );
     }
   }
@@ -3573,6 +3581,14 @@ button.nav-link.backlog-flash {
       fragments.forEach((fragment) => {
         const fragmentEl = document.createElement('li');
 
+        const params = new URLSearchParams();
+        if (fragment.id) params.append('id', fragment.id);
+        fragment.links.forEach((link) => params.append('url', link));
+        const fragmentSearch = makeLink(`/pfragments?${params.toString()}`, '🔎');
+        fragmentSearch.classList.add('me-1', 'text-decoration-none');
+        fragmentSearch.title = 'Search for other fragments...';
+        fragmentEl.appendChild(fragmentSearch);
+
         let fragmentName;
         if (fragment.id) {
           fragmentName = makeLink(`/performers/${fragment.id}`, fragment.name, { color: 'var(--bs-teal)' });
@@ -4911,6 +4927,105 @@ button.nav-link.backlog-flash {
 
     renderPerformersList(sortedPerformers, performersList);
   } // iPerformerBacklogPage
+
+  async function iPerformerFragmentsPage() {
+    const main = /** @type {HTMLDivElement} */ (await elementReadyIn('.NarrowPage', 200));
+    if (!main) {
+      alert('failed to construct backlog page');
+      return;
+    }
+
+    toggleBacklogInfo(false);
+    document.title = `Performer Fragments Search | ${document.title}`;
+
+    const performers = document.createElement('div');
+    main.appendChild(performers);
+
+    const performersHeader = document.createElement('h3');
+    performersHeader.innerText = 'Performer Fragments';
+    performers.appendChild(performersHeader);
+
+    const subTitle = document.createElement('h5');
+    subTitle.innerText = 'Loading...';
+    performers.appendChild(subTitle);
+
+    const desc = document.createElement('p');
+    desc.innerText = '';
+    performers.appendChild(desc);
+
+    const inputWrapper = document.createElement('div');
+    inputWrapper.classList.add('my-2');
+
+    const inputLabel = document.createElement('label');
+    inputLabel.setAttribute('for', 'idInput');
+    inputLabel.innerText = 'Performer ID:';
+    inputLabel.classList.add('font-bold', 'me-2');
+    inputWrapper.appendChild(inputLabel);
+
+    const idInput = document.createElement('input');
+    idInput.id = 'idInput';
+    setStyles(idInput, { fontFamily: 'monospace', width: '350px' });
+    inputWrapper.appendChild(idInput);
+
+    performers.appendChild(inputWrapper);
+
+    const urlInputWrapper = document.createElement('div');
+    urlInputWrapper.classList.add('my-2');
+
+    const urlInputLabel = document.createElement('label');
+    urlInputLabel.setAttribute('for', 'urlInput');
+    urlInputLabel.innerText = 'Links';
+    urlInputLabel.classList.add('font-bold', 'd-block');
+    urlInputWrapper.appendChild(urlInputLabel);
+
+    const urlInput = document.createElement('textarea');
+    urlInput.id = 'urlInput';
+    urlInput.cols = 80;
+    urlInput.rows = 5;
+    urlInputWrapper.appendChild(urlInput);
+
+    performers.appendChild(urlInputWrapper);
+
+    const performersList = document.createElement('ol');
+    // performersList.classList.add('ps-2');
+    performers.appendChild(performersList);
+
+    window.addEventListener(locationChanged, () => performers.remove(), { once: true });
+
+    desc.innerText = (
+      'The checkbox marks an entry as "seen" but leaving this page will reset that status.'
+      + '\nMarking as "seen" does not do any action.'
+    );
+
+    subTitle.innerText = (
+      'Note: There is currently no automated check for submitted entries or completed entries.'
+      + '\nSome entries need to be merged and/or split, take extra cake with those.'
+    );
+
+    await wait(0);
+
+    const renderList = () => {
+      performersList.innerHTML = '';
+      const performerId = idInput.value.trim() || undefined;
+      const urls = urlInput.value.replace(/^\s+|\s+$/g, '').split('\n');
+      const { performerFragments, fragmentIndexMap } = getPerformerFragments({ performerId, urls });
+      renderPerformersList(performerFragments, performersList, 'fragments', fragmentIndexMap);
+    }
+    idInput.addEventListener('input', renderList);
+    urlInput.addEventListener('input', renderList);
+
+    const params = new URLSearchParams(window.location.search);
+    const performerId = params.get('id');
+    const urls = params.getAll('url');
+    if (performerId)
+      idInput.value = performerId;
+    if (urls.length > 0)
+      urlInput.value = urls.join('\n');
+
+    if (performerId || urls.length > 0)
+      renderList();
+
+  } // iPerformerFragmentsPage
 }
 
 // Based on: https://dirask.com/posts/JavaScript-on-location-changed-event-on-url-changed-event-DKeyZj
