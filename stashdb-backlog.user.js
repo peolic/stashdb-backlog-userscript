@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.31.1
+// @version     1.31.2
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1448,7 +1448,7 @@ button.nav-link.backlog-flash {
   /**
    * @param {PerformerEntriesItem[]} list
    * @param {HTMLOListElement} target
-   * @param {'fragments'} [custom]
+   * @param {'fragments' | 'fragment-search'} [custom]
    * @param {FragmentIndexMap} [customData]
    */
   const renderPerformersList = (list, target, custom, customData) =>
@@ -1503,9 +1503,26 @@ button.nav-link.backlog-flash {
           .join(', ');
 
         row.append(makeSep(), keys);
-      } else if (custom === 'fragments' && customData?.[performerId] !== undefined) {
+      } else if ((custom === 'fragments' || custom === 'fragment-search') && customData?.[performerId] !== undefined) {
         const fragmentNumbers = customData[performerId].map((index) => `fragment #${index + 1}`).join(', ');
         row.append(makeSep(), fragmentNumbers);
+        if (custom === 'fragment-search' && customData?.[performerId] !== undefined) {
+          const { shards: fragments } = performerData.split;
+          row.append(makeSep());
+          customData[performerId].forEach((fragmentIndex, i) => {
+            if (i > 0) row.append(' / ');
+            const { id, name } = fragments[fragmentIndex];
+            let fragmentName;
+            if (id) {
+              fragmentName = makeLink(`/performers/${id}`, name, { color: 'var(--bs-teal)' });
+              fragmentName.target = '_blank';
+            } else {
+              fragmentName = document.createElement('span');
+              fragmentName.innerText = name;
+            }
+            row.append(fragmentName);
+          });
+        }
       }
 
       target.appendChild(row);
@@ -4946,12 +4963,8 @@ button.nav-link.backlog-flash {
     performers.appendChild(performersHeader);
 
     const subTitle = document.createElement('h5');
-    subTitle.innerText = 'Loading...';
+    subTitle.innerText = 'Input performer ID and/or links to find fragments that match:';
     performers.appendChild(subTitle);
-
-    const desc = document.createElement('p');
-    desc.innerText = '';
-    performers.appendChild(desc);
 
     const inputWrapper = document.createElement('div');
     inputWrapper.classList.add('my-2');
@@ -4974,7 +4987,7 @@ button.nav-link.backlog-flash {
 
     const urlInputLabel = document.createElement('label');
     urlInputLabel.setAttribute('for', 'urlInput');
-    urlInputLabel.innerText = 'Links';
+    urlInputLabel.innerText = 'Links:';
     urlInputLabel.classList.add('font-bold', 'd-block');
     urlInputWrapper.appendChild(urlInputLabel);
 
@@ -4986,30 +4999,48 @@ button.nav-link.backlog-flash {
 
     performers.appendChild(urlInputWrapper);
 
-    const performersList = document.createElement('ol');
-    // performersList.classList.add('ps-2');
-    performers.appendChild(performersList);
+    const linksFromFragmentsDiv = document.createElement('div');
+    linksFromFragmentsDiv.classList.add('d-none');
+    const linksFromFragmentsHeading = document.createElement('h4');
+    linksFromFragmentsDiv.appendChild(linksFromFragmentsHeading);
+    linksFromFragmentsHeading.innerText = 'Links found in fragments:';
+    const linksFromFragments = document.createElement('ul');
+    linksFromFragmentsDiv.appendChild(linksFromFragments);
+    performers.appendChild(linksFromFragmentsDiv);
 
-    window.addEventListener(locationChanged, () => performers.remove(), { once: true });
-
+    const desc = document.createElement('p');
     desc.innerText = (
       'The checkbox marks an entry as "seen" but leaving this page will reset that status.'
       + '\nMarking as "seen" does not do any action.'
     );
+    performers.appendChild(desc);
 
-    subTitle.innerText = (
-      'Note: There is currently no automated check for submitted entries or completed entries.'
-      + '\nSome entries need to be merged and/or split, take extra cake with those.'
-    );
+    const performersList = document.createElement('ol');
+    performers.appendChild(performersList);
+
+    window.addEventListener(locationChanged, () => performers.remove(), { once: true });
 
     await wait(0);
 
     const renderList = () => {
       performersList.innerHTML = '';
+      linksFromFragments.innerHTML = '';
+
       const performerId = idInput.value.trim() || undefined;
       const urls = urlInput.value.replace(/^\s+|\s+$/g, '').split('\n');
-      const { performerFragments, fragmentIndexMap } = getPerformerFragments({ performerId, urls });
-      renderPerformersList(performerFragments, performersList, 'fragments', fragmentIndexMap);
+      if (!performerId && urls.length === 0)
+        return;
+      const { performerFragments, possibleLinks, fragmentIndexMap } = getPerformerFragments({ performerId, urls });
+      renderPerformersList(performerFragments, performersList, 'fragment-search', fragmentIndexMap);
+
+      linksFromFragmentsDiv.classList.toggle('d-none', possibleLinks.length === 0);
+      possibleLinks.forEach((url) => {
+        const container = document.createElement('li');
+        const a = makeLink(url, undefined, { color: 'var(--bs-teal)' });
+        a.target = '_blank';
+        container.appendChild(a);
+        linksFromFragments.appendChild(container);
+      });
     }
     idInput.addEventListener('input', renderList);
     urlInput.addEventListener('input', renderList);
@@ -5022,8 +5053,7 @@ button.nav-link.backlog-flash {
     if (urls.length > 0)
       urlInput.value = urls.join('\n');
 
-    if (performerId || urls.length > 0)
-      renderList();
+    renderList();
 
   } // iPerformerFragmentsPage
 }
