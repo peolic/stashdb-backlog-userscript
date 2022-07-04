@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.30.0
+// @version     1.30.1
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3584,7 +3584,7 @@ button.nav-link.backlog-flash {
         fragmentEl.appendChild(fragmentName);
 
         if (fragment.text || fragment.notes) {
-          const notes = (fragment.text ? [fragment.text] : []).concat(fragment.notes || []).join('\n');
+          const notes = (fragment.text ? [fragment.text] : ['']).concat(fragment.notes || []).join('\n');
           const text = document.createElement('span');
           text.append(...strikethroughTextElements(`: ${notes}`));
           text.classList.add('fw-normal');
