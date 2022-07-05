@@ -85,7 +85,7 @@ interface PerformerDataObject {
     duplicate_of?: string;
     split?: {
         name: string;
-        shards: SplitFragment[];
+        fragments: SplitFragment[];
         notes?: string[];
         links?: string[];
     };
@@ -125,9 +125,21 @@ type DataObjectKeys<T extends DataObject> =
     T extends SceneDataObject ? ObjectKeys["scenes"] :
     never;
 
-type MutationDataCache = Omit<BaseCache, "submitted"> & {
+type CompactDataCache = Omit<BaseCache, "submitted"> & {
     submitted?: string[] | BaseCache["submitted"];
     [cacheKey: string]: DataObject;
+}
+
+type MigrationPerformerDataObject = PerformerDataObject & {
+    split?: {
+        shards?: SplitFragment[];
+    };
+}
+
+type MigrationDataCache = DataCache & {
+    performers: {
+        [uuid: string]: MigrationPerformerDataObject;
+    };
 }
 
 interface PerformerEntry {

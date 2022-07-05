@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.31.3
+// @version     1.31.4
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -704,11 +704,15 @@ button.nav-link.backlog-flash {
         /** @type {DataCache} */
         const dataCache = { scenes, performers, lastChecked, lastUpdated, submitted };
         if (Object.values(scenes).length === 0 && Object.values(performers).length === 0) {
-          const legacyCache = /** @type {MutationDataCache} */ (await this._getValue(this._LEGACY_DATA_KEY));
+          const legacyCache = /** @type {CompactDataCache} */ (await this._getValue(this._LEGACY_DATA_KEY));
           this._data = await applyDataCacheMigrations(legacyCache);
         } else {
           this._data = dataCache;
         }
+
+        this._data = await applyMigrations(this._data);
+        await this.setData(this._data);
+
         this._performerScenes = this._generatePerformerScenes();
       }
       return this._data;
@@ -807,7 +811,7 @@ button.nav-link.backlog-flash {
   }
 
   /**
-   * @param {MutationDataCache} legacyCache
+   * @param {CompactDataCache} legacyCache
    * @returns {Promise<DataCache>}
    */
   async function applyDataCacheMigrations(legacyCache) {
@@ -860,13 +864,31 @@ button.nav-link.backlog-flash {
     return dataCache;
   }
 
+  /**
+   * @param {MigrationDataCache} dataCache
+   * @returns {Promise<DataCache>}
+   */
+  async function applyMigrations(dataCache) {
+    const performersMigration = Object.values(dataCache.performers);
+
+    // performer split `shards` -> `fragments`
+    performersMigration.forEach((item) => {
+      if (!item.split?.shards) return;
+      item.split.fragments = item.split.shards;
+      delete item.split.shards;
+    });
+
+    return dataCache;
+  }
+
   async function fetchBacklogData() {
     try {
       setStatus(`[backlog] getting cache...`);
 
-      /** @type {MutationDataCache} */
+      /** @type {CompactDataCache} */
       const legacyCache = (await request(`${BASE_URL}/stashdb_backlog.json`, 'json'));
-      const dataCache = await applyDataCacheMigrations(legacyCache);
+      let dataCache = await applyDataCacheMigrations(legacyCache);
+      dataCache = await applyMigrations(dataCache);
       await Cache.setData(dataCache);
 
       setStatus('[backlog] data updated', 5000);
@@ -1398,7 +1420,7 @@ button.nav-link.backlog-flash {
     const performerFullURL = `${window.location.origin}/performers/${performerId}`;
     const performerFragments = Object.entries(Cache.data.performers).filter(([id, { split }]) => {
       if ((performerId && id === performerId) || !split) return false;
-      const { shards: fragments } = split;
+      const { fragments } = split;
       const matchedFragments = fragments.filter(({ id: fragmentId, links }) => (
         // fragment id is currently viewed performer
         (performerId && fragmentId === performerId) ||
@@ -1494,7 +1516,7 @@ button.nav-link.backlog-flash {
               case 'duplicates':
                 return `${Object.values(performerData[k]).length}x ${k}`;
               case 'split':
-                const { shards: fragments } = performerData[k];
+                const { fragments } = performerData[k];
                 return fragments.length > 0 ? `${fragments.length}x fragments` : k;
               default:
                 return k;
@@ -1507,7 +1529,7 @@ button.nav-link.backlog-flash {
         const fragmentNumbers = customData[performerId].map((index) => `fragment #${index + 1}`).join(', ');
         row.append(makeSep(), fragmentNumbers);
         if (custom === 'fragment-search' && customData?.[performerId] !== undefined) {
-          const { shards: fragments } = performerData.split;
+          const { fragments } = performerData.split;
           row.append(makeSep());
           customData[performerId].forEach((fragmentIndex, i) => {
             if (i > 0) row.append(' / ');
@@ -3524,7 +3546,6 @@ button.nav-link.backlog-flash {
       if (!foundData.split) return;
       if (backlogDiv.querySelector('[data-backlog="split"]')) return;
       const splitItem = foundData.split;
-      const { shards: fragments } = splitItem;
 
       const toSplit = document.createElement('div');
       toSplit.dataset.backlog = 'split';
@@ -3574,6 +3595,8 @@ button.nav-link.backlog-flash {
       emoji.classList.add('me-1');
       emoji.innerText = '🔀';
       toSplit.prepend(emoji);
+
+      const { fragments } = splitItem;
 
       if (fragments.length === 0) {
         const noFragments = document.createElement('div');
