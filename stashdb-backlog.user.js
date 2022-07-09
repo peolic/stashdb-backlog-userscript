@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.31.4
+// @version     1.31.5
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3549,7 +3549,7 @@ button.nav-link.backlog-flash {
 
       const toSplit = document.createElement('div');
       toSplit.dataset.backlog = 'split';
-      toSplit.classList.add('mb-1', 'p-1', 'fw-bold');
+      toSplit.classList.add('mb-1', 'p-1');
 
       const backlogSheetId = '1067038397'; // Performers To Split Up
       const sheetLink = makeLink(
@@ -3557,7 +3557,14 @@ button.nav-link.backlog-flash {
         'Performers To Split Up',
         { color: 'var(--bs-orange)' },
       );
-      toSplit.append('This performer is listed on ', sheetLink, ':');
+
+      const emoji = document.createElement('span');
+      emoji.classList.add('me-1');
+      emoji.innerText = '🔀';
+      const label = document.createElement('span');
+      label.classList.add('fw-bold');
+      label.append('This performer is listed on ', sheetLink, ':');
+      toSplit.append(emoji, label);
 
       const performerName =
         /** @type {HTMLElement[]} */
@@ -3574,13 +3581,13 @@ button.nav-link.backlog-flash {
       if (splitItem.notes) {
         const notes = document.createElement('div');
         notes.style.marginLeft = '1.75rem';
-        notes.classList.add('fw-normal');
         notes.append(...strikethroughTextElements(splitItem.notes.join('\n')));
         toSplit.append(notes);
       }
 
       if (splitItem.links) {
         const links = document.createElement('div');
+        links.classList.add('fw-bold');
         links.style.marginLeft = '1.75rem';
         splitItem.links.forEach((url) => {
           const link = makeLink(url, `[${getSiteName(url)}]`, { color: 'var(--bs-yellow)' });
@@ -3591,15 +3598,11 @@ button.nav-link.backlog-flash {
         toSplit.append(links);
       }
 
-      const emoji = document.createElement('span');
-      emoji.classList.add('me-1');
-      emoji.innerText = '🔀';
-      toSplit.prepend(emoji);
-
       const { fragments } = splitItem;
 
       if (fragments.length === 0) {
         const noFragments = document.createElement('div');
+        noFragments.classList.add('fw-bold');
         setStyles(noFragments, { marginLeft: '1.75rem', color: 'tan', width: 'max-content' });
         noFragments.innerText = 'No fragments listed.';
         toSplit.appendChild(noFragments);
@@ -3610,6 +3613,7 @@ button.nav-link.backlog-flash {
       const fragmentsDetails = document.createElement('details');
       fragmentsDetails.style.marginLeft = '1.5rem';
       const summary = document.createElement('summary');
+      summary.classList.add('fw-bold');
       setStyles(summary, { color: 'tan', width: 'max-content' });
       summary.innerText = `${fragments.length} fragment${fragments.length === 1 ? '' : 's'}`;
       fragmentsDetails.append(summary);
@@ -3625,7 +3629,7 @@ button.nav-link.backlog-flash {
         if (fragment.id) params.append('id', fragment.id);
         fragment.links?.forEach((link) => params.append('url', link));
         const fragmentSearch = makeLink(`/pfragments?${params.toString()}`, '🔎');
-        fragmentSearch.classList.add('me-1', 'text-decoration-none');
+        fragmentSearch.classList.add('me-1', 'fw-bold', 'text-decoration-none');
         fragmentSearch.title = 'Search for other fragments...';
         fragmentEl.appendChild(fragmentSearch);
 
@@ -3637,23 +3641,28 @@ button.nav-link.backlog-flash {
           fragmentName = document.createElement('span');
           fragmentName.innerText = fragment.name;
         }
+        fragmentName.classList.add('fw-bold');
         fragmentEl.appendChild(fragmentName);
+
+        if (fragment.id && isMarkedForSplit(fragment.id)) {
+          const hasFragments = document.createElement('abbr');
+          hasFragments.classList.add('ms-1', 'text-decoration-none');
+          hasFragments.innerText = '🔀';
+          hasFragments.title = 'Linked performer needs to be split up.';
+          fragmentEl.append(hasFragments);
+        }
 
         if (fragment.text || fragment.notes) {
           const notes = (fragment.text ? [fragment.text] : ['']).concat(fragment.notes || []).join('\n');
           const text = document.createElement('span');
           text.append(...strikethroughTextElements(`: ${notes}`));
-          text.classList.add('fw-normal');
           fragmentEl.appendChild(text);
         }
-
-        if (fragment.id && isMarkedForSplit(fragment.id))
-          fragmentEl.append(' 🔀 needs to be split up');
 
         const links = document.createElement('div');
         (fragment.links || []).forEach((url) => {
           const link = makeLink(url, `[${getSiteName(url)}]`, { color: 'var(--bs-yellow)' });
-          link.classList.add('me-1');
+          link.classList.add('me-1', 'fw-bold');
           link.title = url;
           links.appendChild(link);
         });
