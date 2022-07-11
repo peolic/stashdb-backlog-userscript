@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.31.6
+// @version     1.31.7
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -580,6 +580,34 @@ button.nav-link.backlog-flash {
     date = date instanceof Date ? date : new Date(date);
     return date.toLocaleString("en-us", { month: "short", year: "numeric", day: "numeric" })
       + ' ' + date.toLocaleTimeString(navigator.languages[0]);
+  }
+
+  /**
+   * @see https://github.com/stashapp/stash/blob/v0.12.0/ui/v2.5/src/utils/hamming.ts
+   * @param {string} hex
+   */
+  function hexToBinary(hex) {
+    return hex.split('').map((i) => parseInt(i, 16).toString(2).padStart(4, '0')).join('');
+  }
+
+  /**
+   * @see https://github.com/stashapp/stash/blob/v0.12.0/ui/v2.5/src/utils/hamming.ts
+   * @param {string} a
+   * @param {string | null} [b]
+   * @returns {number}
+   */
+  function hammingDistance(a, b) {
+    if (!b || a.length !== b.length) return 32;
+
+    const aBinary = hexToBinary(a);
+    const bBinary = hexToBinary(b);
+
+    let counter = 0;
+    for (let i = 0; i < aBinary.length; i++) {
+      if (aBinary[i] !== bBinary[i]) counter++;
+    }
+
+    return counter;
   }
 
   /**
@@ -4558,6 +4586,46 @@ button.nav-link.backlog-flash {
         })
       );
 
+    /** @param {HTMLDivElement} cardBody */
+    const handleFingerprints = (cardBody) => {
+      /** @type {HTMLAnchorElement[]} */
+      const fingerprintLinks = Array.from(cardBody.querySelectorAll('.ListChangeRow-Fingerprints a'));
+      /** @type {Array<Required<Omit<SceneFingerprint, "correct_scene_id"> & { el: HTMLElement }>>} */
+      const editFingerprints = fingerprintLinks.map((el) => {
+        const [algorithm, hash] = el.innerText.trim().split(': ');
+        const durationEl = /** @type {HTMLSpanElement} */ (el.nextElementSibling);
+        return {
+          algorithm: /** @type {FingerprintAlgorithm} */ (algorithm.toLowerCase()),
+          hash,
+          duration: Number(durationEl.title.replace(/s$/, '')),
+          el,
+        };
+      });
+
+      Object.entries(Cache.data.scenes).forEach(([, { fingerprints }]) =>
+        fingerprints?.forEach((fp) => {
+          const match = editFingerprints.find((efp) =>
+            fp.algorithm === efp.algorithm &&
+            ((fp.algorithm === 'phash' && hammingDistance(fp.hash, efp.hash) <= 4) || fp.hash === efp.hash)
+            && (!fp.duration || Math.abs(efp.duration - fp.duration) <= 5)
+          );
+          if (!match) return;
+          const distance = fp.algorithm === 'phash' ? hammingDistance(fp.hash, match.hash) : undefined;
+          match.el.classList.add('fw-bold');
+          setStyles(match.el, {
+            backgroundColor: 'var(--bs-indigo)',
+            padding: '.2rem',
+            maxWidth: 'max-content',
+          });
+          match.el.title = `Fingerprint is reported as incorrect` + (
+            fp.algorithm === 'phash'
+              ? `\nPHash distance: ${distance ? `${distance} to ${fp.hash}` : 'exact'}`
+              : ''
+          );
+        })
+      );
+    };
+
     /**
      * @param {HTMLAnchorElement} entityLink
      * @param {EditTargetType} editEntity
@@ -4665,6 +4733,8 @@ button.nav-link.backlog-flash {
         if (performerLinks.length > 0) {
           performerLinks.forEach((el) => handleEntityLink(el, entity));
         }
+
+        handleFingerprints(cardBody);
       }
 
       if (entity === 'performer' && operation !== 'destroy') {
