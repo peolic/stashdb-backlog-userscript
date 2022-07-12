@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.31.7
+// @version     1.31.8
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3659,7 +3659,7 @@ button.nav-link.backlog-flash {
         const fragmentSearchQS = params.toString();
         if (fragmentSearchQS) {
           const fragmentSearch = makeLink(`/pfragments?${fragmentSearchQS}`, '🔎');
-          fragmentSearch.classList.add('me-1', 'fw-bold', 'text-decoration-none');
+          fragmentSearch.classList.add('me-1', 'fw-bold', 'text-decoration-none', 'user-select-none');
           fragmentSearch.title = 'Search for other fragments...';
           fragmentEl.appendChild(fragmentSearch);
         }
