@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.31.9
+// @version     1.31.10
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3336,7 +3336,7 @@ button.nav-link.backlog-flash {
       backlogDiv = document.createElement('div');
       backlogDiv.classList.add('performer-backlog', 'mb-2');
       setStyles(backlogDiv, {
-        maxWidth: 'max-content',
+        maxWidth: '75%',
         minWidth: 'calc(50% - 15px)',
         transition: 'background-color .5s',
       });
@@ -3667,6 +3667,7 @@ button.nav-link.backlog-flash {
 
       fragments.forEach((fragment) => {
         const fragmentEl = document.createElement('li');
+        fragmentEl.classList.add('mt-1');
 
         const params = new URLSearchParams();
         if (fragment.id) params.append('id', fragment.id);
@@ -3701,8 +3702,8 @@ button.nav-link.backlog-flash {
         if (fragment.text || fragment.notes) {
           const notes = (fragment.text ? [fragment.text] : ['']).concat(fragment.notes || []).join('\n');
           const text = document.createElement('span');
-          text.append(...strikethroughTextElements(`: ${notes}`));
-          fragmentEl.appendChild(text);
+          text.append(...strikethroughTextElements(notes));
+          fragmentEl.append(': ', text);
         }
 
         const links = document.createElement('div');
