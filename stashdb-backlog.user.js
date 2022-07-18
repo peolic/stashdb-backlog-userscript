@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.31.10
+// @version     1.31.11
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1415,7 +1415,7 @@ button.nav-link.backlog-flash {
       const obj = parsed.pathname.match(/^\/([a-z]+)\/.+/)?.[1]?.slice(0, -1);
       if (obj)
         siteName += ` ${obj}`;
-      else if (parsed.hostname === 'cdn.stashdb.org')
+      else if (parsed.hostname === 'cdn.stashdb.org' && parsed.pathname.startsWith('/images/'))
         siteName += ' image';
     }
     if (parsed.hostname === 'web.archive.org') {
@@ -1513,8 +1513,8 @@ button.nav-link.backlog-flash {
   /**
    * @param {PerformerEntriesItem[]} list
    * @param {HTMLOListElement} target
-   * @param {'fragments' | 'fragment-search'} [custom]
-   * @param {FragmentIndexMap} [customData]
+   * @param {'simple' | 'fragments' | 'fragment-search'} [custom]
+   * @param {FragmentIndexMap | { [performerId: string]: string }} [customData]
    */
   const renderPerformersList = (list, target, custom, customData) =>
     list.forEach(([performerId, performerData], idx) => {
@@ -1544,14 +1544,14 @@ button.nav-link.backlog-flash {
       if (!name)
         link.classList.add('font-monospace');
       link.classList.add('text-decoration-underline');
-      link.title = 'Edit scene';
+      link.title = mainURL === viewURL ? 'View performer' : 'Edit performer';
       const mainClick = () => check.checked = true;
       link.addEventListener('click', mainClick);
       link.addEventListener('auxclick', mainClick);
 
       row.append(link);
 
-      if (!custom) {
+      if (!custom || custom === 'simple') {
         const keys = dataObjectKeys(performerData)
           .map((k) => {
             switch (k) {
@@ -1569,12 +1569,15 @@ button.nav-link.backlog-flash {
 
         row.append(makeSep(), keys);
       } else if ((custom === 'fragments' || custom === 'fragment-search') && customData?.[performerId] !== undefined) {
-        const fragmentNumbers = customData[performerId].map((index) => `fragment #${index + 1}`).join(', ');
-        row.append(makeSep(), fragmentNumbers);
-        if (custom === 'fragment-search' && customData?.[performerId] !== undefined) {
+        const fragmentNumbers = customData[performerId];
+        const label = Array.isArray(fragmentNumbers)
+          ? fragmentNumbers.map((index) => `fragment #${index + 1}`).join(', ')
+          : fragmentNumbers;
+        row.append(makeSep(), label);
+        if (custom === 'fragment-search' && Array.isArray(fragmentNumbers)) {
           const { fragments } = performerData.split;
           row.append(makeSep());
-          customData[performerId].forEach((fragmentIndex, i) => {
+          fragmentNumbers.forEach((fragmentIndex, i) => {
             if (i > 0) row.append(' / ');
             const { id, name } = fragments[fragmentIndex];
             let fragmentName;
@@ -3700,7 +3703,7 @@ button.nav-link.backlog-flash {
         }
 
         if (fragment.text || fragment.notes) {
-          const notes = (fragment.text ? [fragment.text] : ['']).concat(fragment.notes || []).join('\n');
+          const notes = [fragment.text || ''].concat(fragment.notes || []).join('\n');
           const text = document.createElement('span');
           text.append(...strikethroughTextElements(notes));
           fragmentEl.append(': ', text);
@@ -5066,7 +5069,7 @@ button.nav-link.backlog-flash {
       + '\nSome entries need to be merged and/or split, take extra cake with those.'
     );
 
-    renderPerformersList(sortedPerformers, performersList);
+    renderPerformersList(sortedPerformers, performersList, 'simple');
   } // iPerformerBacklogPage
 
   async function iPerformerFragmentsPage() {
@@ -5155,6 +5158,17 @@ button.nav-link.backlog-flash {
       if (!performerId && urls.length === 0)
         return;
       const { performerFragments, possibleLinks, fragmentIndexMap } = getPerformerFragments({ performerId, urls });
+
+      // find by pending links
+      const performerByPendingLinks = Object.entries(Cache.data.performers).find(
+        ([, { urls: pendingLinks }]) => !!pendingLinks && urls.some((url) => pendingLinks.includes(url))
+      );
+      if (performerByPendingLinks) {
+        performerFragments.splice(0, 0, performerByPendingLinks);
+        /** @type {FragmentIndexMap | { [performerId: string]: string }} */
+        (fragmentIndexMap)[performerByPendingLinks[0]] = 'Matched main performer by pending links';
+      }
+
       renderPerformersList(performerFragments, performersList, 'fragment-search', fragmentIndexMap);
 
       linksFromFragmentsDiv.classList.toggle('d-none', possibleLinks.length === 0);
