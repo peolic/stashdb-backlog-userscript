@@ -3569,9 +3569,12 @@ button.nav-link.backlog-flash {
           linksFromFragments.append(document.createElement('br'));
           const container = document.createElement('span');
           container.style.marginLeft = '1.75rem';
+          const site = document.createElement('i');
+          setStyles(site, { color: 'var(--bs-yellow)' });
+          site.innerText = `${getSiteName(url)}: `;
           const a = makeLink(url, undefined, { color: 'var(--bs-teal)' });
           a.target = '_blank';
-          container.appendChild(a);
+          container.append(site, a);
           linksFromFragments.appendChild(container);
         });
 
