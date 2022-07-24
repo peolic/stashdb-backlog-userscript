@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.31.11
+// @version     1.31.12
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1126,7 +1126,8 @@ button.nav-link.backlog-flash {
       if (e.ctrlKey) return;
       e.preventDefault();
       e.stopPropagation();
-      reactRouterHistory.push(url);
+      const state = el.dataset.state ? JSON.parse(el.dataset.state) : undefined;
+      reactRouterHistory.push(url, state);
     });
   }
 
@@ -1574,6 +1575,10 @@ button.nav-link.backlog-flash {
           ? fragmentNumbers.map((index) => `fragment #${index + 1}`).join(', ')
           : fragmentNumbers;
         row.append(makeSep(), label);
+
+        if (Array.isArray(fragmentNumbers))
+          link.dataset.state = JSON.stringify({ performerFragment: fragmentNumbers });
+
         if (custom === 'fragment-search' && Array.isArray(fragmentNumbers)) {
           const { fragments } = performerData.split;
           row.append(makeSep());
@@ -3664,13 +3669,20 @@ button.nav-link.backlog-flash {
       summary.innerText = `${fragments.length} fragment${fragments.length === 1 ? '' : 's'}`;
       fragmentsDetails.append(summary);
 
+      /** @type {number[]} */
+      const highlightFragments = history.state?.state?.performerFragment || [];
+      fragmentsDetails.open = highlightFragments.length > 0;
+
       const fragmentsList = document.createElement('ol');
       setStyles(fragmentsList, { padding: '0', margin: '0 0 0 2rem' });
       fragmentsDetails.append(fragmentsList);
 
-      fragments.forEach((fragment) => {
+      fragments.forEach((fragment, index) => {
         const fragmentEl = document.createElement('li');
         fragmentEl.classList.add('mt-1');
+
+        if (highlightFragments.includes(index))
+          fragmentEl.classList.add('bg-primary', 'bg-opacity-50');
 
         const params = new URLSearchParams();
         if (fragment.id) params.append('id', fragment.id);
