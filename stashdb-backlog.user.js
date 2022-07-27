@@ -1446,6 +1446,17 @@ button.nav-link.backlog-flash {
     return siteName;
   };
 
+  /** @type {(string | RegExp)[]} */
+  const fragmentLinksToIgnore = [
+    'https://www.iafd.com/title.rme/',
+    'https://www.indexxx.com/set/',
+    'https://www.freeones.com/forums/threads/performer-guide-netvideogirls-com.101884/',
+  ];
+
+  /** @param {string} url */
+  const validFragmentLink = (url) =>
+    !fragmentLinksToIgnore.some((i) => i instanceof RegExp ? i.test(url) : url.startsWith(i))
+
   /**
    * @param {{ performerId?: string; urls: string[]; }} data
    * @returns {{
@@ -3689,7 +3700,7 @@ button.nav-link.backlog-flash {
 
         const params = new URLSearchParams();
         if (fragment.id) params.append('id', fragment.id);
-        fragment.links?.forEach((link) => params.append('url', link));
+        fragment.links?.filter(validFragmentLink)?.forEach((link) => params.append('url', link));
         const fragmentSearchQS = params.toString();
         if (fragmentSearchQS) {
           const fragmentSearch = makeLink(`/pfragments?${fragmentSearchQS}`, '🔎');
