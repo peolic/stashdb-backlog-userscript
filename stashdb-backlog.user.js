@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.31.12
+// @version     1.31.13
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -4788,7 +4788,13 @@ button.nav-link.backlog-flash {
           (Array.from(card.querySelectorAll('.SiteLink + a'))).map((a) => a.href);
         /** @type {HTMLDivElement[]} */
         (Array.from(card.querySelectorAll('.EditComment > .card-body')))
-          .forEach((cEl) => urls.push(...(cEl.textContent.match(/(https?:\/\/[^\s]+)/g) ?? [])), []);
+          .flatMap((cEl) => cEl.textContent.match(/(https?:\/\/[^\s]+)/g) ?? [])
+          .forEach((cUrl) => {
+            if (!validFragmentLink(cUrl)) return;
+            // simple unique sites
+            if (!urls.find((u) => u.startsWith(new URL(cUrl).origin)))
+              urls.push(cUrl);
+          });
 
         (function fragments() {
           const { performerFragments, fragmentIndexMap } = getPerformerFragments({ urls });
