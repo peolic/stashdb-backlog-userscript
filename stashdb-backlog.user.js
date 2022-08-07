@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.31.13
+// @version     1.31.14
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2407,7 +2407,7 @@ button.nav-link.backlog-flash {
 
       /** @type {HTMLDivElement | null} */
       let code = (sceneFooter.querySelector(':scope > div:last-of-type'));
-      if (!code || !/^Code:/.test(code.innerText)) {
+      if (!code || !/^Studio Code:/.test(code.innerText)) {
         const newCode = document.createElement('b');
         newCode.innerText = found.code;
         code = document.createElement('div');
@@ -2416,7 +2416,7 @@ button.nav-link.backlog-flash {
         code.classList.add('ms-3', 'bg-success', 'p-1', 'my-auto');
         sceneFooter.append(code);
       } else {
-        const currentCode = code.innerText.match(/^Code: (.+)$/)[1];
+        const currentCode = code.innerText.match(/^Studio Code: (.+)$/)[1];
         if (found.code === currentCode) {
           code.classList.add('bg-warning', 'p-1');
           code.prepend('<already correct> ');
