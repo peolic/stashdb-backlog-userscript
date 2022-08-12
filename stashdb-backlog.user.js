@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.31.14
+// @version     1.31.15
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1393,6 +1393,11 @@ button.nav-link.backlog-flash {
       link.addEventListener('click', editClick);
       link.addEventListener('auxclick', editClick);
 
+      if (!object && isSubmitted('scenes', sceneId)) {
+        link.style.color = 'var(--bs-cyan)';
+        link.title += ' (This entry may have already been submitted, please double-check before submitting an edit.';
+      }
+
       const keys = dataObjectKeys(sceneData)
         .map((k) => k === 'performers' ? `${Object.values(sceneData.performers).flat().length}x ${k}` : k)
         .join(', ');
@@ -1450,6 +1455,9 @@ button.nav-link.backlog-flash {
   const fragmentLinksToIgnore = [
     'https://www.iafd.com/title.rme/',
     'https://www.indexxx.com/set/',
+    'https://www.data18.com/scenes/',
+    'https://www.data18.com/movies/',
+    'https://gayeroticvideoindex.com/video/',
     'https://www.freeones.com/forums/threads/performer-guide-netvideogirls-com.101884/',
   ];
 
@@ -3731,6 +3739,7 @@ button.nav-link.backlog-flash {
         if (fragment.text || fragment.notes) {
           const notes = [fragment.text || ''].concat(fragment.notes || []).join('\n');
           const text = document.createElement('span');
+          text.style.whiteSpace = 'pre-wrap';
           text.append(...strikethroughTextElements(notes));
           fragmentEl.append(': ', text);
         }
