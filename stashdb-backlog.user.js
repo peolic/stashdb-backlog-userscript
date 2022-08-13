@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.31.15
+// @version     1.32.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -5186,12 +5186,16 @@ button.nav-link.backlog-flash {
     const performersList = document.createElement('ol');
     performers.appendChild(performersList);
 
+    const scenesList = document.createElement('ol');
+    performers.appendChild(scenesList);
+
     window.addEventListener(locationChanged, () => performers.remove(), { once: true });
 
     await wait(0);
 
     const renderList = () => {
       performersList.innerHTML = '';
+      scenesList.innerHTML = '';
       linksFromFragments.innerHTML = '';
 
       const performerId = idInput.value.trim() || undefined;
@@ -5220,7 +5224,28 @@ button.nav-link.backlog-flash {
         container.appendChild(a);
         linksFromFragments.appendChild(container);
       });
-    }
+
+      const scenesForPerformer = Object.entries(Cache.data.scenes).filter((entry) => {
+        if (!entry[1].performers)
+          return false;
+
+        return entry[1].performers.append.some(({ id, status_url, notes }) => {
+          // fragment id is currently viewed performer
+          if (performerId && id === performerId)
+            return true;
+          const links = [status_url]
+            .concat(notes?.filter((note) => /^https?:/.test(note)) || [])
+            .filter(Boolean);
+          return !!links && (
+            // any fragment url listed in links?
+            urls.some((url) => links.includes(url))
+          );
+        });
+      });
+
+      renderScenesList(scenesForPerformer, scenesList, null);
+    };
+
     idInput.addEventListener('input', renderList);
     urlInput.addEventListener('input', renderList);
 
