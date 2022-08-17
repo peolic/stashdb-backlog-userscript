@@ -222,7 +222,7 @@ async function inject() {
 
     // Search results
     if (object === 'search') {
-      return await highlightSearchResults();
+      return await iSearchPage();
     }
 
     // Backlog scenes list page
@@ -4303,6 +4303,56 @@ button.nav-link.backlog-flash {
 
   // =====
 
+  async function iSearchPage() {
+    const selector = 'a.SearchPage-scene, a.SearchPage-performer';
+    const isLoading = !!document.querySelector('.LoadingIndicator');
+    if (!await elementReadyIn(selector, isLoading ? 5000 : 2000)) {
+      console.debug('[backlog] no scene/performer search results found, skipping');
+      return;
+    }
+
+    /** @type {HTMLAnchorElement[]} */
+    (Array.from(document.querySelectorAll(selector))).forEach((cardLink) => {
+      const markerDataset = cardLink.dataset;
+      if (markerDataset.backlogInjected) return;
+      else markerDataset.backlogInjected = 'true';
+
+      const { object, ident: uuid } = parsePath(cardLink.href);
+      if (!isSupportedObject(object)) return;
+
+      const found = getDataFor(object, uuid);
+      const changes = dataObjectKeys(found || {});
+      if (object === 'performers') {
+        if (Cache.performerScenes(uuid).length > 0)
+          changes.push('scenes');
+
+        /** @type {{ urls: ScenePerformance_URL[] }} */
+        const performerFiber = getReactFiber(cardLink)?.return?.return?.return?.return?.memoizedProps?.performer;
+        const urls = performerFiber?.urls.map((u) => u.url) || [];
+        const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: uuid, urls });
+        if (Object.keys(fragments).length > 0)
+          changes.push('fragments');
+      }
+
+      if (changes.length === 0)
+        return;
+
+      if (changes) {
+        const card = /** @type {HTMLDivElement} */ (cardLink.querySelector(':scope > .card'));
+        card.style.outline = getHighlightStyle(object, changes);
+        if (object === 'scenes') {
+          const sceneChanges = /** @type {ObjectKeys["scenes"][]} */ (changes);
+          cardLink.title = `<pending> changes to:\n - ${sceneChanges.join('\n - ')}\n(click scene to view changes)`;
+          sceneCardHighlightChanges(card, sceneChanges, uuid);
+        } else if (object === 'performers') {
+          cardLink.title = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
+        }
+      }
+    });
+  } // iSearchPage
+
+  // =====
+
   /**
    * @template {SupportedObject} T
    * @param {T} object
@@ -4436,54 +4486,6 @@ button.nav-link.backlog-flash {
       card.title = info;
       /** @type {HTMLImageElement} */
       (card.querySelector('.PerformerCard-image > img')).title += `\n\n${info}`;
-    });
-  }
-
-  async function highlightSearchResults() {
-    const selector = 'a.SearchPage-scene, a.SearchPage-performer';
-    const isLoading = !!document.querySelector('.LoadingIndicator');
-    if (!await elementReadyIn(selector, isLoading ? 5000 : 2000)) {
-      console.debug('[backlog] no scene/performer search results found, skipping');
-      return;
-    }
-
-    /** @type {HTMLAnchorElement[]} */
-    (Array.from(document.querySelectorAll(selector))).forEach((cardLink) => {
-      const markerDataset = cardLink.dataset;
-      if (markerDataset.backlogInjected) return;
-      else markerDataset.backlogInjected = 'true';
-
-      const { object, ident: uuid } = parsePath(cardLink.href);
-      if (!isSupportedObject(object)) return;
-
-      const found = getDataFor(object, uuid);
-      const changes = dataObjectKeys(found || {});
-      if (object === 'performers') {
-        if (Cache.performerScenes(uuid).length > 0)
-          changes.push('scenes');
-
-        /** @type {{ urls: ScenePerformance_URL[] }} */
-        const performerFiber = getReactFiber(cardLink)?.return?.return?.return?.return?.memoizedProps?.performer;
-        const urls = performerFiber?.urls.map((u) => u.url) || [];
-        const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: uuid, urls });
-        if (Object.keys(fragments).length > 0)
-          changes.push('fragments');
-      }
-
-      if (changes.length === 0)
-        return;
-
-      if (changes) {
-        const card = /** @type {HTMLDivElement} */ (cardLink.querySelector(':scope > .card'));
-        card.style.outline = getHighlightStyle(object, changes);
-        if (object === 'scenes') {
-          const sceneChanges = /** @type {ObjectKeys["scenes"][]} */ (changes);
-          cardLink.title = `<pending> changes to:\n - ${sceneChanges.join('\n - ')}\n(click scene to view changes)`;
-          sceneCardHighlightChanges(card, sceneChanges, uuid);
-        } else if (object === 'performers') {
-          cardLink.title = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
-        }
-      }
     });
   }
 
