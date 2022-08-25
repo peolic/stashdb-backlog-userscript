@@ -200,6 +200,7 @@ interface ScenePerformance_Studio {
     __typename: "Studio";
     id: string;
     name: string;
+    parent?: ScenePerformance_Studio;
 }
 
 enum GenderEnum {
