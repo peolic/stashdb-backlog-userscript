@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.1
+// @version     1.32.2
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -213,6 +213,9 @@ async function inject() {
       }
     }
 
+    // /edits
+    // /edits/:uuid
+    // /users/:user/edits
     if (
       (object === 'edits' && !action)
       || (object === 'users' && ident && action === 'edits')
@@ -4389,8 +4392,8 @@ button.nav-link.backlog-flash {
       if (!(isDev || settings.sceneCardPerformers)) return;
 
       /** @type {ScenePerformance} */
-      const data = getReactFiber(card)?.return?.return?.memoizedProps?.performance;
-      if (data) {
+      const data = getReactFiber(card)?.return?.return?.memoizedProps?.scene;
+      if (data && data.performers) {
         const { performers } = data;
         const info = document.createElement('div');
         info.classList.add('backlog-scene-performers', 'mt-1', 'text-muted', 'border-top', 'line-clamp');
