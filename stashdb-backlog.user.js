@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.2
+// @version     1.32.3
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -184,7 +184,13 @@ async function inject() {
     }
 
     if (object === 'studios' && ident && !action) {
-      return await iStudioPage(ident);
+      await iStudioPage(ident);
+      if (window.location.hash === '#edits') {
+        await iEditCards();
+      } else if (window.location.hash === '#performers') {
+        await highlightPerformerCards();
+      }
+      return;
     }
 
     // Scene cards lists on Tag pages
@@ -201,6 +207,8 @@ async function inject() {
         await iPerformerPage(ident);
         if (window.location.hash === '#edits') {
           await iEditCards();
+        } else if (window.location.hash === '#scenePairings') {
+          await highlightPerformerCards();
         }
         return;
       }
@@ -4444,7 +4452,7 @@ button.nav-link.backlog-flash {
 
     highlight();
 
-    if (object === 'performers') {
+    if (object === 'performers' && document.querySelector('.scenes-list')) {
       const studioSelectorValue = document.querySelector(
         '.PerformerScenes > .CheckboxSelect > .react-select__control > .react-select__value-container'
       );
@@ -4478,7 +4486,7 @@ button.nav-link.backlog-flash {
         changes.push('scenes');
       /** @type {{ urls: ScenePerformance_URL[] }} */
       const performerFiber = getReactFiber(card)?.return?.return?.memoizedProps?.performer;
-      const urls = performerFiber?.urls.map((u) => u.url) || [];
+      const urls = performerFiber?.urls?.map((u) => u.url) || [];
       const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId, urls });
       if (Object.keys(fragments).length > 0)
         changes.push('fragments');
