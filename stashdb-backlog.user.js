@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.3
+// @version     1.32.4
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -140,7 +140,7 @@ async function inject() {
 
     await Promise.all([
       elementReadyIn('#root > *'),
-      elementReadyIn('.MainContent > .LoadingIndicator', 100),
+      elementReadyIn('.MainContent .LoadingIndicator', 100),
     ]);
 
     if (document.querySelector('.LoginPrompt')) return;
@@ -4301,7 +4301,7 @@ button.nav-link.backlog-flash {
   // =====
 
   async function iHomePage() {
-    if (document.querySelector('main > .LoadingIndicator')) {
+    if (document.querySelector('.MainContent .LoadingIndicator')) {
       await Promise.all([
         elementReadyIn(`.HomePage-scenes:nth-of-type(1) .SceneCard`, 2000),
         elementReadyIn(`.HomePage-scenes:nth-of-type(2) .SceneCard`, 2000),
