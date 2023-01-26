@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.4
+// @version     1.32.5
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -114,7 +114,9 @@ async function inject() {
       if (!e) return undefined;
       const f = getReactFiber(e);
       if (!f) return undefined;
-      return f.return?.return?.memoizedProps?.value?.history;
+      let r = f;
+      while ((r = r.return) && r !== null && !r.memoizedProps?.value?.navigator);
+      return r?.memoizedProps?.value?.navigator;
     };
 
     let attempt = 0;
@@ -264,11 +266,10 @@ async function inject() {
   }
 
   if (reactRouterHistory) {
-    reactRouterHistory.listen(() => dispatcher());
+    // reactRouterHistory.listen(() => dispatcher());
     console.debug(`[backlog] hooked into react router`);
-  } else {
-    window.addEventListener(locationChanged, () => dispatcher());
   }
+  window.addEventListener(locationChanged, () => dispatcher());
 
   setTimeout(dispatcher, 0, true);
 
@@ -1138,7 +1139,7 @@ button.nav-link.backlog-flash {
       e.preventDefault();
       e.stopPropagation();
       const state = el.dataset.state ? JSON.parse(el.dataset.state) : undefined;
-      reactRouterHistory.push(url, state);
+      reactRouterHistory.push(url, { state });
     });
   }
 
@@ -3703,7 +3704,7 @@ button.nav-link.backlog-flash {
       fragmentsDetails.append(summary);
 
       /** @type {number[]} */
-      const highlightFragments = history.state?.state?.performerFragment || [];
+      const highlightFragments = history.state?.usr?.state?.performerFragment || [];
       fragmentsDetails.open = highlightFragments.length > 0;
 
       const fragmentsList = document.createElement('ol');
