@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.5
+// @version     1.32.6
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -2841,7 +2841,8 @@ button.nav-link.backlog-flash {
             flashField(performerItem);
 
             /** @type {HTMLInputElement} */
-            const aliasEl = performerItem.querySelector('input.performer-alias');
+            const aliasEl = performerItem.querySelector('input[role="combobox"]'); // input.performer-alias
+            if (!aliasEl) return alert('performer alias field not found');
             setNativeValue(aliasEl, entry.appearance || '');
             if (entry.appearance) flashField(aliasEl);
             return;
@@ -2911,7 +2912,8 @@ button.nav-link.backlog-flash {
                 if (!performerItem) return alert('performer not found');
 
                 /** @type {HTMLInputElement} */
-                const aliasEl = performerItem.querySelector('input.performer-alias');
+                const aliasEl = performerItem.querySelector('input[role="combobox"]'); // input.performer-alias
+                if (!aliasEl) return alert('performer alias field not found');
                 setNativeValue(aliasEl, entry.appearance || '');
                 flashField(aliasEl);
               });
@@ -3003,7 +3005,8 @@ button.nav-link.backlog-flash {
                     flashField(performerItem);
 
                     /** @type {HTMLInputElement} */
-                    const aliasEl = performerItem.querySelector('input.performer-alias');
+                    const aliasEl = performerItem.querySelector('input[role="combobox"]'); // input.performer-alias
+                    if (!aliasEl) return alert('performer alias field not found');
                     setNativeValue(aliasEl, entry.appearance || '');
                     flashField(aliasEl);
                     return;
