@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.6
+// @version     1.32.7
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3553,7 +3553,7 @@ button.nav-link.backlog-flash {
         }
         const emoji = document.createElement('span');
         emoji.classList.add('me-1');
-        emoji.innerText = '🎥';
+        emoji.innerText = '📹';
         sceneChanges.prepend(emoji);
         backlogDiv.prepend(sceneChanges);
       } catch (error) {
@@ -4292,7 +4292,7 @@ button.nav-link.backlog-flash {
 
         const emoji = document.createElement('span');
         emoji.classList.add('me-1');
-        emoji.innerText = '🎥';
+        emoji.innerText = '📹';
         sceneChanges.prepend(emoji);
         backlogDiv.prepend(sceneChanges);
       } catch (error) {
@@ -4827,7 +4827,7 @@ button.nav-link.backlog-flash {
           if (performerFragments.length === 0) return;
 
           const title = `✂ Performer is listed as a fragment for ${performerFragments.length} performer${
-            performerFragments.length !== 1 ? 's' : ''} to split up:`;
+            performerFragments.length !== 1 ? 's' : ''} to split up`;
           if (isEditsList) {
             cardHeading.style.backgroundColor = 'var(--bs-success)';
             cardHeading.title = title;
@@ -4846,10 +4846,10 @@ button.nav-link.backlog-flash {
 
         const scenes = editPendingScenes(editUrl, urls);
         if (scenes.length > 0) {
-          const pendingScenes = `Performer has ${scenes.length} pending scene${scenes.length !== 1 ? 's' : ''}`;
+          const pendingScenes = `📹 Performer has ${scenes.length} pending scene${scenes.length !== 1 ? 's' : ''}`;
           if (isEditsList) {
             cardHeading.style.backgroundColor = 'var(--bs-success)';
-            cardHeading.title = (cardHeading.title ? `\n${cardHeading.title}` : '') + pendingScenes;
+            cardHeading.title = (cardHeading.title ? `${cardHeading.title}\n` : '') + pendingScenes;
           } else {
             const header = document.createElement('h3');
             header.innerText = `Backlog: ${pendingScenes}`;
