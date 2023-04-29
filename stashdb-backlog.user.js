@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.7
+// @version     1.32.8
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1571,7 +1571,7 @@ button.nav-link.backlog-flash {
       const mainURL = !custom
         ? (!performerData.duplicates ? `${viewURL}/edit` : `${viewURL}/merge`)
         : viewURL;
-      const name = [performerData.name, performerData.split?.name].find((n) => !!n);
+      const name = [performerData.name, performerData.split?.name, performerData.duplicates?.name].find((n) => !!n);
       const link = makeLink(mainURL, name || performerId);
       if (!name)
         link.classList.add('font-monospace');
@@ -5097,7 +5097,7 @@ button.nav-link.backlog-flash {
     };
     /** @param {PerformerDataObject} item */
     const sortKey = (item) => {
-      return item.name || item.split?.name || dataObjectKeys(item).length;
+      return item.name || item.split?.name || item.duplicates?.name || dataObjectKeys(item).length;
     };
 
     const sortedPerformers =

@@ -79,6 +79,7 @@ interface SplitFragment {
 
 interface PerformerDataObject {
     duplicates?: {
+        name: string;
         ids: string[];
         notes?: string[];
     };
