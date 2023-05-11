@@ -269,7 +269,10 @@ async function inject() {
     // reactRouterHistory.listen(() => dispatcher());
     console.debug(`[backlog] hooked into react router`);
   }
-  window.addEventListener(locationChanged, () => dispatcher());
+  window.addEventListener(locationChanged, async (ev) => {
+    if (/** @type {CustomEvent<string>} */ (ev).detail === 'popstate') await wait(200);
+    dispatcher();
+  });
 
   setTimeout(dispatcher, 0, true);
 
@@ -5290,25 +5293,24 @@ const locationChanged = (function() {
     .replace(/[^a-z0-9 -]/g, '')
     .replace(/\s+/g, '-');
 
-  const eventLocationChange = new Event(`${prefix}$locationchange`);
+  const eventName = `${prefix}$locationchange`;
+  const makeLocationChangeEvent = (/** @type {string} */ source) => new CustomEvent(eventName, { detail: source });
 
   history.pushState = function(...args) {
     pushState.apply(history, args);
-    window.dispatchEvent(new Event(`${prefix}$pushstate`));
-    window.dispatchEvent(eventLocationChange);
+    window.dispatchEvent(makeLocationChangeEvent('pushState'));
   }
 
   history.replaceState = function(...args) {
     replaceState.apply(history, args);
-    window.dispatchEvent(new Event(`${prefix}$replacestate`));
-    window.dispatchEvent(eventLocationChange);
+    window.dispatchEvent(makeLocationChangeEvent('replaceState'));
   }
 
   window.addEventListener('popstate', function() {
-    window.dispatchEvent(eventLocationChange);
+    window.dispatchEvent(makeLocationChangeEvent('popstate'));
   });
 
-  return eventLocationChange.type;
+  return eventName;
 })();
 
 // MIT Licensed
