@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.8
+// @version     1.32.9
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1591,8 +1591,9 @@ button.nav-link.backlog-flash {
           .map((k) => {
             switch (k) {
               case 'urls':
-              case 'duplicates':
                 return `${Object.values(performerData[k]).length}x ${k}`;
+              case 'duplicates':
+                return `${performerData[k].ids.length}x ${k}`;
               case 'split':
                 const { fragments } = performerData[k];
                 return fragments.length > 0 ? `${fragments.length}x fragments` : k;
@@ -3781,13 +3782,7 @@ button.nav-link.backlog-flash {
       if (!foundData.duplicates) return;
       if (backlogDiv.querySelector('[data-backlog="duplicates"]')) return;
 
-      // backwards compatible
-      /** @type {PerformerDataObject['duplicates']} */
-      const { ids, notes } = (
-        Array.isArray(foundData.duplicates)
-          ? { ids: foundData.duplicates, notes: undefined }
-          : foundData.duplicates
-      );
+      const { ids, notes } = foundData.duplicates;
 
       const hasDuplicates = document.createElement('div');
       hasDuplicates.dataset.backlog = 'duplicates';
@@ -4049,13 +4044,7 @@ button.nav-link.backlog-flash {
       if (!foundData.duplicates) return;
       if (backlogDiv.querySelector('[data-backlog="duplicates"]')) return;
 
-      // backwards compatible
-      /** @type {PerformerDataObject['duplicates']} */
-      const { ids, notes } = (
-        Array.isArray(foundData.duplicates)
-          ? { ids: foundData.duplicates, notes: undefined }
-          : foundData.duplicates
-      );
+      const { ids, notes } = foundData.duplicates;
 
       /** @param {string} uuid */
       const addPerformer = async (uuid) => {
