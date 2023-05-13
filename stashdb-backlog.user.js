@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.9
+// @version     1.32.10
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -341,6 +341,12 @@ async function inject() {
 
 .backlog-fingerprint-duration {
   background-color: #4691ff;
+}
+
+.performer-backlog [data-backlog="split"] s {
+  /* text-muted */
+  --bs-text-opacity: 1;
+  color: #bfccd6;
 }
 
 /* https://codepen.io/zachhanding/pen/MKyVPq */
@@ -1474,6 +1480,7 @@ button.nav-link.backlog-flash {
     'https://www.data18.com/movies/',
     'https://gayeroticvideoindex.com/video/',
     'https://www.freeones.com/forums/threads/performer-guide-netvideogirls-com.101884/',
+    'https://stashdb.org/scenes/'
   ];
 
   /** @param {string} url */
