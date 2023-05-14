@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.10
+// @version     1.32.11
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3789,7 +3789,7 @@ button.nav-link.backlog-flash {
       if (!foundData.duplicates) return;
       if (backlogDiv.querySelector('[data-backlog="duplicates"]')) return;
 
-      const { ids, notes } = foundData.duplicates;
+      const { ids, name: expectedName, notes } = foundData.duplicates;
 
       const hasDuplicates = document.createElement('div');
       hasDuplicates.dataset.backlog = 'duplicates';
@@ -3799,11 +3799,23 @@ button.nav-link.backlog-flash {
       label.innerText = 'This performer has duplicates:';
       hasDuplicates.appendChild(label);
 
+      const performerName =
+        /** @type {HTMLElement[]} */
+        (Array.from(performerInfo.querySelectorAll('h3 > span, h3 > small')))
+          .map(e => e.innerText).join(' ');
+      if (performerName !== expectedName) {
+        const warning = document.createElement('div');
+        warning.classList.add('bg-danger', 'fw-bold');
+        setStyles(warning, { marginLeft: '1.75rem', padding: '.15rem .25rem', width: 'fit-content' });
+        warning.innerText = `Unexpected performer name - expected "${expectedName}"`;
+        hasDuplicates.appendChild(warning);
+      }
+
       const linksSpan = document.createElement('span');
 
-      const infoSpan = document.createElement('span');
-      setStyles(infoSpan, { marginLeft: '1.75rem', whiteSpace: 'pre-wrap' });
-      infoSpan.classList.add('d-inline-block', 'fw-normal');
+      const notesDiv = document.createElement('div');
+      setStyles(notesDiv, { marginLeft: '1.75rem', whiteSpace: 'pre-wrap' });
+      notesDiv.classList.add('fw-normal');
 
       (notes || []).forEach((note) => {
         if (/^https?:/.test(note)) {
@@ -3813,7 +3825,7 @@ button.nav-link.backlog-flash {
           link.title = note;
           linksSpan.appendChild(link);
         } else {
-          infoSpan.append((infoSpan.textContent ? '\n' : '') + note);
+          notesDiv.append((notesDiv.textContent ? '\n' : '') + note);
         }
       });
 
@@ -3821,19 +3833,21 @@ button.nav-link.backlog-flash {
         label.after(linksSpan);
       }
 
-      if (infoSpan.textContent) {
-        infoSpan.prepend('📝 ');
-        hasDuplicates.append(document.createElement('br'), infoSpan);
+      if (notesDiv.textContent) {
+        notesDiv.prepend('📝 ');
+        hasDuplicates.appendChild(notesDiv);
       }
 
       ids.forEach((dupId) => {
-        hasDuplicates.append(document.createElement('br'));
-        const a = makeLink(`/performers/${dupId}`, dupId, { color: 'var(--bs-teal)', marginLeft: '1.75rem' });
+        const dupDiv = document.createElement('div');
+        dupDiv.classList.add('fw-normal');
+        dupDiv.style.marginLeft = '1.75rem';
+        const a = makeLink(`/performers/${dupId}`, dupId, { color: 'var(--bs-teal)' });
         a.target = '_blank';
-        a.classList.add('fw-normal');
-        hasDuplicates.append(a);
+        dupDiv.append(a);
 
         if (isMarkedForSplit(dupId)) a.after(' 🔀 needs to be split up');
+        hasDuplicates.append(dupDiv);
       });
       const emoji = document.createElement('span');
       emoji.classList.add('me-1');
