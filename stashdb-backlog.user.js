@@ -3671,9 +3671,9 @@ button.nav-link.backlog-flash {
           .map(e => e.innerText).join(' ');
       if (performerName !== splitItem.name) {
         const warning = document.createElement('div');
-        warning.classList.add('text-warning', 'fw-bold');
-        warning.style.marginLeft = '1.75rem';
-        warning.innerText = `Unexpected performer name. Expected "${splitItem.name}"`;
+        warning.classList.add('bg-danger', 'fw-bold');
+        setStyles(warning, { marginLeft: '1.75rem', padding: '.15rem .25rem', width: 'fit-content' });
+        warning.innerText = `Unexpected performer name - expected "${splitItem.name}"`;
         toSplit.appendChild(warning);
       }
 
@@ -3888,8 +3888,9 @@ button.nav-link.backlog-flash {
           .map(e => e.innerText).join(' ');
       if (performerName !== expectedName) {
         const warning = document.createElement('span');
-        warning.classList.add('text-warning', 'fw-bold');
-        warning.innerText = `Unexpected performer name. Expected "${expectedName}"`;
+        warning.classList.add('bg-danger', 'fw-bold');
+        setStyles(warning, { marginLeft: '1.75rem', padding: '.15rem .25rem', width: 'fit-content' });
+        warning.innerText = `Unexpected performer name - expected "${expectedName}"`;
         pendingURLs.append(document.createElement('br'), warning);
       }
 
