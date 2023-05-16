@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.12
+// @version     1.32.13
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1384,6 +1384,20 @@ button.nav-link.backlog-flash {
     sep.innerHTML = '&mdash;';
     return sep;
   };
+
+  /**
+   * @param {HTMLElement} element
+   * @see https://www.javascripttutorial.net/dom/css/check-if-an-element-is-visible-in-the-viewport/
+   */
+  function isInViewport(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top >= 0 &&
+        rect.left >= 0 &&
+        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+        rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+    );
+  }
 
   /**
    * @param {SceneEntriesItem[]} list
@@ -3725,12 +3739,17 @@ button.nav-link.backlog-flash {
       setStyles(fragmentsList, { padding: '0', margin: '0 0 0 2rem' });
       fragmentsDetails.append(fragmentsList);
 
+      /** @type {HTMLLIElement} */
+      let firstHighlighedFragmentEl;
       fragments.forEach((fragment, index) => {
         const fragmentEl = document.createElement('li');
         fragmentEl.classList.add('mt-1');
 
-        if (highlightFragments.includes(index))
+        if (highlightFragments.includes(index)) {
           fragmentEl.classList.add('bg-primary', 'bg-opacity-50');
+          if (!firstHighlighedFragmentEl)
+            firstHighlighedFragmentEl = fragmentEl;
+        }
 
         const params = new URLSearchParams();
         if (fragment.id) params.append('id', fragment.id);
@@ -3783,6 +3802,11 @@ button.nav-link.backlog-flash {
       });
       toSplit.appendChild(fragmentsDetails);
       backlogDiv.append(toSplit);
+
+      if (firstHighlighedFragmentEl && !isInViewport(firstHighlighedFragmentEl)) {
+        firstHighlighedFragmentEl.scrollIntoView();
+      }
+
     })();
 
     (function duplicates() {
