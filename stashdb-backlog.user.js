@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.13
+// @version     1.32.14
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1637,10 +1637,14 @@ button.nav-link.backlog-flash {
 
         if (custom === 'fragment-search' && Array.isArray(fragmentNumbers)) {
           const { fragments } = performerData.split;
+
+          const fragmentDetails = document.createElement('div');
+          fragmentDetails.style.marginLeft = '1.2rem';
+
           row.append(makeSep());
           fragmentNumbers.forEach((fragmentIndex, i) => {
             if (i > 0) row.append(' / ');
-            const { id, name } = fragments[fragmentIndex];
+            const { id, name, ...fragment } = fragments[fragmentIndex];
             let fragmentName;
             if (id) {
               fragmentName = makeLink(`/performers/${id}`, name, { color: 'var(--bs-teal)' });
@@ -1650,7 +1654,26 @@ button.nav-link.backlog-flash {
               fragmentName.innerText = name;
             }
             row.append(fragmentName);
+
+            if (fragment.text || fragment.notes) {
+              const notes = [].concat([fragment.text], fragment.notes).filter(Boolean);
+              /** @type {HTMLSpanElement | HTMLDetailsElement} */
+              let text;
+              if (notes.length < 6) {
+                text = document.createElement('span');
+              } else {
+                text = document.createElement('details');
+                const summary = document.createElement('summary');
+                summary.innerText = `fragment #${fragmentIndex + 1}`;
+                text.append(summary);
+              }
+              text.style.whiteSpace = 'pre-wrap';
+              text.append(...strikethroughTextElements(notes.join('\n')));
+              fragmentDetails.append(text);
+            }
           });
+
+          row.append(fragmentDetails);
         }
       }
 
