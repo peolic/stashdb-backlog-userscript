@@ -1765,7 +1765,7 @@ button.nav-link.backlog-flash {
 
   /**
    * @param {HTMLElement} el
-   * @param {SupportedObject} object
+   * @param {AnyObject} object
    * @param {string} uuid
    * @see https://stackoverflow.com/a/48890844
    */
@@ -4874,6 +4874,9 @@ button.nav-link.backlog-flash {
       }
 
       if (entity === 'performer' && operation !== 'destroy') {
+        const backlogDiv = document.createElement('div');
+        backlogDiv.classList.add('performer-backlog', 'mb-2');
+
         const editUrl = cardHeading.closest('a').href;
         const urls = /** @type {HTMLAnchorElement[]} */
           (Array.from(card.querySelectorAll('.SiteLink + a'))).map((a) => a.href);
@@ -4903,7 +4906,7 @@ button.nav-link.backlog-flash {
             const performersList = document.createElement('ol');
             setStyles(performersList, { paddingLeft: '2rem', fontWeight: 'normal' });
 
-            cardBody.prepend(header, performersList);
+            backlogDiv.append(header, performersList);
 
             renderPerformersList(performerFragments, performersList, 'fragments', fragmentIndexMap);
           }
@@ -4922,10 +4925,15 @@ button.nav-link.backlog-flash {
             const scenesList = document.createElement('ol');
             setStyles(scenesList, { paddingLeft: '2rem', fontWeight: 'normal' });
 
-            cardBody.prepend(header, scenesList);
+            backlogDiv.append(header, scenesList);
 
             renderScenesList(scenes, scenesList, 'edits');
           }
+        }
+
+        if (backlogDiv.childElementCount > 0) {
+          cardBody.prepend(backlogDiv);
+          removeHook(backlogDiv, 'edits', parsePath(editUrl).ident);
         }
       }
     }
