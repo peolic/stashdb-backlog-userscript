@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.14
+// @version     1.32.15
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -4875,7 +4875,7 @@ button.nav-link.backlog-flash {
 
       if (entity === 'performer' && operation !== 'destroy') {
         const backlogDiv = document.createElement('div');
-        backlogDiv.classList.add('performer-backlog', 'mb-2');
+        backlogDiv.classList.add('performer-backlog', 'mb-4', 'pb-3', 'border-bottom');
 
         const editUrl = cardHeading.closest('a').href;
         const urls = /** @type {HTMLAnchorElement[]} */
@@ -4893,6 +4893,59 @@ button.nav-link.backlog-flash {
         (function fragments() {
           const { performerFragments, fragmentIndexMap } = getPerformerFragments({ urls });
           if (performerFragments.length === 0) return;
+
+          (function possibleExistingPerformers() {
+            /** @type {{ url: string, id: string, name: string }[]} */
+            let existingPerformers = [];
+            performerFragments.forEach(([pId, data]) => {
+              const { fragments } = data.split;
+              for (const fragmentIndex of fragmentIndexMap[pId]) {
+                const fragment = fragments[fragmentIndex];
+                if (fragment.id)
+                  existingPerformers.push({
+                    url: `/performers/${fragment.id}`,
+                    id: fragment.id,
+                    name: fragment.name,
+                  });
+                fragment.links?.forEach((link) => {
+                  if (!link.startsWith('https://stashdb.org/')) return;
+                  const loc = parsePath(link);
+                  if (loc.object === 'performers' && loc.ident && !loc.action) {
+                    existingPerformers.push({
+                      url: `/performers/${loc.ident}`,
+                      id: loc.ident,
+                      name: fragment.name
+                    });
+                  }
+                });
+              }
+            });
+
+            const targetPerformers = targetLinks.map(({ href }) => (new URL(href)).pathname);
+            existingPerformers = existingPerformers.filter((p, i, self) => {
+              return !targetPerformers.includes(p.url) && i === self.findIndex(({ url }) => url === p.url);
+            });
+
+            if (existingPerformers.length === 0) return;
+
+            const header = document.createElement('h3');
+            header.innerHTML = 'Backlog: <b><i>Possible</i></b> existing performers';
+
+            const performersList = document.createElement('ul');
+            setStyles(performersList, { paddingLeft: '2rem', fontWeight: 'normal' });
+
+            backlogDiv.append(header, performersList);
+
+            existingPerformers.forEach(({ url, id, name }) => {
+              const li = document.createElement('li');
+              li.append(
+                makeLink(url, name, { color: 'var(--bs-teal)' }),
+                ' \u2013 ',
+                createSelectAllSpan(id, { fontFamily: 'monospace' }),
+              );
+              performersList.append(li);
+            })
+          })();
 
           const title = `✂ Performer is listed as a fragment for ${performerFragments.length} performer${
             performerFragments.length !== 1 ? 's' : ''} to split up`;
