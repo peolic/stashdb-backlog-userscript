@@ -1253,6 +1253,17 @@ button.nav-link.backlog-flash {
     );
   }
 
+  /**
+   * @param {string} text
+   * @param {Partial<CSSStyleDeclaration>} [style]
+   * @returns {HTMLSpanElement}
+   */
+  function createSelectAllSpan(text, style) {
+    const span = document.createElement('span');
+    span.innerText = text;
+    return setStyles(span, { userSelect: 'all', ...style });
+  };
+
   /** @param {HTMLElement | string} fieldOrText */
   const getTabButton = (fieldOrText) => {
     /** @type {HTMLButtonElement[]} */
@@ -2774,17 +2785,6 @@ button.nav-link.backlog-flash {
     sceneForm.append(pendingChangesContainer);
 
     /**
-     * @param {string} text
-     * @returns {HTMLSpanElement}
-     */
-    const createSelectAllSpan = (text) => {
-      const span = document.createElement('span');
-      span.innerText = text;
-      span.style.userSelect = 'all';
-      return span;
-    };
-
-    /**
      * @param {HTMLElement} field
      * @param {string} fieldName
      * @param {string | ((current?: string) => string)} value
@@ -2981,9 +2981,10 @@ button.nav-link.backlog-flash {
               }
 
               if (action === 'append') {
-                const uuid = createSelectAllSpan(entry.id);
-                uuid.style.fontSize = '.9rem';
-                info.append(document.createElement('br'), uuid);
+                info.append(
+                  document.createElement('br'),
+                  createSelectAllSpan(entry.id, { fontSize: '.9rem' }),
+                );
 
                 // Attempt to find a performer-to-remove with the same name
                 const replacement = (
@@ -3242,9 +3243,10 @@ button.nav-link.backlog-flash {
         found[field].forEach((fp, index) => {
           if (index > 0) dd.append(document.createElement('br'));
           const fpElement = document.createElement('span');
-          const fpHash = createSelectAllSpan(fp.hash);
-          fpHash.style.marginLeft = '.5rem';
-          fpElement.append(fp.algorithm.toUpperCase(), fpHash);
+          fpElement.append(
+            fp.algorithm.toUpperCase(),
+            createSelectAllSpan(fp.hash, { marginLeft: '.5rem' }),
+          );
 
           const remove = document.createElement('a');
           remove.innerText = 'remove';
@@ -3263,9 +3265,11 @@ button.nav-link.backlog-flash {
           if (fp.correct_scene_id) {
             const correct = makeLink(`/scenes/${fp.correct_scene_id}`, 'correct scene', { color: 'var(--bs-teal)' });
             correct.target = '_blank';
-            const uuid = createSelectAllSpan(fp.correct_scene_id);
-            uuid.style.fontSize = '.9rem';
-            fpElement.append(document.createElement('br'), '\u{22D9} ', correct, ': ', uuid);
+            fpElement.append(
+              document.createElement('br'),
+              '\u{22D9} ', correct, ': ',
+              createSelectAllSpan(fp.correct_scene_id, { fontSize: '.9rem' }),
+            );
           }
 
           const cfp = currentFingerprints.find(findFingerprint(fp));
