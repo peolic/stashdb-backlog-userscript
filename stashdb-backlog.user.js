@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.15
+// @version     1.32.16
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -347,6 +347,10 @@ async function inject() {
   /* text-muted */
   --bs-text-opacity: 1;
   color: #bfccd6;
+}
+
+.performer-backlog [data-backlog="split"] a[href^="/scenes/"] {
+  color: rgba(0,212,255,1) !important;
 }
 
 /* https://codepen.io/zachhanding/pen/MKyVPq */
