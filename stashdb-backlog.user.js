@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.16
+// @version     1.32.17
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1466,15 +1466,16 @@ button.nav-link.backlog-flash {
   /** @param {string} url */
   const getSiteName = (url) => {
     const parsed = new URL(url);
-    let siteName = parsed.hostname.split(/\./).slice(-2)[0];
+    const hostname = parsed.hostname.replace(/^www\./, '');
+    let siteName = hostname.match(/([^.]+)/)?.[1]; // hostname.split(/\./).slice(-2)[0];
     if (siteName === 'stashdb') {
       const obj = parsed.pathname.match(/^\/([a-z]+)\/.+/)?.[1]?.slice(0, -1);
       if (obj)
         siteName += ` ${obj}`;
-      else if (parsed.hostname === 'cdn.stashdb.org' && parsed.pathname.startsWith('/images/'))
+      else if (hostname === 'cdn.stashdb.org' && parsed.pathname.startsWith('/images/'))
         siteName += ' image';
     }
-    if (parsed.hostname === 'web.archive.org') {
+    if (hostname === 'web.archive.org') {
       const archived = parsed.pathname.match(/\/(http:.+$)/)?.[1];
       if (archived) {
         const actual = new URL(archived);
@@ -3874,7 +3875,7 @@ button.nav-link.backlog-flash {
 
       (notes || []).forEach((note) => {
         if (/^https?:/.test(note)) {
-          const siteName = (new URL(note)).hostname.split(/\./).slice(-2)[0];
+          const siteName = getSiteName(note);
           const link = makeLink(note, `[${siteName}]`, { color: 'var(--bs-yellow)' });
           link.classList.add('ms-1');
           link.title = note;
@@ -4149,7 +4150,7 @@ button.nav-link.backlog-flash {
 
       (notes || []).forEach((note) => {
         if (/^https?:/.test(note)) {
-          const siteName = (new URL(note)).hostname.split(/\./).slice(-2)[0];
+          const siteName = getSiteName(note);
           const link = makeLink(note, `[${siteName}]`, { color: 'var(--bs-yellow)' });
           link.classList.add('ms-1');
           link.title = note;
@@ -4470,7 +4471,7 @@ button.nav-link.backlog-flash {
 
     /** @param {HTMLDivElement} card */
     const appendScenePerformers = (card) => {
-      if (!(isDev || settings.sceneCardPerformers)) return;
+      if (!settings.sceneCardPerformers) return;
 
       /** @type {ScenePerformance} */
       const data = getReactFiber(card)?.return?.return?.memoizedProps?.scene;
