@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.32.17
+// @version     1.33.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1822,6 +1822,18 @@ button.nav-link.backlog-flash {
     /** @type {ScenePerformance} */
     const sceneFiber = _sceneFiberAlt?.id && _sceneFiberAlt.id !== _sceneFiberCur?.id ? _sceneFiberAlt : _sceneFiberCur;
 
+    (function parentStudio() {
+      if (!sceneFiber.studio.parent?.name) return;
+      const studioElement = /** @type {HTMLAnchorElement} */ (sceneInfo.querySelector(':scope > .card-header > h6 > a'));
+      if (studioElement.parentElement.querySelector('.backlog-scene-studio-parent')) return;
+      const parentStudio = document.createElement('small');
+      parentStudio.classList.add('backlog-scene-studio-parent', 'fst-italic');
+      const parentStudioLink = makeLink(`/studios/${sceneFiber.studio.parent.id}`, sceneFiber.studio.parent.name, { color: 'var(--bs-yellow)' });
+      parentStudio.append(' of ', parentStudioLink, '');
+      parentStudio.title = 'added by the StashDB Backlog userscript';
+      studioElement.after(parentStudio);
+      removeHook(parentStudio, 'scenes', sceneId);
+    })();
 
     const found = getDataFor('scenes', sceneId);
     if (!found) return;
