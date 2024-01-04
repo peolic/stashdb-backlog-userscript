@@ -1529,6 +1529,21 @@ button.nav-link.backlog-flash {
     /** @type {FragmentIndexMap} */
     const fragmentIndexMap = {};
 
+    /** @param {string} s */
+    const reNoSchemeWWW = (s) => s.replace(/^https?:\/\/(www\.)?/, '');
+    /**
+     * @param {string[]} arr
+     * @param {string} search
+     * @returns {Boolean}
+     */
+    const arrayIncludesURL = (arr, search) => {
+      const searchNoSchemeWWW = reNoSchemeWWW(search);
+      return arr.some((v) => (
+        0 === v.localeCompare(search, undefined, { sensitivity: 'base' })
+        || 0 === reNoSchemeWWW(v).localeCompare(searchNoSchemeWWW, undefined, { sensitivity: 'base' })
+      ));
+    };
+
     /** @type {string[]} */
     const possibleLinks = [];
 
@@ -1541,7 +1556,7 @@ button.nav-link.backlog-flash {
         (performerId && fragmentId === performerId) ||
         !!links && (
           // any performer url listed in fragment links?
-          urls.some((url) => links.includes(url)) ||
+          urls.some((url) => arrayIncludesURL(links, url)) ||
           // current performer url listed in fragment links? (additional performers)
           links.some((link) => link.startsWith(performerFullURL))
         )
@@ -1550,17 +1565,17 @@ button.nav-link.backlog-flash {
       matchedFragments.forEach((matchedFragment) => {
         if (matchedFragment.id && performerId && matchedFragment.id !== performerId) {
           const fragmentPerformerURL = `${window.location.origin}/performers/${matchedFragment.id}`;
-          if (!possibleLinks.includes(fragmentPerformerURL))
+          if (!arrayIncludesURL(possibleLinks, fragmentPerformerURL))
             possibleLinks.push(fragmentPerformerURL);
         }
         if (matchedFragment.links) {
           const newLinks = matchedFragment.links
             .filter((link) => (
-              !urls.includes(link) // is new link
+              !arrayIncludesURL(urls, link) // is new link
               && link !== performerFullURL // is not a link to current performer
             ));
           newLinks.forEach((newLink) => {
-            if (!possibleLinks.includes(newLink))
+            if (!arrayIncludesURL(possibleLinks, newLink))
               possibleLinks.push(newLink);
           });
         }
