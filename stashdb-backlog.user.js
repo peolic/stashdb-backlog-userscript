@@ -3788,9 +3788,13 @@ button.nav-link.backlog-flash {
       summary.innerText = `${fragments.length} fragment${fragments.length === 1 ? '' : 's'}`;
       fragmentsDetails.append(summary);
 
+      const fragmentsAreShort = (
+        fragments.length === 1
+        && ((fragments[0].text?.match(/\n/g)?.length || 1) + (fragments[0].notes?.length || 0)) <= 5
+      );
       /** @type {number[]} */
       const highlightFragments = history.state?.usr?.state?.performerFragment || [];
-      fragmentsDetails.open = highlightFragments.length > 0;
+      fragmentsDetails.open = highlightFragments.length > 0 || fragmentsAreShort;
 
       const fragmentsList = document.createElement('ol');
       setStyles(fragmentsList, { padding: '0', margin: '0 0 0 2rem' });
