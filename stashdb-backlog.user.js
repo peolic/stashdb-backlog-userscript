@@ -1800,12 +1800,17 @@ button.nav-link.backlog-flash {
       console.debug('[backlog] already injected');
     }
 
+    const _sceneFiberEl = getReactFiber(sceneInfo)?.return?.return;
+    const _sceneFiberCur = _sceneFiberEl?.memoizedProps?.scene;
+    const _sceneFiberAlt = _sceneFiberEl?.alternate?.memoizedProps?.scene;
+
+    /** @type {ScenePerformance} */
+    const sceneFiber = _sceneFiberAlt?.id && _sceneFiberAlt.id !== _sceneFiberCur?.id ? _sceneFiberAlt : _sceneFiberCur;
+
+
     const found = getDataFor('scenes', sceneId);
     if (!found) return;
     console.debug('[backlog] found', found);
-
-    /** @type {ScenePerformance} */
-    const sceneFiber = getReactFiber(sceneInfo)?.return?.return?.memoizedProps?.scene;
 
     const sceneHeader = /** @type {HTMLDivElement} */ (sceneInfo.querySelector(':scope > .card-header'));
     sceneHeader.style.borderTop = '1rem solid var(--bs-warning)';
@@ -3385,8 +3390,13 @@ button.nav-link.backlog-flash {
     const performerInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.PerformerInfo', 1000));
     if (!performerInfo) return;
 
+    const _performerFiberEl = getReactFiber(performerInfo)?.return;
+    const _performerFiberCur = _performerFiberEl?.memoizedProps?.performer;
+    const _performerFiberAlt = _performerFiberEl?.alternate?.memoizedProps?.performer;
+
     /** @type {{ urls: ScenePerformance_URL[] }} */
-    const performerFiber = getReactFiber(performerInfo)?.return?.memoizedProps?.performer;
+    const performerFiber = _performerFiberAlt?.id && _performerFiberAlt.id !== _performerFiberCur?.id ? _performerFiberAlt : _performerFiberCur;
+
     /** @type {string[] | undefined} */
     const performerUrls = performerFiber?.urls.map((u) => u.url);
 
