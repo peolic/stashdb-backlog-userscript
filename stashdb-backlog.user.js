@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.33.0
+// @version     1.34.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -248,6 +248,12 @@ async function inject() {
     //@ts-expect-error
     if (object === 'pbacklog') {
       return await iPerformerBacklogPage();
+    }
+
+    // Backlog performers to split with ready fragments list page
+    //@ts-expect-error
+    if (object === 'preadyfragments') {
+      return await iPerformersSplitReadyFragmentsPage();
     }
 
     // Fragments list page
@@ -516,6 +522,8 @@ button.nav-link.backlog-flash {
         makeLink('/backlog', 'Scene Backlog Summary Page'),
         hr.cloneNode(),
         makeLink('/pbacklog', 'Performer Backlog Summary Page'),
+        hr.cloneNode(),
+        makeLink('/preadyfragments', 'Performers with ready fragments'),
         hr.cloneNode(),
         makeLink('/pfragments', 'Performer Fragments Search Page'),
       );
@@ -1687,14 +1695,16 @@ button.nav-link.backlog-flash {
             row.append(fragmentName);
 
             if (fragment.text || fragment.notes) {
+              const shortFragment = ((fragment.text?.match(/\n/g)?.length || 1) + (fragment.notes?.length || 0)) <= 6;
               const notes = [].concat([fragment.text], fragment.notes).filter(Boolean);
               /** @type {HTMLSpanElement | HTMLDetailsElement} */
               let text;
-              if (notes.length < 6) {
+              if (shortFragment) {
                 text = document.createElement('span');
               } else {
                 text = document.createElement('details');
                 const summary = document.createElement('summary');
+                summary.style.maxWidth = 'fit-content';
                 summary.innerText = `fragment #${fragmentIndex + 1}`;
                 text.append(summary);
               }
@@ -5289,18 +5299,110 @@ button.nav-link.backlog-flash {
           return 0;
         });
 
-    desc.innerText = (
-      'The checkbox marks an entry as "seen" but leaving this page will reset that status.'
-      + '\nMarking as "seen" does not do any action.'
-    );
-
     subTitle.innerText = (
       'Note: There is currently no automated check for submitted entries or completed entries.'
       + '\nSome entries need to be merged and/or split, take extra cake with those.'
     );
 
+    desc.innerText = (
+      'The checkbox marks an entry as "seen" but leaving this page will reset that status.'
+      + '\nMarking as "seen" does not do any action.'
+    );
+
     renderPerformersList(sortedPerformers, performersList, 'simple');
+
   } // iPerformerBacklogPage
+
+  async function iPerformersSplitReadyFragmentsPage() {
+    const main = /** @type {HTMLDivElement} */ (await elementReadyIn('.NarrowPage', 200));
+    if (!main) {
+      alert('failed to construct backlog page');
+      return;
+    }
+
+    toggleBacklogInfo(false);
+    document.title = `Performers To Split (with ready fragments) | ${document.title}`;
+
+    const performers = document.createElement('div');
+    main.appendChild(performers);
+
+    const performersHeader = document.createElement('h3');
+    performersHeader.innerText = 'Performers to split with ready fragments';
+    performers.appendChild(performersHeader);
+
+    const subTitle = document.createElement('h5');
+    subTitle.innerText = 'Loading...';
+    performers.appendChild(subTitle);
+
+    const desc = document.createElement('p');
+    desc.innerText = '';
+    performers.appendChild(desc);
+
+    const performersList = document.createElement('ol');
+    // performersList.classList.add('ps-2');
+    performers.appendChild(performersList);
+
+    window.addEventListener(locationChanged, () => performers.remove(), { once: true });
+
+    await wait(0);
+
+    /** @type {FragmentIndexMap} */
+    const fragmentIndexMap = {};
+
+    /**
+     * @param {PerformerEntriesItem[]} result
+     * @param {PerformerEntriesItem} item
+     */
+    const reduceKey = (result, item) => {
+      const [key, value] = item;
+      const valid = value.split?.fragments?.some((fragment, fragmentIndex) => {
+        if (fragment.id === null || fragment.id === key) return false;
+
+        // Store fragment index for matching later
+        if (!fragmentIndexMap[key])
+          fragmentIndexMap[key] = [fragmentIndex];
+        else if (!fragmentIndexMap[key].includes(fragmentIndex))
+          fragmentIndexMap[key].push(fragmentIndex);
+
+        return true;
+      });
+
+      return valid ? result.concat([item]) : result;
+    };
+    /** @param {PerformerDataObject} item */
+    const sortKey = (item) => {
+      return item.name || item.split?.name;
+    };
+
+    const sortedPerformers =
+      Object.entries(Cache.data.performers)
+        .reduce(reduceKey, [])
+        .sort((a, b) => {
+          const aKey = sortKey(a[1]);
+          const bKey = sortKey(b[1]);
+          if (typeof bKey === 'string' && typeof aKey === 'string')
+            return aKey.localeCompare(bKey, undefined, { sensitivity: 'accent' });
+          if (typeof bKey === 'number' && typeof aKey === 'number')
+            return bKey - aKey;
+          if (typeof aKey === 'string')
+            return -1;
+          if (typeof bKey === 'string')
+            return 1;
+          return 0;
+        });
+
+    subTitle.innerText = (
+      'Fragments of performers that might be ready to correct, or be marked as done.'
+    );
+
+    desc.innerText = (
+      'The checkbox marks an entry as "seen" but leaving this page will reset that status.'
+      + '\nMarking as "seen" does not do any action.'
+    );
+
+    renderPerformersList(sortedPerformers, performersList, 'fragment-search', fragmentIndexMap);
+
+  } // iPerformersSplitReadyFragmentsPage
 
   async function iPerformerFragmentsPage() {
     const main = /** @type {HTMLDivElement} */ (await elementReadyIn('.NarrowPage', 200));
