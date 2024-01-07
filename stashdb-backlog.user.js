@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.34.0
+// @version     1.34.1
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -385,6 +385,11 @@ button.nav-link.backlog-flash {
 
 .backlog-flash:not(input, textarea, button.nav-link) {
   outline: .5rem solid var(--bs-yellow);
+}
+
+details.backlog-fragment:not([open]) > summary > span:first-child,
+details.backlog-fragment:not([open]) > summary::marker {
+  color: var(--bs-orange);
 }
     `);
   }
@@ -1608,7 +1613,7 @@ button.nav-link.backlog-flash {
   /**
    * @param {PerformerEntriesItem[]} list
    * @param {HTMLOListElement} target
-   * @param {'simple' | 'fragments' | 'fragment-search'} [custom]
+   * @param {'simple' | 'fragments' | 'fragment-search' | 'ready-fragments'} [custom]
    * @param {FragmentIndexMap | { [performerId: string]: string }} [customData]
    */
   const renderPerformersList = (list, target, custom, customData) =>
@@ -1715,6 +1720,50 @@ button.nav-link.backlog-flash {
           });
 
           row.append(fragmentDetails);
+        }
+      } else if (custom === 'ready-fragments' && customData?.[performerId] !== undefined) {
+        const fragmentNumbers = customData[performerId];
+        const label = Array.isArray(fragmentNumbers)
+          ? 'fragments ' + fragmentNumbers.map((index) => `#${index + 1}`).join(', ')
+          : fragmentNumbers;
+        row.append(makeSep(), label);
+
+        if (Array.isArray(fragmentNumbers)) {
+          link.dataset.state = JSON.stringify({ performerFragment: fragmentNumbers });
+
+          const { fragments } = performerData.split;
+          fragmentNumbers.forEach((fragmentIndex, i) => {
+            const { id, name, ...fragment } = fragments[fragmentIndex];
+            let fragmentName;
+            if (id) {
+              fragmentName = makeLink(`/performers/${id}`, name, { color: 'var(--bs-teal)' });
+              fragmentName.target = '_blank';
+            } else {
+              fragmentName = document.createElement('span');
+              fragmentName.innerText = name;
+            }
+
+            const fragmentLength = ((fragment.text?.match(/\n/g)?.length || 1) + (fragment.notes?.length || 0));
+            const fragmentDetails = document.createElement('details');
+            fragmentDetails.open = fragmentLength <= 6;
+            fragmentDetails.classList.add('backlog-fragment');
+            const fragmentNumber =  document.createElement('span');
+            fragmentNumber.innerText = `fragment #${fragmentIndex + 1}`;
+            const fragmentSummary = document.createElement('summary');
+            fragmentSummary.style.maxWidth = 'fit-content';
+            fragmentSummary.append(fragmentNumber, makeSep(), fragmentName);
+            fragmentDetails.append(fragmentSummary);
+            row.append(fragmentDetails);
+
+            if (fragment.text || fragment.notes) {
+              const notes = [].concat([fragment.text], fragment.notes).filter(Boolean);
+              const text = document.createElement('div');
+              text.classList.add('d-inline-block');
+              Object.assign(text.style, { marginLeft: '1.2rem', whiteSpace: 'pre-wrap' });
+              text.append(...strikethroughTextElements(notes.join('\n')));
+              fragmentDetails.append(text);
+            }
+          });
         }
       }
 
@@ -5355,7 +5404,7 @@ button.nav-link.backlog-flash {
      */
     const reduceKey = (result, item) => {
       const [key, value] = item;
-      const valid = value.split?.fragments?.some((fragment, fragmentIndex) => {
+      const valid = value.split?.fragments?.filter((fragment, fragmentIndex) => {
         if (fragment.id === null || fragment.id === key) return false;
 
         // Store fragment index for matching later
@@ -5365,7 +5414,7 @@ button.nav-link.backlog-flash {
           fragmentIndexMap[key].push(fragmentIndex);
 
         return true;
-      });
+      }).length > 0;
 
       return valid ? result.concat([item]) : result;
     };
@@ -5400,7 +5449,13 @@ button.nav-link.backlog-flash {
       + '\nMarking as "seen" does not do any action.'
     );
 
-    renderPerformersList(sortedPerformers, performersList, 'fragment-search', fragmentIndexMap);
+    renderPerformersList(sortedPerformers, performersList, 'ready-fragments', fragmentIndexMap);
+
+    for (const li of Array.from(performersList.querySelectorAll('li'))) {
+      if (li.nextElementSibling) {
+        li.after(document.createElement('br'));
+      }
+    }
 
   } // iPerformersSplitReadyFragmentsPage
 
