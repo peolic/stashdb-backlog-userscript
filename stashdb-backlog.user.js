@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.34.1
+// @version     1.34.2
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -238,28 +238,64 @@ async function inject() {
       return await iSearchPage();
     }
 
-    // Backlog scenes list page
+    // Backlog - generated pages
+
+    // FIXME: (2024-01-07) temporary - redirect old
+    const newBacklogPath = ({
+      'pbacklog': ['backlog', 'performers'],
+      'preadyfragments': ['backlog', 'fragments-ready'],
+      'pfragments': ['backlog', 'fragment-search'],
+    })[/** @type {string} */ (object)];
+
+    if (newBacklogPath) {
+      document.body.innerHTML = '<div align="center" class="mt-5 fs-1 fw-bold">Redirecting\u{2026}</div>';
+      setTimeout(() => {
+        window.location.pathname = '/' + newBacklogPath.join('/');
+      }, 500);
+      return;
+    }
+
     //@ts-expect-error
     if (object === 'backlog') {
-      return await iSceneBacklogPage();
-    }
+      if (!ident) {
+        // Backlog info page
+        toggleBacklogInfo(true);
 
-    // Backlog performers list page
-    //@ts-expect-error
-    if (object === 'pbacklog') {
-      return await iPerformerBacklogPage();
-    }
+        const backlogInfoStyle = document.createElement('style');
+        backlogInfoStyle.id = 'backlog-info-page';
+        backlogInfoStyle.textContent = [
+          `nav > .backlog-info > div { margin-top: 2em; margin-right: calc(50vw - 7em); font-size: 1.3em; width: 450px !important; }`,
+          `nav > .backlog-info > span { opacity: 0.5; pointer-events: none; }`,
+        ].join('\n');
+        document.head.append(backlogInfoStyle);
 
-    // Backlog performers to split with ready fragments list page
-    //@ts-expect-error
-    if (object === 'preadyfragments') {
-      return await iPerformersSplitReadyFragmentsPage();
-    }
+        window.addEventListener(locationChanged, () => {
+          toggleBacklogInfo(false);
+          backlogInfoStyle.remove();
+        }, { once: true });
 
-    // Fragments list page
-    //@ts-expect-error
-    if (object === 'pfragments') {
-      return await iPerformerFragmentsPage();
+        return;
+      }
+
+      // Backlog scenes list page
+      if (ident === 'scenes') {
+        return await iSceneBacklogPage();
+      }
+
+      // Backlog performers list page
+      if (ident === 'performers') {
+        return await iPerformerBacklogPage();
+      }
+
+      // Backlog performers to split with ready fragments list page
+      if (ident === 'fragments-ready') {
+        return await iPerformersSplitReadyFragmentsPage();
+      }
+
+      // Fragments list page
+      if (ident === 'fragment-search') {
+        return await iPerformerFragmentsPage();
+      }
     }
 
     // Home page
@@ -524,13 +560,13 @@ details.backlog-fragment:not([open]) > summary::marker {
       info.append(
         toggleSceneCardPerformers,
         hr.cloneNode(),
-        makeLink('/backlog', 'Scene Backlog Summary Page'),
+        makeLink('/backlog/scenes', 'Scene Backlog Summary Page'),
         hr.cloneNode(),
-        makeLink('/pbacklog', 'Performer Backlog Summary Page'),
+        makeLink('/backlog/performers', 'Performer Backlog Summary Page'),
         hr.cloneNode(),
-        makeLink('/preadyfragments', 'Performers with ready fragments'),
+        makeLink('/backlog/fragments-ready', 'Performers with ready fragments'),
         hr.cloneNode(),
-        makeLink('/pfragments', 'Performer Fragments Search Page'),
+        makeLink('/backlog/fragment-search', 'Performer Fragments Search Page'),
       );
     }
   }
@@ -3888,7 +3924,7 @@ details.backlog-fragment:not([open]) > summary::marker {
         fragment.links?.filter(validFragmentLink)?.forEach((link) => params.append('url', link));
         const fragmentSearchQS = params.toString();
         if (fragmentSearchQS) {
-          const fragmentSearch = makeLink(`/pfragments?${fragmentSearchQS}`, '🔎');
+          const fragmentSearch = makeLink(`/backlog/fragment-search?${fragmentSearchQS}`, '🔎');
           fragmentSearch.classList.add('me-1', 'fw-bold', 'text-decoration-none', 'user-select-none');
           fragmentSearch.title = 'Search for other fragments...';
           fragmentEl.appendChild(fragmentSearch);
