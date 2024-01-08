@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.34.2
+// @version     1.34.3
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -4919,6 +4919,9 @@ details.backlog-fragment:not([open]) > summary::marker {
         if (Cache.performerScenes(ident).length > 0)
           changes.push('scenes');
 
+        // FIXME: getPerformerFragments is too heavy for the edits pages
+        //        optimize, we only need number of fragments
+        if (false) { // disabled section
         /** @type {string[]} */
         const urls = (() => {
           /** @type {HTMLDivElement} */
@@ -4934,6 +4937,7 @@ details.backlog-fragment:not([open]) > summary::marker {
         const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: ident, urls });
         if (Object.keys(fragments).length > 0)
           changes.push('fragments');
+        } // disabled section
       }
 
       if (changes.length === 0)
