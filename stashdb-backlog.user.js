@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.34.4
+// @version     1.34.5
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3621,8 +3621,8 @@ details.backlog-fragment:not([open]) > summary::marker {
           } else if (action === 'remove') {
             const removeEntry = remove.find(({ id }) => id === performerId);
             const targetEntry = append.find(({ appearance, name }) => {
-              if (appearance) return [appearance, name].includes(removeEntry.name);
-              return name.split(/\b/)[0] === removeEntry.name.split(/\b/)[0];
+              if (!appearance) return name.split(/\b/)[0] === removeEntry.name.split(/\b/)[0];
+              return [appearance, name].some((a) => [removeEntry.appearance, removeEntry.name].includes(a));
             });
             if (targetEntry && (removeEntry.status === 'edit' || removeEntry.status === 'merge'))
               targetEntry.status = removeEntry.status;
