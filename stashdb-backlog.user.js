@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.34.6
+// @version     1.34.7
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1369,7 +1369,7 @@ details.backlog-fragment:not([open]) > summary::marker {
    * @param {string} url
    * @param {boolean} [replace=false]
    */
-  const addSiteURL = (site, url, replace = false) => {
+  const addSiteURL = async (site, url, replace = false) => {
     const link = getLinkBySiteType(site);
 
     if (link) {
@@ -1393,8 +1393,11 @@ details.backlog-fragment:not([open]) > summary::marker {
       return alert('unable to add url (add button disabled)');
     }
     addButton.click();
-    const newLink = /** @type {HTMLDivElement} */ (linksContainer.querySelector(':scope > ul > li:last-child > .input-group'));
-    flashField(newLink);
+    const result = /** @type {HTMLAnchorElement | null} */ (await elementReadyIn(`a[href="${url}"]`, 250, linksContainer));
+    if (result) {
+      const newLink = /** @type {HTMLDivElement} */ (result?.closest('.input-group'));
+      flashField(newLink);
+    }
   };
 
   /** @param {[name: string, parent: string | null]} [studio] */
