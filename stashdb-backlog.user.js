@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.34.5
+// @version     1.34.6
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3862,11 +3862,11 @@ details.backlog-fragment:not([open]) > summary::marker {
         (Array.from(performerInfo.querySelectorAll('h3 > span, h3 > small')))
           .map(e => e.innerText).join(' ');
       if (performerName !== splitItem.name) {
-        const warning = document.createElement('div');
-        warning.classList.add('bg-danger', 'fw-bold');
-        setStyles(warning, { marginLeft: '1.75rem', padding: '.15rem .25rem', width: 'fit-content' });
-        warning.innerText = `Unexpected performer name - expected "${splitItem.name}"`;
-        toSplit.appendChild(warning);
+        const unexpectedName = document.createElement('div');
+        unexpectedName.classList.add('bg-danger', 'fw-bold');
+        setStyles(unexpectedName, { marginLeft: '1.75rem', padding: '.15rem .25rem', width: 'fit-content' });
+        unexpectedName.innerText = `Unexpected performer name - expected "${splitItem.name}"`;
+        toSplit.appendChild(unexpectedName);
       }
 
       if (splitItem.notes) {
@@ -4107,11 +4107,19 @@ details.backlog-fragment:not([open]) > summary::marker {
         (Array.from(performerInfo.querySelectorAll('h3 > span, h3 > small')))
           .map(e => e.innerText).join(' ');
       if (performerName !== expectedName) {
-        const warning = document.createElement('span');
-        warning.classList.add('bg-danger', 'fw-bold');
-        setStyles(warning, { marginLeft: '1.75rem', padding: '.15rem .25rem', width: 'fit-content' });
-        warning.innerText = `Unexpected performer name - expected "${expectedName}"`;
-        pendingURLs.append(document.createElement('br'), warning);
+        const unexpectedName = document.createElement('div');
+        unexpectedName.classList.add('bg-danger', 'fw-bold');
+        setStyles(unexpectedName, { marginLeft: '1.75rem', padding: '.15rem .25rem', width: 'fit-content' });
+        unexpectedName.innerText = `Unexpected performer name - expected "${expectedName}"`;
+        pendingURLs.append(unexpectedName);
+      }
+
+      if (foundData.urls_notes && foundData.urls_notes.length > 0) {
+        const notesDiv = document.createElement('div');
+        setStyles(notesDiv, { marginLeft: '1.75rem', whiteSpace: 'pre-wrap' });
+        notesDiv.classList.add('fw-normal');
+        notesDiv.append('📝 ', (foundData.urls_notes || []).join('\n'));
+        pendingURLs.appendChild(notesDiv);
       }
 
       if (foundData.urls.every((url) => existingURLs.includes(url))) {
@@ -4122,8 +4130,7 @@ details.backlog-fragment:not([open]) > summary::marker {
       }
 
       foundData.urls.forEach((url) => {
-        pendingURLs.append(document.createElement('br'));
-        const container = document.createElement('span');
+        const container = document.createElement('div');
         container.style.marginLeft = '1.75rem';
         const a = makeLink(url, undefined, { color: 'var(--bs-teal)' });
         a.target = '_blank';
@@ -5271,7 +5278,7 @@ details.backlog-fragment:not([open]) > summary::marker {
     /** @type {(keyof SceneDataObject)[]} */
     const unsubmittableKeys = ['fingerprints'];
     /** @param {string} key */
-    const submittableKeys = (key) => !(unsubmittableKeys).includes(/** @type {keyof SceneDataObject} */ (key));
+    const submittableKeys = (key) => !unsubmittableKeys.includes(/** @type {keyof SceneDataObject} */ (key));
 
     /**
      * @param {SceneEntriesItem[]} result
@@ -5407,7 +5414,7 @@ details.backlog-fragment:not([open]) > summary::marker {
     /** @type {(keyof PerformerDataObject)[]} */
     const unsubmittableKeys = ['name'];
     /** @param {string} key */
-    const submittableKeys = (key) => !(unsubmittableKeys).includes(/** @type {keyof PerformerDataObject} */ (key));
+    const submittableKeys = (key) => !unsubmittableKeys.includes(/** @type {keyof PerformerDataObject} */ (key));
 
     /**
      * @param {PerformerEntriesItem[]} result
@@ -5415,7 +5422,7 @@ details.backlog-fragment:not([open]) > summary::marker {
      */
     const reduceKey = (result, item) => {
       const [key, value] = item;
-      const { ...rest } = value;
+      const { urls_notes, ...rest } = value;
       return dataObjectKeys(rest).filter(submittableKeys).length > 0 ? result.concat([[key, rest]]) : result;
     };
     /** @param {PerformerDataObject} item */

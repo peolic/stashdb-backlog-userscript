@@ -91,6 +91,7 @@ interface PerformerDataObject {
         links?: string[];
     };
     urls?: string[];
+    urls_notes?: string[];
     name?: string;
 }
 
