@@ -925,8 +925,8 @@ details.backlog-fragment:not([open]) > summary::marker {
       lastChecked,
       lastUpdated,
       submitted: {
-        scenes: legacySubmitted && Array.isArray(legacySubmitted) ? legacySubmitted : [],
-        performers: [],
+        scenes: (Array.isArray(legacySubmitted) ? legacySubmitted : legacySubmitted?.scenes) ?? [],
+        performers: (Array.isArray(legacySubmitted) ? [] : legacySubmitted?.performers) ?? [],
       },
     };
 
@@ -1055,7 +1055,7 @@ details.backlog-fragment:not([open]) > summary::marker {
    * @returns {boolean | null}
    */
   function isSubmitted(object, uuid) {
-    if (object !== 'scenes') return null;
+    if (object !== 'scenes' && object !== 'performers') return null;
     return Cache.data.submitted[object].find((i) => i === uuid) !== undefined;
   }
 
@@ -1494,7 +1494,7 @@ details.backlog-fragment:not([open]) > summary::marker {
 
       if (!object && isSubmitted('scenes', sceneId)) {
         link.style.color = 'var(--bs-cyan)';
-        link.title += ' (This entry may have already been submitted, please double-check before submitting an edit.';
+        link.title += ' (This entry may have already been submitted, please double-check before submitting an edit)';
       }
 
       const keys = dataObjectKeys(sceneData)
@@ -1684,6 +1684,11 @@ details.backlog-fragment:not([open]) > summary::marker {
       const mainClick = () => check.checked = true;
       link.addEventListener('click', mainClick);
       link.addEventListener('auxclick', mainClick);
+
+      if (isSubmitted('performers', performerId)) {
+        link.style.color = 'var(--bs-cyan)';
+        link.title += ' (This entry may have already been submitted, please double-check before submitting an edit)';
+      }
 
       row.append(link);
 
@@ -4168,6 +4173,24 @@ details.backlog-fragment:not([open]) > summary::marker {
 
     const performerForm = /** @type {HTMLFormElement} */ (document.querySelector('.PerformerForm'));
 
+    (function submittedWarning() {
+      if (!isSubmitted('performers', performerId)) return;
+
+      const editsLink = makeLink(`/performers/${performerId}#edits`, 'double-check');
+      editsLink.classList.add('fw-bold', 'text-decoration-underline');
+
+      const warning = document.createElement('h3');
+      warning.classList.add('text-center', 'w-75', 'py-2', 'bg-gradient', 'bg-primary');
+      warning.append(
+        'This backlog entry (or parts of it) may have already been submitted, ',
+        document.createElement('br'),
+        'please ', editsLink, ' before submitting an edit.',
+      );
+
+      performerForm.prepend(warning);
+      removeHook(warning, 'performers', performerId);
+    })();
+
     const pendingChangesContainer = document.createElement('div');
     pendingChangesContainer.classList.add('PendingChanges');
     setStyles(pendingChangesContainer, { position: 'absolute', top: '6rem', right: '1vw', width: '24vw' });
@@ -4254,6 +4277,26 @@ details.backlog-fragment:not([open]) > summary::marker {
     const foundData = getDataFor('performers', performerId);
     if (!foundData) return;
     console.debug('[backlog] found', foundData);
+
+    (async function submittedWarning() {
+      if (!isSubmitted('performers', performerId)) return;
+
+      await elementReady('.PerformerForm', performerMerge);
+
+      const editsLink = makeLink(`/performers/${performerId}#edits`, 'double-check');
+      editsLink.classList.add('fw-bold', 'text-decoration-underline');
+
+      const warning = document.createElement('h3');
+      warning.classList.add('text-center', 'w-75', 'py-2', 'bg-gradient', 'bg-primary');
+      warning.append(
+        'This backlog entry (or parts of it) may have already been submitted, ',
+        document.createElement('br'),
+        'please ', editsLink, ' before submitting an edit.',
+      );
+
+      performerMerge.prepend(warning);
+      removeHook(warning, 'performers', performerId);
+    })();
 
     const isMarkedForSplit = (/** @type {string} */ uuid) => {
       const dataEntry = Cache.data.performers[uuid];
