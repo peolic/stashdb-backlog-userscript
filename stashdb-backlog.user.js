@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.34.7
+// @version     1.34.8
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -3193,7 +3193,15 @@ details.backlog-fragment:not([open]) > summary::marker {
                     .find((btn) => btn.innerText === 'Change')
                     ?.click();
 
-                  const searchField = /** @type {HTMLDivElement} */ (replPerformerItem.querySelector('.SearchField'));
+                  const failHandler = () => {
+                    const replName = replacement.name + (replacement.disambiguation ? ` [${replacement.disambiguation}]` : '');
+                    alert(`failed to replace performer ${replName} with ${name}`);
+                  };
+
+                  const searchField = /** @type {HTMLDivElement | null} */ (await elementReadyIn('.SearchField', 2000, replPerformerItem));
+                  if (!searchField) {
+                    return failHandler();
+                  }
                   const fieldEl = /** @type {HTMLInputElement} */ (searchField.querySelector('input'));
                   setNativeValue(fieldEl, entry.id);
                   const result = /** @type {HTMLDivElement | null} */ (await elementReadyIn('.react-select__option', 2000, searchField));
@@ -3214,8 +3222,7 @@ details.backlog-fragment:not([open]) > summary::marker {
                       .find((btn) => btn.innerText === 'Cancel')
                       .click();
                   } finally {
-                    const replName = replacement.name + (replacement.disambiguation ? ` [${replacement.disambiguation}]` : '');
-                    alert(`failed to replace performer ${replName} with ${name}`);
+                    failHandler();
                   }
                 });
               }
