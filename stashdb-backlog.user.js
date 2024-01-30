@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.34.8
+// @version     1.34.9
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1768,7 +1768,9 @@ details.backlog-fragment:not([open]) > summary::marker {
       } else if (custom === 'ready-fragments' && customData?.[performerId] !== undefined) {
         const fragmentNumbers = customData[performerId];
         const label = Array.isArray(fragmentNumbers)
-          ? 'fragments ' + fragmentNumbers.map((index) => `#${index + 1}`).join(', ')
+          ? fragmentNumbers.length === 0
+              ? 'no fragments'
+              : 'fragments ' + fragmentNumbers.map((index) => `#${index + 1}`).join(', ')
           : fragmentNumbers;
         const flag = document.createTextNode('');
         row.append(makeSep(), flag, label);
@@ -1778,12 +1780,14 @@ details.backlog-fragment:not([open]) > summary::marker {
 
           const { fragments } = performerData.split;
 
-          if (performerData.split.notes?.some((t) => t?.match(/\bcomplete list\b/))) {
-            if (fragmentNumbers.length === fragments.length && fragments.every(({ id }) => !!id))
-              flag.textContent = '🔶 ';
-            else if (fragments.length === 1)
-              flag.textContent = '⭐ ';
-          }
+          // reminder: all entries reaching this point have been filtered through the 'complete list' note sieve.
+          // is 'complete list', and also:
+          if (fragments.length === 0)
+            flag.textContent = '🟢 ';
+          else if (fragments.length === 1)
+            flag.textContent = '⭐ ';
+          else if (fragmentNumbers.length === fragments.length && fragments.every(({ id }) => !!id))
+            flag.textContent = '🔶 ';
 
           fragmentNumbers.forEach((fragmentIndex, i) => {
             const { id, name, ...fragment } = fragments[fragmentIndex];
@@ -5513,7 +5517,10 @@ details.backlog-fragment:not([open]) > summary::marker {
      */
     const reduceKey = (result, item) => {
       const [key, value] = item;
-      const valid = value.split?.fragments?.filter((fragment, fragmentIndex) => {
+      if (!value.split) return result;
+      const { fragments, notes } = value.split;
+
+      let valid = fragments.filter((fragment, fragmentIndex) => {
         if (fragment.id === null || fragment.id === key) return false;
 
         // Store fragment index for matching later
@@ -5524,13 +5531,16 @@ details.backlog-fragment:not([open]) > summary::marker {
 
         return true;
       }).length > 0;
-      const lastFragment = value.split?.fragments?.length === 1 && value.split?.notes?.some((t) => t?.match(/\bcomplete list\b/));
-      if (!valid && lastFragment) {
-        // Store fragment index for matching later
-        fragmentIndexMap[key] = [0];
+
+      if (!valid && notes?.some((t) => t?.match(/\bcomplete list\b/i))) {
+        if (valid = fragments.length <= 1) {
+          fragmentIndexMap[key] = [];
+          // Store fragment index for matching later
+          if (fragments.length === 1) fragmentIndexMap[key].push(0);
+        }
       }
 
-      return (valid || lastFragment) ? result.concat([item]) : result;
+      return valid ? result.concat([item]) : result;
     };
     /** @param {PerformerDataObject} item */
     const sortKey = (item) => {
