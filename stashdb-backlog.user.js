@@ -1749,7 +1749,7 @@ details.backlog-fragment:not([open]) > summary::marker {
               /** @type {HTMLSpanElement | HTMLDetailsElement} */
               let text;
               if (shortFragment) {
-                text = document.createElement('span');
+                text = document.createElement('div');
               } else {
                 text = document.createElement('details');
                 const summary = document.createElement('summary');
@@ -4097,6 +4097,17 @@ details.backlog-fragment:not([open]) > summary::marker {
       emoji.classList.add('me-1');
       emoji.innerText = '♊';
       duplicateOf.prepend(emoji);
+
+      const mainData = getDataFor('performers', foundData.duplicate_of);
+      const mainNotes = mainData?.duplicates.notes?.filter((note) => !/^https?:/.test(note));
+      if (mainNotes?.length > 0) {
+        const notesDiv = document.createElement('div');
+        setStyles(notesDiv, { marginLeft: '1.75rem', whiteSpace: 'pre-wrap' });
+        notesDiv.classList.add('fw-normal');
+        notesDiv.append('📝 ', mainNotes.join('\n'));
+        duplicateOf.appendChild(notesDiv);
+      }
+
       backlogDiv.append(duplicateOf);
     })();
 
@@ -4384,7 +4395,7 @@ details.backlog-fragment:not([open]) > summary::marker {
 
         const add = document.createElement('span');
         setStyles(add, { marginLeft: '1.5rem', marginRight: '0.5rem', cursor: 'pointer' });
-        add.innerText = '\u{2795}';
+        add.innerText = '\u{2795}'; // ➕
         add.addEventListener('click', () => {
           addPerformer(dupId);
         });
@@ -4425,6 +4436,16 @@ details.backlog-fragment:not([open]) > summary::marker {
       emoji.classList.add('me-1');
       emoji.innerText = '♊';
       duplicateOf.prepend(emoji);
+
+      const mainData = getDataFor('performers', foundData.duplicate_of);
+      if (mainData && mainData.duplicates.notes?.length > 0) {
+        const notesDiv = document.createElement('div');
+        setStyles(notesDiv, { marginLeft: '1.75rem', whiteSpace: 'pre-wrap' });
+        notesDiv.classList.add('fw-normal');
+        notesDiv.append('📝 ', mainData.duplicates.notes.filter((note) => !/^https?:/.test(note)).join('\n'));
+        duplicateOf.appendChild(notesDiv);
+      }
+
       backlogDiv.append(duplicateOf);
     })();
 
@@ -4484,6 +4505,13 @@ details.backlog-fragment:not([open]) > summary::marker {
         li.appendChild(link);
         list.appendChild(li);
       });
+
+      if (foundData.duplicates.notes?.length > 0) {
+        const notesDiv = document.createElement('div');
+        setStyles(notesDiv, { whiteSpace: 'pre-wrap' });
+        notesDiv.append('📝 ', foundData.duplicates.notes.filter((note) => !/^https?:/.test(note)).join('\n'));
+        backlogDiv.appendChild(notesDiv);
+      }
 
       backlogDiv.appendChild(list);
   })();
