@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.34.9
+// @version     1.34.10
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -1519,13 +1519,16 @@ details.backlog-fragment:not([open]) > summary::marker {
   const getSiteName = (url) => {
     const parsed = new URL(url);
     const hostname = parsed.hostname.replace(/^www\./, '');
-    let siteName = hostname.match(/([^.]+)/)?.[1]; // hostname.split(/\./).slice(-2)[0];
+    let siteName = hostname.match(/(.+)(?=\..+$)/)?.[1] ?? hostname;
     if (siteName === 'stashdb') {
       const obj = parsed.pathname.match(/^\/([a-z]+)\/.+/)?.[1]?.slice(0, -1);
       if (obj)
         siteName += ` ${obj}`;
-      else if (hostname === 'cdn.stashdb.org' && parsed.pathname.startsWith('/images/'))
-        siteName += ' image';
+    }
+    if (hostname === 'cdn.stashdb.org') {
+      if (siteName !== 'stashdb')
+        siteName = 'stashdb';
+      siteName += parsed.pathname.startsWith('/images/') ? ' image' : ' cdn';
     }
     if (hostname === 'web.archive.org') {
       const archived = parsed.pathname.match(/\/(http:.+$)/)?.[1];
