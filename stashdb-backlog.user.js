@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.35.0
+// @version     1.35.1
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
 // @namespace   https://github.com/peolic
@@ -550,20 +550,29 @@ details.backlog-fragment:not([open]) > summary::marker {
       const versionInfo = block(`userscript version: ${usVersion}`);
       info.append(hr, versionInfo);
 
-      const toggleSceneCardPerformers = makeLink('#', 'Toggle scene card performers');
-      setStyles(toggleSceneCardPerformers, {
-        cursor: 'pointer',
-        color: settings.sceneCardPerformers ? 'var(--bs-success)' : 'var(--bs-danger)',
-      });
-      toggleSceneCardPerformers.addEventListener('click', async (ev) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        const newState = await Cache.toggleSetting('sceneCardPerformers');
-        toggleSceneCardPerformers.style.color = newState ? 'var(--bs-success)' : 'var(--bs-danger)';
+      const toggles = /** @type {{ name: string; key: keyof Settings; title: string; }[]} */
+      ([
+        {key: 'sceneCardPerformers', name: 'scene card performers', title: ''},
+        {key: 'highlightFragments', name: 'highlight fragments (!)', title: '(!) incurs slowness due to heavy calculations'},
+      ]).flatMap(({key, name, title}, i) => {
+        const toggle = makeLink('#', `Toggle ${name}`);
+        if (title) toggle.title = title;
+        setStyles(toggle, {
+          cursor: 'pointer',
+          color: settings[key] ? 'var(--bs-success)' : 'var(--bs-danger)',
+        });
+        toggle.addEventListener('click', async (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const newState = await Cache.toggleSetting(key);
+          toggle.style.color = newState ? 'var(--bs-success)' : 'var(--bs-danger)';
+        });
+        if (i > 0) return [document.createElement('br'), toggle];
+        else return toggle;
       });
 
       info.append(
-        toggleSceneCardPerformers,
+        ...toggles,
         hr.cloneNode(),
         makeLink('/backlog/scenes', 'Scene Backlog Summary Page'),
         hr.cloneNode(),
@@ -1168,6 +1177,11 @@ details.backlog-fragment:not([open]) > summary::marker {
     if (text !== null) {
       a.innerText = text === undefined ? url : text;
     }
+
+    if (url === '#') {
+      return a;
+    }
+
     // Relative
     if (url.startsWith('/') || !/^https?:/.test(url)) {
       a.href = url;
@@ -4696,12 +4710,14 @@ details.backlog-fragment:not([open]) > summary::marker {
         if (Cache.performerScenes(uuid).length > 0)
           changes.push('scenes');
 
-        /** @type {{ urls: ScenePerformance_URL[] }} */
-        const performerFiber = getReactFiber(cardLink)?.return?.return?.return?.return?.memoizedProps?.performer;
-        const urls = performerFiber?.urls.map((u) => u.url) || [];
-        const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: uuid, urls });
-        if (Object.keys(fragments).length > 0)
-          changes.push('fragments');
+        if (settings.highlightFragments) {
+          /** @type {{ urls: ScenePerformance_URL[] }} */
+          const performerFiber = getReactFiber(cardLink)?.return?.return?.return?.return?.memoizedProps?.performer;
+          const urls = performerFiber?.urls.map((u) => u.url) || [];
+          const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: uuid, urls });
+          if (Object.keys(fragments).length > 0)
+            changes.push('fragments');
+        }
       }
 
       if (changes.length === 0)
@@ -4843,12 +4859,16 @@ details.backlog-fragment:not([open]) > summary::marker {
       const changes = dataObjectKeys(found || {});
       if (Cache.performerScenes(performerId).length > 0)
         changes.push('scenes');
-      /** @type {{ urls: ScenePerformance_URL[] }} */
-      const performerFiber = getReactFiber(card)?.return?.return?.memoizedProps?.performer;
-      const urls = performerFiber?.urls?.map((u) => u.url) || [];
-      const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId, urls });
-      if (Object.keys(fragments).length > 0)
-        changes.push('fragments');
+
+      if (settings.highlightFragments) {
+        /** @type {{ urls: ScenePerformance_URL[] }} */
+        const performerFiber = getReactFiber(card)?.return?.return?.memoizedProps?.performer;
+        const urls = performerFiber?.urls?.map((u) => u.url) || [];
+        const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId, urls });
+        if (Object.keys(fragments).length > 0)
+          changes.push('fragments');
+      }
+
       if (changes.length === 0)
         return;
       card.style.outline = getHighlightStyle('performers', changes);
@@ -5070,22 +5090,22 @@ details.backlog-fragment:not([open]) > summary::marker {
 
         // FIXME: getPerformerFragments is too heavy for the edits pages
         //        optimize, we only need number of fragments
-        if (false) { // disabled section
-        /** @type {string[]} */
-        const urls = (() => {
-          /** @type {HTMLDivElement} */
-          const changeRow = entityLink.closest('.ListChangeRow-Performers');
-          if (!changeRow) return [];
-          const { added, removed } = getReactFiber(changeRow)?.return?.return?.memoizedProps;
-          const performerFiber =
-            /** @type {{ performer: { id: string; urls: ScenePerformance_URL[] } }[]} */
-            (added || removed || [])
-              .map(({ performer }) => performer).find(({ id }) => id === ident);
-          return performerFiber?.urls?.map((u) => u.url) || [];
-        })();
-        const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: ident, urls });
-        if (Object.keys(fragments).length > 0)
-          changes.push('fragments');
+        if (false /* settings.highlightFragments */) { // disabled section
+          /** @type {string[]} */
+          const urls = (() => {
+            /** @type {HTMLDivElement} */
+            const changeRow = entityLink.closest('.ListChangeRow-Performers');
+            if (!changeRow) return [];
+            const { added, removed } = getReactFiber(changeRow)?.return?.return?.memoizedProps;
+            const performerFiber =
+              /** @type {{ performer: { id: string; urls: ScenePerformance_URL[] } }[]} */
+              (added || removed || [])
+                .map(({ performer }) => performer).find(({ id }) => id === ident);
+            return performerFiber?.urls?.map((u) => u.url) || [];
+          })();
+          const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: ident, urls });
+          if (Object.keys(fragments).length > 0)
+            changes.push('fragments');
         } // disabled section
       }
 
@@ -5185,6 +5205,8 @@ details.backlog-fragment:not([open]) > summary::marker {
           });
 
         (function fragments() {
+          if (isEditsList && !settings.highlightFragments) return;
+
           const { performerFragments, fragmentIndexMap } = getPerformerFragments({ urls });
           if (performerFragments.length === 0) return;
 
