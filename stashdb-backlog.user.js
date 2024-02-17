@@ -3573,8 +3573,19 @@ details.backlog-fragment:not([open]) > summary::marker {
 
       if (!performerFiber) return;
 
+      // Reduce link clutter
+      /** @type {ScenePerformance_URL[][]} */
+      const [studioUrls, tpdbUrls] = [[], []];
       const sortedUrls = performerFiber.urls
-        .slice().sort((a, b) => a.site.name.localeCompare(b.site.name));
+        .slice().sort((a, b) => a.site.name.localeCompare(b.site.name))
+        .filter((url) => {
+          if (url.site.id === /* Studio Profile */ 'fcb954ab-122a-4550-bfd6-0208141a025a')
+            return studioUrls.push(url), false;
+          else if (url.url.startsWith('https://metadataapi.net/performer-sites/'))
+            return tpdbUrls.push(url), false;
+          else
+            return true;
+        });
 
       const links = document.createElement('div');
       links.classList.add('ms-auto', 'mt-auto', 'text-end', 'lh-sm');
@@ -3595,6 +3606,33 @@ details.backlog-fragment:not([open]) > summary::marker {
         a.appendChild(icon);
         return a;
       }));
+
+      [studioUrls, tpdbUrls].forEach((urls) => {
+        if (urls.length === 0) return;
+        const count = document.createElement('small');
+        count.classList.add('me-0', 'ms-1');
+        count.innerText = `+${urls.length}`;
+        count.title = urls
+          .reduce((r, { url }, i) => {
+            const rIdx = Math.floor(i / 5);
+            if (!r[rIdx]) r[rIdx] = [];
+            r[rIdx].push(getSiteName(url));
+            return r;
+          }, [])
+          .map((a) => a.join(' | ')).join('\n');
+        Object.assign(count.style, {
+          fontSize: '.85em',
+          width: '16px',
+          height: '16px',
+          textOverflow: 'clip',
+          display: 'inline-flex',
+          justifyContent: 'flex-end',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          verticalAlign: 'top',
+        });
+        links.append(count);
+      });
     })();
 
     highlightSceneCards('performers');
