@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.35.1
+// @version     1.35.2
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
-// @icon        https://cdn.discordapp.com/attachments/559159668912553989/841890253707149352/stash2.png
+// @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
 // @match       https://stashdb.org/*
 // @grant       GM.setValue
@@ -4571,7 +4571,8 @@ details.backlog-fragment:not([open]) > summary::marker {
       if (foundData.duplicates.notes?.length > 0) {
         const notesDiv = document.createElement('div');
         setStyles(notesDiv, { whiteSpace: 'pre-wrap' });
-        notesDiv.append('📝 ', foundData.duplicates.notes.filter((note) => !/^https?:/.test(note)).join('\n'));
+        const textNotes = foundData.duplicates.notes.filter((note) => !/^https?:/.test(note)).join('\n');
+        if (textNotes) notesDiv.append('📝 ', textNotes);
         backlogDiv.appendChild(notesDiv);
       }
 
