@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.35.3
+// @version     1.35.4
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -3958,6 +3958,14 @@ details.backlog-fragment:not([open]) > summary::marker {
         setStyles(unexpectedName, { marginLeft: '1.75rem', padding: '.15rem .25rem', width: 'fit-content' });
         unexpectedName.innerText = `Unexpected performer name - expected "${splitItem.name}"`;
         toSplit.appendChild(unexpectedName);
+      }
+
+      if (splitItem.status) {
+        const splitStatus = document.createElement('h4');
+        splitStatus.classList.add('my-2', 'fw-bold');
+        setStyles(splitStatus, { marginLeft: '1.75rem' });
+        splitStatus.append(`status: ${splitItem.status}`);
+        toSplit.append(splitStatus);
       }
 
       if (splitItem.notes) {

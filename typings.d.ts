@@ -90,6 +90,7 @@ interface PerformerDataObject {
         fragments: SplitFragment[];
         notes?: string[];
         links?: string[];
+        status?: string;
     };
     urls?: string[];
     urls_notes?: string[];
