@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.35.2
+// @version     1.35.3
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -1288,11 +1288,15 @@ details.backlog-fragment:not([open]) > summary::marker {
   };
 
   /**
-   * @param {Pick<SceneFingerprint, "algorithm" | "hash">} fp fingerprint to search for
-   * @returns {(cfp: Pick<FingerprintsRow, "algorithm" | "hash">) => boolean} predicate
+   * @param {Pick<SceneFingerprint, "algorithm" | "hash" | "duration">} fp fingerprint to search for
+   * @returns {(cfp: Pick<FingerprintsRow, "algorithm" | "hash" | "duration">) => boolean} predicate
    */
-  const findFingerprint = (fp) =>
-    (cfp) => (cfp.algorithm === fp.algorithm.toUpperCase() && cfp.hash === fp.hash);
+  const findFingerprintExact = (fp) =>
+    (cfp) => (
+      cfp.algorithm === fp.algorithm.toUpperCase() &&
+      cfp.hash === fp.hash &&
+      (!fp.duration || cfp.duration === fp.duration)
+    );
 
   /**
    * @param {PerformerEntry} [entry]
@@ -2785,14 +2789,15 @@ details.backlog-fragment:not([open]) > summary::marker {
 
       // Compare
       const reportedExact = found.fingerprints;
+      const notFound = /** @type {SceneFingerprint[]} */ ([]);
       const exactMatches = reportedExact.filter((fp) => {
-        const cfp = currentFingerprints.find(findFingerprint(fp));
-        if (!cfp) return false;
+        const cfp = currentFingerprints.find(findFingerprintExact(fp));
+        if (!cfp) return notFound.push(fp), false;
         markFingerprint(cfp, fp, true);
         return true;
-      }).length;
+      });
 
-      const reportedDurations = found.fingerprints.filter((fp) => !!fp.duration);
+      const reportedDurations = exactMatches.filter((fp) => !!fp.duration);
       const uniqueDurations = reportedDurations.filter(
         (fp, i, self) => i === self.findIndex(
           (other) => fp.duration && other.duration && fp.duration === other.duration
@@ -2809,9 +2814,7 @@ details.backlog-fragment:not([open]) > summary::marker {
         return count;
       }, 0);
 
-      const notFound = found.fingerprints.length - exactMatches;
-
-      if (exactMatches || durationsFound || notFound) {
+      if (exactMatches.length || durationsFound || notFound.length) {
         const fpInfoWrapper = document.createElement('div');
         fpInfoWrapper.dataset.backlog = 'fingerprints';
         fpInfoWrapper.classList.add('position-relative');
@@ -2876,14 +2879,14 @@ details.backlog-fragment:not([open]) > summary::marker {
           return span;
         };
 
-        if (exactMatches) {
+        if (exactMatches.length) {
           const el = makeElement('Incorrect fingerprints:');
           el.classList.add('text-warning');
           const count = document.createElement('b');
           count.classList.add('ms-2');
           el.appendChild(count);
           const countExact = document.createElement('span');
-          countExact.innerText = `${exactMatches}`;
+          countExact.innerText = `${exactMatches.length}`;
           count.append(countExact);
           if (durationsFound) {
             const countDuration = document.createElement('span');
@@ -2895,9 +2898,21 @@ details.backlog-fragment:not([open]) > summary::marker {
           count.append(' \u{2139}');
           fpInfo.appendChild(el);
         }
-        if (notFound)
-          fpInfo.appendChild(makeElement('Missing fingerprints:', `${notFound} ⚠`))
-            .classList.add('text-danger');
+        if (notFound.length) {
+          const missing = makeElement('Missing fingerprints:', `${notFound.length} ⚠`);
+          missing.classList.add('text-danger');
+          missing.title = notFound.map((fp) => `${fp.hash}\t${fp.algorithm}\t${formatDuration(fp.duration)}`).join('\n');
+          fpInfo.appendChild(missing);
+          // copy to clipboard
+          missing.style.cursor = 'pointer';
+          missing.addEventListener('click', async (ev) => {
+            ev.preventDefault();
+            const check = document.createTextNode('✅ ');
+            await navigator.clipboard.writeText(missing.title);
+            missing.prepend(check);
+            wait(1500).then(() => check.remove());
+          });
+        }
         sceneInfo.parentElement.querySelector('ul.nav[role="tablist"]').before(fpInfoWrapper);
         removeHook(fpInfoWrapper, 'scenes', sceneId);
       }
@@ -3437,7 +3452,7 @@ details.backlog-fragment:not([open]) > summary::marker {
           setStyles(remove, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer' });
           fpElement.appendChild(remove);
           remove.addEventListener('click', () => {
-            const row = currentFingerprints.find(findFingerprint(fp))?.row;
+            const row = currentFingerprints.find(findFingerprintExact(fp))?.row;
             if (row) {
               /** @type {HTMLButtonElement} */
               (row.querySelector('.remove-item')).click();
@@ -3456,7 +3471,7 @@ details.backlog-fragment:not([open]) > summary::marker {
             );
           }
 
-          const cfp = currentFingerprints.find(findFingerprint(fp));
+          const cfp = currentFingerprints.find(findFingerprintExact(fp));
           if (cfp) {
             cfp.row.classList.add(fp.correct_scene_id ? 'bg-warning' : 'bg-danger');
           }
