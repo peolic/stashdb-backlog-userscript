@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.35.4
+// @version     1.35.5
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -394,6 +394,10 @@ async function inject() {
   /* text-muted */
   --bs-text-opacity: 1;
   color: #bfccd6;
+}
+
+.performer-backlog [data-backlog="split"] a {
+  display: inline-block;
 }
 
 .performer-backlog [data-backlog="split"] a[href^="/scenes/"] {
@@ -1590,7 +1594,13 @@ details.backlog-fragment:not([open]) > summary::marker {
     'https://www.data18.com/movies/',
     'https://gayeroticvideoindex.com/video/',
     'https://www.freeones.com/forums/threads/performer-guide-netvideogirls-com.101884/',
-    'https://stashdb.org/scenes/'
+    'https://stashdb.org/scenes/',
+    'https://adultempire.com/',
+    'https://adultdvdempire.com/',
+    'https://gaydvdempire.com/',
+    'https://vod.aebn.com/',
+    'https://straight.aebn.com/',
+    'https://gay.aebn.com/'
   ];
 
   /** @param {string} url */
@@ -3597,6 +3607,7 @@ details.backlog-fragment:not([open]) > summary::marker {
         else return;
       }
 
+      // Dev-only
       const header = performerInfo.querySelector('.card-header');
       if (header.querySelector('[data-backlog="links"]')) return;
 
@@ -3610,7 +3621,7 @@ details.backlog-fragment:not([open]) > summary::marker {
         .filter((url) => {
           if (url.site.id === /* Studio Profile */ 'fcb954ab-122a-4550-bfd6-0208141a025a')
             return studioUrls.push(url), false;
-          else if (url.url.startsWith('https://metadataapi.net/performer-sites/'))
+          else if (url.url.startsWith('https://theporndb.net/performer-sites/'))
             return tpdbUrls.push(url), false;
           else
             return true;
@@ -3717,7 +3728,7 @@ details.backlog-fragment:not([open]) > summary::marker {
           } else if (action === 'remove') {
             const removeEntry = remove.find(({ id }) => id === performerId);
             const targetEntry = append.find(({ appearance, name }) => {
-              if (!appearance) return name.split(/\b/)[0] === removeEntry.name.split(/\b/)[0];
+              if (!appearance) return [removeEntry.appearance, removeEntry.name.split(/\b/)[0]].includes(name.split(/\b/)[0]);
               return [appearance, name].some((a) => [removeEntry.appearance, removeEntry.name].includes(a));
             });
             if (targetEntry && (removeEntry.status === 'edit' || removeEntry.status === 'merge'))
