@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.35.5
+// @version     1.35.6
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -3713,7 +3713,7 @@ details.backlog-fragment:not([open]) > summary::marker {
         /** @typedef {[sceneId: string, entry: PerformerEntry, studio: string]} performerScene */
         /** @type {Record<keyof SceneDataObject["performers"], performerScene[]>} */
         const performerScenes = { append: [], remove: [], update: [] };
-        /** @type {{ [sceneId: string]: null }} */
+        /** @type {{ [sceneId: string]: true }} */
         const sceneIds = {};
 
         for (const { sceneId, action } of Cache.performerScenes(performerId)) {
@@ -3724,7 +3724,7 @@ details.backlog-fragment:not([open]) > summary::marker {
           if (action === 'append') {
             const appendEntry = append.find(({ id }) => id === performerId);
             performerScenes.append.push([sceneId, appendEntry, studio]);
-            sceneIds[sceneId] = null;
+            sceneIds[sceneId] = true;
           } else if (action === 'remove') {
             const removeEntry = remove.find(({ id }) => id === performerId);
             const targetEntry = append.find(({ appearance, name }) => {
@@ -3734,11 +3734,11 @@ details.backlog-fragment:not([open]) > summary::marker {
             if (targetEntry && (removeEntry.status === 'edit' || removeEntry.status === 'merge'))
               targetEntry.status = removeEntry.status;
             performerScenes.remove.push([sceneId, targetEntry, studio]);
-            sceneIds[sceneId] = null;
+            sceneIds[sceneId] = true;
           } else if (action === 'update') {
             const updateEntry = update.find(({ id }) => id === performerId);
             performerScenes.update.push([sceneId, updateEntry, studio]);
-            sceneIds[sceneId] = null;
+            sceneIds[sceneId] = true;
           }
         }
 
@@ -3762,7 +3762,7 @@ details.backlog-fragment:not([open]) > summary::marker {
 
             const studio = studioArrayToString(c_studio);
             performerScenes.append.push([sceneId, appendEntry, studio]);
-            sceneIds[sceneId] = null;
+            sceneIds[sceneId] = true;
           });
         }
 
