@@ -4092,6 +4092,10 @@ details.backlog-fragment:not([open]) > summary::marker {
 
         fragmentsList.appendChild(fragmentEl);
       });
+
+      const fragmentsSceneCount = fragmentsList.querySelectorAll('a[href^="/scenes/"]').length;
+      summary.append(` [${fragmentsSceneCount} scene link${fragmentsSceneCount === 1 ? '' : 's'}]`);
+
       toSplit.appendChild(fragmentsDetails);
       backlogDiv.append(toSplit);
 
