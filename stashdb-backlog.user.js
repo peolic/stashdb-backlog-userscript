@@ -3629,8 +3629,8 @@ details.backlog-fragment:not([open]) > summary::marker {
 
       const links = document.createElement('div');
       links.classList.add('ms-auto', 'mt-auto', 'text-end', 'lh-sm');
-      const pxWidth = Math.ceil(sortedUrls.length / 2) * 1.25;
-      setStyles(links, { flexBasis: `${pxWidth}em`, marginRight: '-.5em' });
+      const numColumns = Math.ceil(sortedUrls.length / 2);
+      setStyles(links, { flexBasis: `calc(${numColumns * .25}rem + ${numColumns * 2}ex)`, marginRight: '-.5em' });
       links.dataset.backlog = 'links';
       header.appendChild(links);
       removeHook(links, 'performers', performerId);
