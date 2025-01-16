@@ -165,6 +165,7 @@ type FingerprintsColumnIndices = {
     hash: number;
     duration: number;
     submissions: number;
+    reports: number;
 }
 
 type FingerprintsRow = {
@@ -173,6 +174,7 @@ type FingerprintsRow = {
     hash: string;
     duration: number | null;
     submissions: number;
+    reports: number;
 }
 
 type SceneEntriesItem = [id: string, data: SceneDataObject]

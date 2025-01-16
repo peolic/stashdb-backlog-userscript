@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.35.6
+// @version     1.35.7
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -33,7 +33,7 @@ async function inject() {
       ? 'http://localhost:8000'
       : 'https://github.com/peolic/stashdb_backlog_data/releases/download/cache';
 
-  const urlRegex = new RegExp(
+  const pathPattern = new RegExp(
     String.raw`(?:/([a-z]+)`
       + String.raw`(?:/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[\w\d. -]+)`
         + String.raw`(?:/([a-z]+)`
@@ -58,7 +58,7 @@ async function inject() {
 
     if (!pathname) return result;
 
-    const match = urlRegex.exec(decodeURIComponent(pathname));
+    const match = pathPattern.exec(decodeURIComponent(pathname));
     if (!match || match.length === 0) return result;
 
     result.object = /** @type {AnyObject} */ (match[1]) || null;
@@ -388,6 +388,12 @@ async function inject() {
 
 .backlog-fingerprint-duration {
   background-color: #4691ff;
+}
+
+/* Fade out fingerprints backlog on edits tab */
+[data-backlog="fingerprints"]:has(~ .tab-content > #scene-tabs-tabpane-edits.active.show) {
+  opacity: .25;
+  z-index: -1;
 }
 
 .performer-backlog [data-backlog="split"] s {
@@ -1272,6 +1278,7 @@ details.backlog-fragment:not([open]) > summary::marker {
           else if (cell.innerText === 'Hash') r.hash = cellIndex;
           else if (cell.innerText === 'Duration') r.duration = cellIndex;
           else if (cell.innerText === 'Submissions') r.submissions = cellIndex;
+          else if (cell.innerText === 'Reports') r.reports = cellIndex;
           return r;
         }, /** @type {FingerprintsColumnIndices} */ ({}));
     /** @type {FingerprintsRow[]} */
@@ -1280,12 +1287,14 @@ details.backlog-fragment:not([open]) > summary::marker {
       const durationEl = /** @type {HTMLSpanElement} */ (cells[headers.duration].firstElementChild);
       const duration = durationEl?.title.match(/(\d+)( second)?s$/)?.[1];
       if (!durationEl || !duration) throw new Error('[backlog] unable to parse fingerprint duration!');
+      const reports = /** @type {String} */ (cells[headers.reports].childNodes[0]?.textContent);
       return {
         row,
         algorithm: /** @type {FingerprintsRow["algorithm"]} */ (cells[headers.algorithm].innerText),
         hash: cells[headers.hash].innerText,
         duration: duration ? Number(duration) : null,
         submissions: Number(cells[headers.submissions].innerText) || null,
+        reports: reports ? Number(reports) : null,
       };
     });
     return { headers, fingerprints };
@@ -2798,11 +2807,13 @@ details.backlog-fragment:not([open]) > summary::marker {
       };
 
       // Compare
+      let nativelyReported = 0;
       const reportedExact = found.fingerprints;
       const notFound = /** @type {SceneFingerprint[]} */ ([]);
       const exactMatches = reportedExact.filter((fp) => {
         const cfp = currentFingerprints.find(findFingerprintExact(fp));
         if (!cfp) return notFound.push(fp), false;
+        if (cfp.reports > 0) nativelyReported++;
         markFingerprint(cfp, fp, true);
         return true;
       });
@@ -2899,14 +2910,22 @@ details.backlog-fragment:not([open]) > summary::marker {
           countExact.innerText = `${exactMatches.length}`;
           count.append(countExact);
           if (durationsFound) {
-            const countDuration = document.createElement('span');
+            const countDuration = document.createElement('abbr');
             countDuration.style.color = '#4691ff';
-            countDuration.innerText = ` +⌚${durationsFound}`;
+            countDuration.innerText = `+⌚${durationsFound}`;
             countDuration.title = 'Fingerprints by duration';
-            count.append(countDuration);
+            count.append(' ', countDuration);
           }
           count.append(' \u{2139}');
           fpInfo.appendChild(el);
+
+          if (nativelyReported > 0) {
+            const native = document.createElement('abbr');
+            native.classList.add('ms-2', 'me-auto', 'text-danger');
+            native.title = 'Number of backlog incorrect fingerprints that are also reported via the native system.';
+            native.innerText = `Native reports: ${nativelyReported}`;
+            fpInfo.appendChild(native);
+          }
         }
         if (notFound.length) {
           const missing = makeElement('Missing fingerprints:', `${notFound.length} ⚠`);
@@ -3629,8 +3648,6 @@ details.backlog-fragment:not([open]) > summary::marker {
 
       const links = document.createElement('div');
       links.classList.add('ms-auto', 'mt-auto', 'text-end', 'lh-sm');
-      const numColumns = Math.ceil(sortedUrls.length / 2);
-      setStyles(links, { flexBasis: `calc(${numColumns * .25}rem + ${numColumns * 2}ex)`, marginRight: '-.5em' });
       links.dataset.backlog = 'links';
       header.appendChild(links);
       removeHook(links, 'performers', performerId);
@@ -3673,6 +3690,9 @@ details.backlog-fragment:not([open]) > summary::marker {
         });
         links.append(count);
       });
+
+      const numColumns = Math.ceil(links.childElementCount / 2);
+      setStyles(links, { /* flexBasis: */ width: `calc(${numColumns * .25}rem + ${numColumns * 2}ex)`, /* marginRight: '-.5em' */ position: 'absolute', top: '.5em', right: '.5em' });
     })();
 
     highlightSceneCards('performers');
@@ -4913,8 +4933,6 @@ details.backlog-fragment:not([open]) > summary::marker {
       card.style.outline = getHighlightStyle('performers', changes);
       const info = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
       card.title = info;
-      /** @type {HTMLImageElement} */
-      (card.querySelector('.PerformerCard-image > img')).title += `\n\n${info}`;
     });
   }
 
