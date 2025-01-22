@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.35.7
+// @version     1.35.8
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -338,35 +338,30 @@ async function inject() {
     }).observe(statusDiv, { childList: true, subtree: true });
   }
 
-  async function setUpMenu() {
-    /** @param {boolean} forceFetch */
-    const fetchData = async (forceFetch) => {
-      const result = await (forceFetch ? fetchBacklogData() : updateBacklogData(true));
-      if (result === 'ERROR') {
-        setStatus('[backlog] failed to download cache', 10000);
-        return;
-      }
-      if (result === 'UPDATED') {
-        setStatus('[backlog] cache downloaded, reloading page...');
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-      } else {
-        setStatus('[backlog] no updates found', 5000);
-      }
+  /** @param {boolean} forceFetch */
+  async function fetchData(forceFetch) {
+    const result = await (forceFetch ? fetchBacklogData() : updateBacklogData(true));
+    if (result === 'ERROR') {
+      setStatus('[backlog] failed to download cache', 10000);
+      return false;
     }
+    if (result === 'UPDATED') {
+      setStatus('[backlog] cache downloaded, reloading page...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } else {
+      setStatus('[backlog] no updates found', 5000);
+    }
+    return true;
+  }
 
+  function setUpMenu() {
+    if (isDev) return;
     //@ts-expect-error
-    GM.registerMenuCommand('🔄 Check for updates', () => {
-      fetchData(false);
+    GM.registerMenuCommand('Information', () => {
+      toggleBacklogInfo(true);
     });
-
-    if (isDev) {
-      //@ts-expect-error
-      GM.registerMenuCommand('📥 Download cache', () => {
-        fetchData(true);
-      });
-    }
   }
 
   function globalStyle() {
@@ -540,6 +535,30 @@ details.backlog-fragment:not([open]) > summary::marker {
     };
 
     info.innerHTML = '';
+
+    const updateButtons = info.appendChild(document.createElement('div'));
+    updateButtons.classList.add('position-absolute', 'end-0', 'me-1');
+
+    const checkForUpdates = updateButtons.appendChild(block('🔄', 'my-1'));
+    checkForUpdates.setAttribute('role', 'button');
+    checkForUpdates.title = 'Check for updates';
+    checkForUpdates.addEventListener('click', async () => {
+      checkForUpdates.classList.toggle('invisible', true);
+      await fetchData(false);
+      checkForUpdates.classList.toggle('invisible', false);
+    });
+
+    if (isDev) {
+      const downloadCache = updateButtons.appendChild(block('📥', 'my-1'));
+      downloadCache.setAttribute('role', 'button');
+      downloadCache.title = 'Download cache';
+      downloadCache.addEventListener('click', async () => {
+        downloadCache.classList.toggle('invisible', true);
+        await fetchData(true);
+        downloadCache.classList.toggle('invisible', false);
+      });
+    }
+
     info.append(block('backlog data last updated:'));
 
     const { lastUpdated } = Cache.data;
