@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.35.8
+// @version     1.35.9
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -567,8 +567,8 @@ details.backlog-fragment:not([open]) > summary::marker {
     } else {
       const ago = humanRelativeDate(new Date(lastUpdated));
       info.append(
-        block(ago, 'd-inline-block', 'me-1'),
-        block(`(${formatDate(lastUpdated)})`, 'd-inline-block'),
+        block(ago, 'me-1'),
+        block(`(${formatDate(lastUpdated)})`),
       );
 
       const hr = document.createElement('hr');
@@ -4621,7 +4621,7 @@ details.backlog-fragment:not([open]) > summary::marker {
       profiles.filter((u) => !urls.includes(u)).forEach((url) => {
         /** @type {string} */
         let site;
-        if (/iafd\.com\/person\.rme\/perfid=/.test(url)) {
+        if (/iafd\.com\/person\.rme\/(perf)?id=/.test(url)) {
           site = 'IAFD';
         } else if (/indexxx\.com\/m\//.test(url)) {
           site = 'Indexxx';
