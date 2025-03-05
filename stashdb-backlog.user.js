@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.35.9
+// @version     1.36.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -366,7 +366,7 @@ async function inject() {
 
   function globalStyle() {
     //@ts-expect-error
-    GM.addStyle(`
+    GM.addStyle(/* css */`
 .performer-backlog:empty,
 .scene-backlog:empty,
 .studio-backlog:empty {
@@ -496,6 +496,7 @@ details.backlog-fragment:not([open]) > summary::marker {
       });
 
       icon.addEventListener('click', () => toggleBacklogInfo());
+      icon.addEventListener('dblclick', () => fetchData(false));
 
       infoContainer.append(icon, info);
 
@@ -5635,17 +5636,67 @@ details.backlog-fragment:not([open]) > summary::marker {
           return 0;
         });
 
+    const filters = [
+      // keep 'all' first
+      { key: 'all', text: 'all', list: sortedPerformers },
+      { key: 'submitted', text: 'submitted', list: sortedPerformers.filter(([id, _]) => isSubmitted('performers', id)) },
+      //
+      { key: 'split', text: 'split', list: sortedPerformers.filter(([, item]) => !!item.split) },
+      { key: 'urls', text: 'urls', list: sortedPerformers.filter(([, item]) => !!item.urls) },
+      { key: 'duplicates', text: 'duplicates', list: sortedPerformers.filter(([, item]) => !!item.duplicates) },
+      //
+      { key: 'multiple', text: 'multiple', list: sortedPerformers.filter(([, item]) => dataObjectKeys(item).length > 1) },
+    ];
+    const otherKeys = filters.slice(2).map(({ key }) => key);
+    filters.push({
+      key: 'other', text: 'other',
+      list: sortedPerformers.filter(([, item]) => dataObjectKeys(item).every((key) => !otherKeys.includes(key))),
+    });
+
     subTitle.innerText = (
       'Note: There is currently no automated check for submitted entries or completed entries.'
       + '\nSome entries need to be merged and/or split, take extra cake with those.'
+      + '\n\nFilter entries:'
     );
 
-    desc.innerText = (
-      'The checkbox marks an entry as "seen" but leaving this page will reset that status.'
-      + '\nMarking as "seen" does not do any action.'
-    );
+    filters.forEach((filter, i) => {
+      if (filter.key !== filters[0].key && filter.list.length === 0) {
+        return;
+      }
+      const toggle = document.createElement('a');
+      toggle.dataset.filter = filter.key;
+      toggle.classList.add('mx-2');
+      toggle.href = `#${filter.key}`;
+      toggle.innerText = `${filter.text} (${filter.list.length})`;
+      toggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        const activeFilter = /** @type {HTMLAnchorElement} */ (subTitle.querySelector('a[data-filter].fw-bold'));
+        if (filter.key === activeFilter.dataset.filter)
+          return;
+        renderList(filter);
+      });
+      subTitle.append((i > 0 ? '|' : ''), toggle);
+    });
 
-    renderPerformersList(sortedPerformers, performersList, 'simple');
+    /** @param {{ key: string; text: string; list: PerformerEntriesItem[] }} [filter] */
+    const renderList = (filter) => {
+      if (filter === undefined) filter = filters[0];
+      /** @type {NodeListOf<HTMLAnchorElement>} */
+      (subTitle.querySelectorAll('a[data-filter]')).forEach((el) => {
+        el.classList.toggle('fw-bold', el.dataset.filter === filter.key);
+      });
+
+      desc.innerText = (
+        'The checkbox marks an entry as "seen" but leaving this page will reset that status.'
+        + '\nMarking as "seen" does not do any action.'
+      );
+
+      performersList.innerHTML = '';
+
+      renderPerformersList(filter.list, performersList, 'simple');
+    };
+
+    renderList();
 
   } // iPerformerBacklogPage
 
