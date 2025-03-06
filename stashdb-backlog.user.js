@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.36.0
+// @version     1.37.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -1716,6 +1716,9 @@ details.backlog-fragment:not([open]) > summary::marker {
     };
   };
 
+  const SPLIT_STATUS_EMPTY = 'empty - delete performer';
+  const SPLIT_STATUS_SINGLE = 'single fragment remains';
+
   /**
    * @param {PerformerEntriesItem[]} list
    * @param {HTMLOListElement} target
@@ -1833,11 +1836,15 @@ details.backlog-fragment:not([open]) > summary::marker {
           row.append(fragmentDetails);
         }
       } else if (custom === 'ready-fragments' && customData?.[performerId] !== undefined) {
+        const { fragments, status } = performerData.split;
+
         const fragmentNumbers = customData[performerId];
         const label = Array.isArray(fragmentNumbers)
           ? fragmentNumbers.length === 0
               ? 'no fragments'
-              : 'fragments ' + fragmentNumbers.map((index) => `#${index + 1}`).join(', ')
+              : (`fragment${fragmentNumbers.length === 1 ? '' : 's'} `
+                 + fragmentNumbers.map((index) => `#${index + 1}`).join(', ')
+                 + ` [of ${fragments.length}]`)
           : fragmentNumbers;
         const flag = document.createTextNode('');
         row.append(makeSep(), flag, label);
@@ -1845,15 +1852,11 @@ details.backlog-fragment:not([open]) > summary::marker {
         if (Array.isArray(fragmentNumbers)) {
           link.dataset.state = JSON.stringify({ performerFragment: fragmentNumbers });
 
-          const { fragments } = performerData.split;
-
-          // reminder: all entries reaching this point have been filtered through the 'complete list' note sieve.
-          // is 'complete list', and also:
-          if (fragments.length === 0)
+          if (fragments.length === 0 || status === SPLIT_STATUS_EMPTY)
             flag.textContent = '🟢 ';
-          else if (fragments.length === 1)
+          else if (fragments.length === 1 || status === SPLIT_STATUS_SINGLE)
             flag.textContent = '⭐ ';
-          else if (fragmentNumbers.length === fragments.length && fragments.every(({ id }) => !!id))
+          else if (fragmentNumbers.length > 0)  // at least one fragment has performer ID
             flag.textContent = '🔶 ';
 
           fragmentNumbers.forEach((fragmentIndex, i) => {
@@ -5757,8 +5760,10 @@ details.backlog-fragment:not([open]) > summary::marker {
         return true;
       }).length > 0;
 
-      if (!valid && notes?.some((t) => t?.match(/\bcomplete list\b/i))) {
-        if (valid = fragments.length <= 1) {
+      if (!valid) {
+        valid = fragments.length <= 1 && notes?.some((t) => t?.match(/\bcomplete list\b/i));
+        if (!valid) valid = [SPLIT_STATUS_EMPTY, SPLIT_STATUS_SINGLE].includes(value.split?.status);
+        if (valid) {
           fragmentIndexMap[key] = [];
           // Store fragment index for matching later
           if (fragments.length === 1) fragmentIndexMap[key].push(0);
@@ -5789,22 +5794,90 @@ details.backlog-fragment:not([open]) > summary::marker {
           return 0;
         });
 
+    /** @type {Set<string>} */
+    const seenEntries = new Set();
+    const filterCondition = (/** @type {string} */ id, /** @type {boolean} */ condition) => {
+      if (seenEntries.has(id))
+        return false;
+      if (condition)
+        seenEntries.add(id);
+      return condition;
+    };
+
+    // reminder: all entries reaching this point have been filtered in `reduceKey`.
+    const filters = [
+      // keep 'all' first
+      { key: 'all', text: 'all', list: sortedPerformers },
+      //
+      { key: 'empty', text: '🟢 empty',
+        list: sortedPerformers.filter(([pId, { split: { fragments, status } }]) =>
+          filterCondition(pId, fragments.length === 0 || status === SPLIT_STATUS_EMPTY)),
+      },
+      { key: 'single', text: '⭐ single fragment remains',
+        list: sortedPerformers.filter(([pId, { split: { fragments, status } }]) =>
+          filterCondition(pId, fragments.length === 1 || status === SPLIT_STATUS_SINGLE)),
+      },
+      { key: 'partial', text: '🔶 partially ready',
+        list: sortedPerformers.filter(([pId, _]) =>
+          filterCondition(pId, fragmentIndexMap[pId].length > 0))  // at least one fragment has performer ID
+      },
+      //
+      { key: 'other', text: 'other',
+        list: sortedPerformers.filter(([pId, _]) => !seenEntries.has(pId))
+      },
+    ];
+
     subTitle.innerText = (
       'Fragments of performers that might be ready to correct, or be marked as done.'
+      + '\n\nFilter entries:'
     );
 
-    desc.innerText = (
-      'The checkbox marks an entry as "seen" but leaving this page will reset that status.'
-      + '\nMarking as "seen" does not do any action.'
-    );
-
-    renderPerformersList(sortedPerformers, performersList, 'ready-fragments', fragmentIndexMap);
-
-    for (const li of Array.from(performersList.querySelectorAll('li'))) {
-      if (li.nextElementSibling) {
-        li.after(document.createElement('br'));
+    filters.forEach((filter, i) => {
+      if (filter.key !== filters[0].key && filter.list.length === 0) {
+        return;
       }
-    }
+      const toggle = document.createElement('a');
+      toggle.dataset.filter = filter.key;
+      toggle.classList.add('mx-2');
+      toggle.href = `#${filter.key}`;
+      toggle.innerText = `${filter.text} (${filter.list.length})`;
+      toggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        const activeFilter = /** @type {HTMLAnchorElement} */ (subTitle.querySelector('a[data-filter].fw-bold'));
+        if (filter.key === activeFilter.dataset.filter)
+          return;
+        renderList(filter);
+      });
+      subTitle.append((i > 0 ? '|' : ''), toggle);
+    });
+
+    /** @param {{ key: string; text: string; list: PerformerEntriesItem[] }} [filter] */
+    const renderList = (filter) => {
+      if (filter === undefined) filter = filters[0];
+      /** @type {NodeListOf<HTMLAnchorElement>} */
+      (subTitle.querySelectorAll('a[data-filter]')).forEach((el) => {
+        el.classList.toggle('fw-bold', el.dataset.filter === filter.key);
+      });
+
+      desc.innerText = (
+        'The checkbox marks an entry as "seen" but leaving this page will reset that status.'
+        + '\nMarking as "seen" does not do any action.'
+      );
+
+      performersList.innerHTML = '';
+
+      renderPerformersList(filter.list, performersList, 'ready-fragments', fragmentIndexMap);
+
+      // add gaps between the entries
+      for (const li of Array.from(performersList.querySelectorAll('li'))) {
+        if (li.nextElementSibling) {
+          li.after(document.createElement('br'));
+        }
+      }
+
+    };
+
+    renderList();
 
   } // iPerformersSplitReadyFragmentsPage
 
