@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.37.0
+// @version     1.37.1
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -1852,7 +1852,7 @@ details.backlog-fragment:not([open]) > summary::marker {
         if (Array.isArray(fragmentNumbers)) {
           link.dataset.state = JSON.stringify({ performerFragment: fragmentNumbers });
 
-          if (fragments.length === 0 || status === SPLIT_STATUS_EMPTY)
+          if ((fragments.length === 0 && status !== SPLIT_STATUS_SINGLE) || status === SPLIT_STATUS_EMPTY)
             flag.textContent = '🟢 ';
           else if (fragments.length === 1 || status === SPLIT_STATUS_SINGLE)
             flag.textContent = '⭐ ';
@@ -5681,9 +5681,8 @@ details.backlog-fragment:not([open]) > summary::marker {
       subTitle.append((i > 0 ? '|' : ''), toggle);
     });
 
-    /** @param {{ key: string; text: string; list: PerformerEntriesItem[] }} [filter] */
+    /** @param {{ key: string; text: string; list: PerformerEntriesItem[] }} filter */
     const renderList = (filter) => {
-      if (filter === undefined) filter = filters[0];
       /** @type {NodeListOf<HTMLAnchorElement>} */
       (subTitle.querySelectorAll('a[data-filter]')).forEach((el) => {
         el.classList.toggle('fw-bold', el.dataset.filter === filter.key);
@@ -5699,7 +5698,7 @@ details.backlog-fragment:not([open]) > summary::marker {
       renderPerformersList(filter.list, performersList, 'simple');
     };
 
-    renderList();
+    renderList(filters.find(({ key }) => key === window.location.hash.slice(1)) ?? filters[0]);
 
   } // iPerformerBacklogPage
 
@@ -5760,15 +5759,25 @@ details.backlog-fragment:not([open]) > summary::marker {
         return true;
       }).length > 0;
 
-      if (!valid) {
-        valid = fragments.length <= 1 && notes?.some((t) => t?.match(/\bcomplete list\b/i));
-        if (!valid) valid = [SPLIT_STATUS_EMPTY, SPLIT_STATUS_SINGLE].includes(value.split?.status);
-        if (valid) {
+      if (!valid && notes?.some((t) => t?.match(/\bcomplete list\b/i))) {
+        if (valid = fragments.length <= 1) {
           fragmentIndexMap[key] = [];
           // Store fragment index for matching later
           if (fragments.length === 1) fragmentIndexMap[key].push(0);
         }
       }
+
+      if (!valid)
+        if (valid = value.split.status === SPLIT_STATUS_EMPTY) {
+          fragmentIndexMap[key] = [];
+        }
+
+      if (!valid)
+        if (valid = value.split.status === SPLIT_STATUS_SINGLE) {
+          fragmentIndexMap[key] = [];
+          // Store fragment index for matching later
+          if (fragments.length === 1) fragmentIndexMap[key].push(0);
+        }
 
       return valid ? result.concat([item]) : result;
     };
@@ -5811,7 +5820,7 @@ details.backlog-fragment:not([open]) > summary::marker {
       //
       { key: 'empty', text: '🟢 empty',
         list: sortedPerformers.filter(([pId, { split: { fragments, status } }]) =>
-          filterCondition(pId, fragments.length === 0 || status === SPLIT_STATUS_EMPTY)),
+          filterCondition(pId, (fragments.length === 0 && status !== SPLIT_STATUS_SINGLE) || status === SPLIT_STATUS_EMPTY)),
       },
       { key: 'single', text: '⭐ single fragment remains',
         list: sortedPerformers.filter(([pId, { split: { fragments, status } }]) =>
@@ -5819,7 +5828,7 @@ details.backlog-fragment:not([open]) > summary::marker {
       },
       { key: 'partial', text: '🔶 partially ready',
         list: sortedPerformers.filter(([pId, _]) =>
-          filterCondition(pId, fragmentIndexMap[pId].length > 0))  // at least one fragment has performer ID
+          filterCondition(pId, (fragmentIndexMap[pId]?.length ?? 0) > 0))  // at least one fragment has performer ID
       },
       //
       { key: 'other', text: 'other',
@@ -5851,9 +5860,8 @@ details.backlog-fragment:not([open]) > summary::marker {
       subTitle.append((i > 0 ? '|' : ''), toggle);
     });
 
-    /** @param {{ key: string; text: string; list: PerformerEntriesItem[] }} [filter] */
+    /** @param {{ key: string; text: string; list: PerformerEntriesItem[] }} filter */
     const renderList = (filter) => {
-      if (filter === undefined) filter = filters[0];
       /** @type {NodeListOf<HTMLAnchorElement>} */
       (subTitle.querySelectorAll('a[data-filter]')).forEach((el) => {
         el.classList.toggle('fw-bold', el.dataset.filter === filter.key);
@@ -5877,7 +5885,7 @@ details.backlog-fragment:not([open]) > summary::marker {
 
     };
 
-    renderList();
+    renderList(filters.find(({ key }) => key === window.location.hash.slice(1)) ?? filters[0]);
 
   } // iPerformersSplitReadyFragmentsPage
 
