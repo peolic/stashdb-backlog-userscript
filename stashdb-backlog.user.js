@@ -401,7 +401,8 @@ async function inject() {
   display: inline-block;
 }
 
-.performer-backlog [data-backlog="split"] a[href^="/scenes/"] {
+.performer-backlog [data-backlog="split"] a[href^="/scenes/"],
+.performer-backlog [data-backlog="fragments"] i[style]:has(+ a[href^="/scenes/"]) {
   color: rgba(0,212,255,1) !important;
 }
 
@@ -433,9 +434,12 @@ button.nav-link.backlog-flash {
   outline: .5rem solid var(--bs-yellow);
 }
 
-details.backlog-fragment:not([open]) > summary > span:first-child,
-details.backlog-fragment:not([open]) > summary::marker {
+details.backlog-fragment:not([open]) > summary:not(:only-child) > span:first-child,
+details.backlog-fragment:not([open]) > summary:not(:only-child)::marker {
   color: var(--bs-orange);
+}
+details.backlog-fragment > summary:only-child {
+  list-style-type: disc;
 }
     `);
   }
