@@ -120,7 +120,7 @@ type SupportedObject = Exclude<keyof DataCache, keyof BaseCache>
 type DataObject = DataCache[SupportedObject][string]
 
 type ObjectKeys = {
-    performers: Exclude<keyof PerformerDataObject, "name"> | "scenes" | "fragments"
+    performers: Exclude<keyof PerformerDataObject, "name">
     scenes: Exclude<keyof SceneDataObject, "comments" | "c_studio">
 }
 
@@ -128,6 +128,9 @@ type DataObjectKeys<T extends DataObject> =
     T extends PerformerDataObject ? ObjectKeys["performers"] :
     T extends SceneDataObject ? ObjectKeys["scenes"] :
     never;
+
+type HighlightKeys<T extends DataObject> =
+    DataObjectKeys<T> | (T extends PerformerDataObject ? "scenes" | "fragments" : never);
 
 type CompactDataCache = Omit<BaseCache, "submitted"> & {
     submitted?: string[] | BaseCache["submitted"];

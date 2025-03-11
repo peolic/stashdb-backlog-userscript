@@ -96,7 +96,7 @@ async function inject() {
    */
   const elementReadyIn = (selector, timeout, parentEl) => {
     const promises = [elementReady(selector, parentEl)];
-    if (timeout) promises.push(wait(timeout).then(() => null));
+    if (timeout) promises.push(wait(timeout).then(/** @returns {null} */ () => null));
     return Promise.race(promises);
   };
 
@@ -957,6 +957,16 @@ details.backlog-fragment:not([open]) > summary::marker {
       (Object.keys(dataObject).filter((key) => key !== 'comments' && key !== 'c_studio' && key !== 'name'))
     );
   }
+
+  /**
+   * @template {DataObject} T
+   * @param {T} dataObject
+   * @returns {HighlightKeys<T>[]}
+   */
+  function highlightObjectKeys(dataObject) {
+    return /** @type {HighlightKeys<T>[]} */ (dataObjectKeys(dataObject));
+  }
+
 
   /**
    * @param {CompactDataCache} legacyCache
@@ -4092,6 +4102,7 @@ details.backlog-fragment:not([open]) > summary::marker {
         const fragmentSearchQS = params.toString();
         if (fragmentSearchQS) {
           const fragmentSearch = makeLink(`/backlog/fragment-search?${fragmentSearchQS}`, '🔎');
+          fragmentSearch.role = 'button';
           fragmentSearch.classList.add('me-1', 'fw-bold', 'text-decoration-none', 'user-select-none');
           fragmentSearch.title = 'Search for other fragments...';
           fragmentEl.appendChild(fragmentSearch);
@@ -4787,7 +4798,7 @@ details.backlog-fragment:not([open]) > summary::marker {
       if (!isSupportedObject(object)) return;
 
       const found = getDataFor(object, uuid);
-      const changes = dataObjectKeys(found || {});
+      const changes = highlightObjectKeys(found || {});
       if (object === 'performers') {
         if (Cache.performerScenes(uuid).length > 0)
           changes.push('scenes');
@@ -4807,9 +4818,9 @@ details.backlog-fragment:not([open]) > summary::marker {
 
       if (changes) {
         const card = /** @type {HTMLDivElement} */ (cardLink.querySelector(':scope > .card'));
-        card.style.outline = getHighlightStyle(object, changes);
+        card.style.outline = getHighlightStyle(changes);
         if (object === 'scenes') {
-          const sceneChanges = /** @type {ObjectKeys["scenes"][]} */ (changes);
+          const sceneChanges = /** @type {HighlightKeys<SceneDataObject>[]} */ (changes);
           cardLink.title = `<pending> changes to:\n - ${sceneChanges.join('\n - ')}\n(click scene to view changes)`;
           sceneCardHighlightChanges(card, sceneChanges, uuid);
         } else if (object === 'performers') {
@@ -4822,12 +4833,11 @@ details.backlog-fragment:not([open]) > summary::marker {
   // =====
 
   /**
-   * @template {SupportedObject} T
-   * @param {T} object
-   * @param {ObjectKeys[T][]} changes
+   * @template {DataObject} T
+   * @param {HighlightKeys<T>[]} changes
    * @returns {string}
    */
-  const getHighlightStyle = (object, changes) => {
+  const getHighlightStyle = (changes) => {
     const style = '0.4rem solid';
     if (changes.length === 1) {
       if (changes[0] === 'duplicate_of' || changes[0] === 'duplicates') {
@@ -4899,8 +4909,8 @@ details.backlog-fragment:not([open]) > summary::marker {
         const found = Cache.data.scenes[sceneId];
         if (!found) return;
         card.classList.add('backlog-highlight');
-        const changes = dataObjectKeys(found);
-        card.style.outline = getHighlightStyle('scenes', changes);
+        const changes = highlightObjectKeys(found);
+        card.style.outline = getHighlightStyle(changes);
         card.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
 
         sceneCardHighlightChanges(card, changes, sceneId);
@@ -4938,7 +4948,7 @@ details.backlog-fragment:not([open]) > summary::marker {
 
       const performerId = parsePath(card.querySelector('a').href).ident;
       const found = Cache.data.performers[performerId];
-      const changes = dataObjectKeys(found || {});
+      const changes = highlightObjectKeys(found || {});
       if (Cache.performerScenes(performerId).length > 0)
         changes.push('scenes');
 
@@ -4953,7 +4963,7 @@ details.backlog-fragment:not([open]) > summary::marker {
 
       if (changes.length === 0)
         return;
-      card.style.outline = getHighlightStyle('performers', changes);
+      card.style.outline = getHighlightStyle(changes);
       const info = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
       card.title = info;
     });
@@ -4962,7 +4972,7 @@ details.backlog-fragment:not([open]) > summary::marker {
   /**
    * Field-specific scene card highlighting
    * @param {HTMLDivElement} card
-   * @param {ObjectKeys["scenes"][]} changes
+   * @param {HighlightKeys<SceneDataObject>[]} changes
    * @param {string} sceneId
    */
   function sceneCardHighlightChanges(card, changes, sceneId) {
@@ -5162,7 +5172,7 @@ details.backlog-fragment:not([open]) > summary::marker {
       const type = object.slice(0, -1);
 
       const found = getDataFor(object, ident);
-      const changes = dataObjectKeys(found || {});
+      const changes = highlightObjectKeys(found || {});
 
       if (object === 'performers') {
         if (Cache.performerScenes(ident).length > 0)
