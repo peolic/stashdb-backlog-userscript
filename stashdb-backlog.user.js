@@ -1732,6 +1732,7 @@ details.backlog-fragment > summary:only-child {
 
   const SPLIT_STATUS_EMPTY = 'empty - delete performer';
   const SPLIT_STATUS_SINGLE = 'single fragment remains';
+  const SPLIT_STATUS_QUEUED = 'queued to be marked as done';
 
   /**
    * @param {PerformerEntriesItem[]} list
@@ -4820,6 +4821,12 @@ details.backlog-fragment > summary:only-child {
       if (changes.length === 0)
         return;
 
+      if (object === 'performers' && changes.length === 1 && changes[0] === 'split') {
+        // only split and it's already queued for deletion
+        if (/** @type {PerformerDataObject} */ (found).split?.status === SPLIT_STATUS_QUEUED)
+          return;
+      }
+
       if (changes) {
         const card = /** @type {HTMLDivElement} */ (cardLink.querySelector(':scope > .card'));
         card.style.outline = getHighlightStyle(changes);
@@ -5653,22 +5660,20 @@ details.backlog-fragment > summary:only-child {
           return 0;
         });
 
+    /** @type {(keyof PerformerDataObject)[]} */
+    const filterKeys = ['split', 'urls', 'duplicates'];
     const filters = [
       // keep 'all' first
       { key: 'all', text: 'all', list: sortedPerformers },
       { key: 'submitted', text: 'submitted', list: sortedPerformers.filter(([id, _]) => isSubmitted('performers', id)) },
       //
-      { key: 'split', text: 'split', list: sortedPerformers.filter(([, item]) => !!item.split) },
-      { key: 'urls', text: 'urls', list: sortedPerformers.filter(([, item]) => !!item.urls) },
-      { key: 'duplicates', text: 'duplicates', list: sortedPerformers.filter(([, item]) => !!item.duplicates) },
+      ...filterKeys.map((key) => ({ key, text: key, list: sortedPerformers.filter(([, item]) => !!item[key]) })),
       //
       { key: 'multiple', text: 'multiple', list: sortedPerformers.filter(([, item]) => dataObjectKeys(item).length > 1) },
+      { key: 'other', text: 'other',
+        list: sortedPerformers.filter(([, item]) => dataObjectKeys(item).every((key) => !filterKeys.includes(key))),
+    }
     ];
-    const otherKeys = filters.slice(2).map(({ key }) => key);
-    filters.push({
-      key: 'other', text: 'other',
-      list: sortedPerformers.filter(([, item]) => dataObjectKeys(item).every((key) => !otherKeys.includes(key))),
-    });
 
     subTitle.innerText = (
       'Note: There is currently no automated check for submitted entries or completed entries.'
