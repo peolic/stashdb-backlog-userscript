@@ -1867,7 +1867,7 @@ details.backlog-fragment > summary:only-child {
         if (Array.isArray(fragmentNumbers)) {
           link.dataset.state = JSON.stringify({ performerFragment: fragmentNumbers });
 
-          if ((fragments.length === 0 && status !== SPLIT_STATUS_SINGLE) || status === SPLIT_STATUS_EMPTY)
+          if ((fragments.length === 0 && !status) || status === SPLIT_STATUS_EMPTY)
             flag.textContent = '🟢 ';
           else if (fragments.length === 1 || status === SPLIT_STATUS_SINGLE)
             flag.textContent = '⭐ ';
@@ -5764,7 +5764,7 @@ details.backlog-fragment > summary:only-child {
     const reduceKey = (result, item) => {
       const [key, value] = item;
       if (!value.split) return result;
-      const { fragments, notes } = value.split;
+      const { fragments, notes, status } = value.split;
 
       let valid = fragments.filter((fragment, fragmentIndex) => {
         if (fragment.id === null || fragment.id === key) return false;
@@ -5787,15 +5787,13 @@ details.backlog-fragment > summary:only-child {
       }
 
       if (!valid)
-        if (valid = value.split.status === SPLIT_STATUS_EMPTY) {
+        if (valid = status === SPLIT_STATUS_EMPTY) {
           fragmentIndexMap[key] = [];
         }
 
       if (!valid)
-        if (valid = value.split.status === SPLIT_STATUS_SINGLE) {
-          fragmentIndexMap[key] = [];
-          // Store fragment index for matching later
-          if (fragments.length === 1) fragmentIndexMap[key].push(0);
+        if (valid = [SPLIT_STATUS_SINGLE, SPLIT_STATUS_QUEUED].includes(status)) {
+          fragmentIndexMap[key] = fragments.length === 1 ? [0] : [];
         }
 
       return valid ? result.concat([item]) : result;
@@ -5836,10 +5834,14 @@ details.backlog-fragment > summary:only-child {
     const filters = [
       // keep 'all' first
       { key: 'all', text: 'all', list: sortedPerformers },
+      { key: 'submitted', text: '📧 submitted',
+        list: sortedPerformers.filter(([pId, _]) =>
+          filterCondition(pId, isSubmitted('performers', pId)))
+      },
       //
       { key: 'empty', text: '🟢 empty',
         list: sortedPerformers.filter(([pId, { split: { fragments, status } }]) =>
-          filterCondition(pId, (fragments.length === 0 && status !== SPLIT_STATUS_SINGLE) || status === SPLIT_STATUS_EMPTY)),
+          filterCondition(pId, (fragments.length === 0 && !status) || status === SPLIT_STATUS_EMPTY)),
       },
       { key: 'single', text: '⭐ single fragment remains',
         list: sortedPerformers.filter(([pId, { split: { fragments, status } }]) =>
