@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.37.1
+// @version     1.37.2
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -4114,6 +4114,25 @@ details.backlog-fragment > summary:only-child {
           fragmentSearch.title = 'Search for other fragments...';
           fragmentEl.appendChild(fragmentSearch);
         }
+
+        const fragmentCopy = document.createElement('div');
+        fragmentCopy.role = 'button';
+        fragmentCopy.innerText = '📋';
+        fragmentCopy.title = 'Copy the information from this fragment to the clipboard';
+        fragmentCopy.classList.add('me-1', 'd-inline-block', 'fw-bold', 'user-select-none');
+        fragmentCopy.style.cursor = 'pointer';
+        // copy to clipboard
+        fragmentCopy.addEventListener('click', async (ev) => {
+          ev.preventDefault();
+          const fragmentInfo = [fragment.name, '', fragment.text]
+            .concat(fragment.notes, '', fragment.links)
+            .filter((v) => v !== undefined)
+            .join('\n');
+          await navigator.clipboard.writeText(fragmentInfo);
+          fragmentCopy.innerText = '✅';
+          wait(1500).then(() => fragmentCopy.innerText = '📋');
+        });
+        fragmentEl.appendChild(fragmentCopy);
 
         let fragmentName;
         if (fragment.id) {
