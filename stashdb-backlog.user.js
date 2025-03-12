@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.37.2
+// @version     1.37.3
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -5802,20 +5802,13 @@ details.backlog-fragment > summary:only-child {
 
       if (!valid && notes?.some((t) => t?.match(/\bcomplete list\b/i))) {
         if (valid = fragments.length <= 1) {
-          fragmentIndexMap[key] = [];
-          // Store fragment index for matching later
-          if (fragments.length === 1) fragmentIndexMap[key].push(0);
+          fragmentIndexMap[key] = fragments.map((_, idx) => idx);
         }
       }
 
       if (!valid)
-        if (valid = status === SPLIT_STATUS_EMPTY) {
-          fragmentIndexMap[key] = [];
-        }
-
-      if (!valid)
-        if (valid = [SPLIT_STATUS_SINGLE, SPLIT_STATUS_QUEUED].includes(status)) {
-          fragmentIndexMap[key] = fragments.length === 1 ? [0] : [];
+        if (valid = [SPLIT_STATUS_EMPTY, SPLIT_STATUS_SINGLE, SPLIT_STATUS_QUEUED].includes(status)) {
+          fragmentIndexMap[key] = fragments.map((_, idx) => idx);
         }
 
       return valid ? result.concat([item]) : result;
