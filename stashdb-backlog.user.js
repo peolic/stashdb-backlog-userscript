@@ -1203,6 +1203,8 @@ details.backlog-fragment > summary:only-child {
     return imgRes;
   }
 
+  const urlPattern = /https?:\/\/([\w-]+(?:(?:\.[\w-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])/g;
+
   /**
    * All external links are made with `_blank` target.
    * @param {string} url
@@ -5295,15 +5297,16 @@ details.backlog-fragment > summary:only-child {
         const editUrl = cardHeading.closest('a').href;
         const urls = /** @type {HTMLAnchorElement[]} */
           (Array.from(card.querySelectorAll('.SiteLink + a'))).map((a) => a.href);
-        /** @type {HTMLDivElement[]} */
-        (Array.from(card.querySelectorAll('.EditComment > .card-body')))
-          .flatMap((cEl) => cEl.textContent.match(/(https?:\/\/[^\s]+)/g) ?? [])
-          .forEach((cUrl) => {
-            if (!validFragmentLink(cUrl)) return;
+        /** @type {NodeListOf<HTMLDivElement>} */
+        (card.querySelectorAll('.EditComment > .card-body')).forEach((commentEl) => {
+          for (const commentURL of (commentEl.textContent.match(urlPattern) ?? [])) {
+            if (!validFragmentLink(commentURL))
+                continue;
             // simple unique sites
-            if (!urls.find((u) => u.startsWith(new URL(cUrl).origin)))
-              urls.push(cUrl);
-          });
+            if (!urls.find((url) => url.startsWith(new URL(commentURL).origin)))
+              urls.push(commentURL);
+          }
+        });
 
         (function fragments() {
           if (isEditsList && !settings.highlightFragments) return;
