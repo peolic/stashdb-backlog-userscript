@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.37.3
+// @version     1.38.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -845,6 +845,8 @@ details.backlog-fragment > summary:only-child {
     static _data = null;
     /** @type {PerformerScenes | null} */
     static _performerScenes = null;
+    /** @type {PerformerFragments | null} */
+    static _performerFragments = null;
 
     /** @param {boolean} invalidate Force reload of stored data */
     static async getStoredData(invalidate = false) {
@@ -865,7 +867,8 @@ details.backlog-fragment > summary:only-child {
         this._data = await applyMigrations(this._data);
         await this.setData(this._data);
 
-        this._performerScenes = this._generatePerformerScenes();
+        // TODO: store and retrieve, only regenerate on update
+        this._generateDynamicData();
       }
       return this._data;
     }
@@ -884,35 +887,77 @@ details.backlog-fragment > summary:only-child {
       this._performerScenes = null;
     }
 
-    static _generatePerformerScenes() {
-      if (!this._data) return null;
+    /** @returns {void} */
+    static _generateDynamicData() {
+      if (!this._data) return;
+
       /** @type {PerformerScenes} */
-      const result = {};
+      this._performerScenes = {};
+
       for (const [sceneId, scene] of Object.entries(this._data.scenes)) {
-        if (!scene.performers) continue;
-        for (const [actionStr, entries] of Object.entries(scene.performers)) {
-          const action = /** @type {keyof SceneDataObject["performers"]} */ (actionStr);
-          for (const entry of entries) {
-            if (!entry.id) continue;
-            if (!result[entry.id]) result[entry.id] = [];
-            result[entry.id].push({ sceneId, action });
+        Object.defineProperties(scene, {
+          type: { get: () => 'SceneDataObject' },
+          changes: { get() { return dataObjectKeys(/** @type {SceneDataObject} */ (this)); } },
+        });
+
+        // Performer Scenes
+        if (scene.performers) {
+          for (const [action, entries] of Object.entries(scene.performers)) {
+            for (const entry of entries) {
+              if (!entry.id)
+                continue;
+              if (!this._performerScenes[entry.id])
+                this._performerScenes[entry.id] = {};
+
+              this._performerScenes[entry.id][sceneId] =
+                /** @type {keyof SceneDataObject["performers"]} */ (action);
+            }
           }
         }
       }
-      return result;
+
+      /** @type {PerformerFragments} */
+      this._performerFragments = {};
+
+      for (const [performerId, performer] of Object.entries(this._data.performers)) {
+        // TODO: improve in order to replace `getPerformerFragments`
+        // Performer Fragments
+        if (performer.split) {
+          performer.split.fragments.forEach((fragment, fragmentIdx) => {
+            if (!fragment.id || fragment.id === performerId)
+              return;
+            if (!this._performerFragments[fragment.id])
+              this._performerFragments[fragment.id] = {};
+
+            this._performerFragments[fragment.id][performerId] = [fragmentIdx];
+          });
+        }
+      }
+
+      const uniquePerformerIds = new Set([
+        ...Object.keys(this._data.performers),
+        ...Object.keys(this._performerScenes),
+        ...Object.keys(this._performerFragments),
+      ]);
+      for (const performerId of uniquePerformerIds) {
+        const pScenes = this._performerScenes[performerId];
+        const pFragments = this._performerFragments[performerId];
+        if (!this._data.performers[performerId] && (pScenes || pFragments))
+          /** @type {Omit<PerformerDataObject, DataObjectGetters>} */
+          (this._data.performers[performerId]) = {};
+
+        Object.defineProperties(this._data.performers[performerId], {
+          type: { get: () => 'PerformerDataObject' },
+          changes: { get() { return dataObjectKeys(/** @type {PerformerDataObject} */ (this)); } },
+          ...(pScenes    && { scenes:    { value: pScenes,    enumerable: true } }),
+          ...(pFragments && { fragments: { value: pFragments, enumerable: true } }),
+        });
+      }
     }
 
     static get data() {
       if (!this._data) throw new Error('Unexpected: null data');
       return Object.freeze(this._data);
-    }
-
-    /**
-     * @param {string} performerId
-     */
-    static performerScenes(performerId) {
-      if (!this._performerScenes) throw new Error('No performer-scenes data');
-      return this._performerScenes[performerId] ?? [];
     }
 
     // ===
@@ -951,26 +996,16 @@ details.backlog-fragment > summary:only-child {
   } // Cache
 
   /**
-   * @template {DataObject} T
+   * @template {DataObject | null | undefined} T
    * @param {T} dataObject
    * @returns {DataObjectKeys<T>[]}
    */
   function dataObjectKeys(dataObject) {
     return (
       /** @type {DataObjectKeys<T>[]} */
-      (Object.keys(dataObject).filter((key) => key !== 'comments' && key !== 'c_studio' && key !== 'name'))
+      (Object.keys(dataObject ?? {}).filter((key) => key !== 'comments' && key !== 'c_studio' && key !== 'name'))
     );
   }
-
-  /**
-   * @template {DataObject} T
-   * @param {T} dataObject
-   * @returns {HighlightKeys<T>[]}
-   */
-  function highlightObjectKeys(dataObject) {
-    return /** @type {HighlightKeys<T>[]} */ (dataObjectKeys(dataObject));
-  }
-
 
   /**
    * @param {CompactDataCache} legacyCache
@@ -1103,7 +1138,7 @@ details.backlog-fragment > summary:only-child {
    * @template {string} I
    * @param {T} object
    * @param {I} uuid
-   * @returns {DataCache[T][I] | null}
+   * @returns {DataCache[T][I] | undefined}
    */
   function getDataFor(object, uuid) {
     return Cache.data[object][uuid];
@@ -1736,6 +1771,14 @@ details.backlog-fragment > summary:only-child {
   const SPLIT_STATUS_SINGLE = 'single fragment remains';
   const SPLIT_STATUS_QUEUED = 'queued to be marked as done';
 
+  /** @param {PerformerDataObject["fragments"]} [performerFragments] */
+  const namesFromFragments = (performerFragments) =>
+    Object.entries(performerFragments || {})
+      .flatMap(([pId, fIds]) => {
+        const { split: { fragments } } = getDataFor('performers', pId);
+        return fIds.map((fId) => fragments[fId].name);
+      });
+
   /**
    * @param {PerformerEntriesItem[]} list
    * @param {HTMLOListElement} target
@@ -1765,7 +1808,12 @@ details.backlog-fragment > summary:only-child {
       const mainURL = !custom
         ? (!performerData.duplicates ? `${viewURL}/edit` : `${viewURL}/merge`)
         : viewURL;
-      const name = [performerData.name, performerData.split?.name, performerData.duplicates?.name].find((n) => !!n);
+      const name = [
+        performerData.name,
+        performerData.split?.name,
+        performerData.duplicates?.name,
+        ...namesFromFragments(performerData.fragments),
+      ].find((n) => !!n);
       const link = makeLink(mainURL, name || performerId);
       if (!name)
         link.classList.add('font-monospace');
@@ -1792,7 +1840,10 @@ details.backlog-fragment > summary:only-child {
                 return `${performerData[k].ids.length}x ${k}`;
               case 'split':
                 const { fragments } = performerData[k];
-                return fragments.length > 0 ? `${fragments.length}x fragments` : k;
+                return (fragments.length > 0 ? `${fragments.length}x ` : '') + k;
+              case 'scenes':
+              case 'fragments':
+                return `${Object.keys(performerData[k]).length}x ${k}`;
               default:
                 return k;
             }
@@ -3080,7 +3131,8 @@ details.backlog-fragment > summary:only-child {
       'details', 'director', 'tags',
       'image', 'fingerprints',
     ];
-    sortedKeys(found, keySortOrder).forEach((field) => {
+    /** @type {Exclude<keyof SceneDataObject, DataObjectGetters>[]} */
+    (sortedKeys(found, keySortOrder)).forEach((field) => {
       if (field === 'c_studio')
         return;
 
@@ -3645,7 +3697,7 @@ details.backlog-fragment > summary:only-child {
    * @param {string} performerId
    */
   async function iPerformerPage(performerId) {
-    const performerInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.PerformerInfo', 1000));
+    const performerInfo = /** @type {HTMLDivElement} */ (await elementReadyIn('.PerformerInfo', 2000));
     if (!performerInfo) return;
 
     const _performerFiberEl = getReactFiber(performerInfo)?.return;
@@ -3765,19 +3817,23 @@ details.backlog-fragment > summary:only-child {
       }
     }
 
+    const foundData = getDataFor('performers', performerId);
+
     // Performer scene changes based on cached data
     (function sceneChanges() {
       if (backlogDiv.querySelector('[data-backlog="scene-changes"]')) return;
 
       try {
+        if (!foundData?.scenes) return;
+
         /** @typedef {[sceneId: string, entry: PerformerEntry, studio: string]} performerScene */
         /** @type {Record<keyof SceneDataObject["performers"], performerScene[]>} */
         const performerScenes = { append: [], remove: [], update: [] };
         /** @type {{ [sceneId: string]: true }} */
         const sceneIds = {};
 
-        for (const { sceneId, action } of Cache.performerScenes(performerId)) {
-          const scene = Cache.data.scenes[sceneId];
+        for (const [sceneId, action] of Object.entries(foundData.scenes)) {
+          const scene = getDataFor('scenes', sceneId);
           const studio = studioArrayToString(scene.c_studio);
 
           const { append, remove, update } = scene.performers;
@@ -3926,8 +3982,6 @@ details.backlog-fragment > summary:only-child {
       }
     })();
 
-    const foundData = getDataFor('performers', performerId);
-
     (function fragments() {
       // merge current links with backlogged links
       const urls = performerUrls.concat(foundData?.urls || []);
@@ -3991,7 +4045,7 @@ details.backlog-fragment > summary:only-child {
     console.debug('[backlog] found', foundData);
 
     const isMarkedForSplit = (/** @type {string} */ uuid) => {
-      const dataEntry = Cache.data.performers[uuid];
+      const dataEntry = getDataFor('performers', uuid);
       return dataEntry && !!dataEntry.split;
     };
 
@@ -4511,7 +4565,7 @@ details.backlog-fragment > summary:only-child {
     })();
 
     const isMarkedForSplit = (/** @type {string} */ uuid) => {
-      const dataEntry = Cache.data.performers[uuid];
+      const dataEntry = getDataFor('performers', uuid);
       return dataEntry && !!dataEntry.split;
     };
 
@@ -4824,39 +4878,36 @@ details.backlog-fragment > summary:only-child {
       if (!isSupportedObject(object)) return;
 
       const found = getDataFor(object, uuid);
-      const changes = highlightObjectKeys(found || {});
-      if (object === 'performers') {
-        if (Cache.performerScenes(uuid).length > 0)
-          changes.push('scenes');
 
-        if (settings.highlightFragments) {
+      if (found?.type === 'PerformerDataObject') {
+        // TODO: remove (in favor of `found.changes`)
+        if (!found.changes.includes('fragments') && settings.highlightFragments) {
           /** @type {{ urls: ScenePerformance_URL[] }} */
           const performerFiber = getReactFiber(cardLink)?.return?.return?.return?.return?.memoizedProps?.performer;
           const urls = performerFiber?.urls.map((u) => u.url) || [];
           const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: uuid, urls });
           if (Object.keys(fragments).length > 0)
-            changes.push('fragments');
+            found.changes.push('fragments');
         }
       }
 
-      if (changes.length === 0)
+      if (!found || found.changes.length === 0)
         return;
 
-      if (object === 'performers' && changes.length === 1 && changes[0] === 'split') {
+      if (found.type === 'PerformerDataObject' && found.changes.length === 1 && found.changes[0] === 'split') {
         // only split and it's already queued for deletion
-        if (/** @type {PerformerDataObject} */ (found).split?.status === SPLIT_STATUS_QUEUED)
+        if (found.split?.status === SPLIT_STATUS_QUEUED)
           return;
       }
 
-      if (changes) {
+      if (found.changes) {
         const card = /** @type {HTMLDivElement} */ (cardLink.querySelector(':scope > .card'));
-        card.style.outline = getHighlightStyle(changes);
-        if (object === 'scenes') {
-          const sceneChanges = /** @type {HighlightKeys<SceneDataObject>[]} */ (changes);
-          cardLink.title = `<pending> changes to:\n - ${sceneChanges.join('\n - ')}\n(click scene to view changes)`;
-          sceneCardHighlightChanges(card, sceneChanges, uuid);
-        } else if (object === 'performers') {
-          cardLink.title = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
+        card.style.outline = getHighlightStyle(found.changes);
+        if (found.type === 'SceneDataObject') {
+          cardLink.title = `<pending> changes to:\n - ${found.changes.join('\n - ')}\n(click scene to view changes)`;
+          sceneCardHighlightChanges(card, found.changes, uuid);
+        } else if (found.type === 'PerformerDataObject') {
+          cardLink.title = `performer is listed for:\n - ${found.changes.join('\n - ')}\n(click performer for more info)`;
         }
       }
     });
@@ -4865,8 +4916,7 @@ details.backlog-fragment > summary:only-child {
   // =====
 
   /**
-   * @template {DataObject} T
-   * @param {HighlightKeys<T>[]} changes
+   * @param {DataObject["changes"]} changes
    * @returns {string}
    */
   const getHighlightStyle = (changes) => {
@@ -4877,6 +4927,9 @@ details.backlog-fragment > summary:only-child {
       }
       if (changes[0] === 'fingerprints' || changes[0] === 'urls') {
         return `${style} var(--bs-cyan)`;
+      }
+      if (changes[0] === 'fragments') {
+        return `${style} var(--bs-blue)`;
       }
       if (changes[0] === 'scenes') {
         return `${style} var(--bs-green)`;
@@ -4938,14 +4991,13 @@ details.backlog-fragment > summary:only-child {
         appendScenePerformers(card);
 
         const sceneId = parsePath(card.querySelector('a').href).ident;
-        const found = Cache.data.scenes[sceneId];
+        const found = getDataFor('scenes', sceneId);
         if (!found) return;
         card.classList.add('backlog-highlight');
-        const changes = highlightObjectKeys(found);
-        card.style.outline = getHighlightStyle(changes);
-        card.title = `<pending> changes to:\n - ${changes.join('\n - ')}\n(click scene to view changes)`;
+        card.style.outline = getHighlightStyle(found.changes);
+        card.title = `<pending> changes to:\n - ${found.changes.join('\n - ')}\n(click scene to view changes)`;
 
-        sceneCardHighlightChanges(card, changes, sceneId);
+        sceneCardHighlightChanges(card, found.changes, sceneId);
       });
     };
 
@@ -4979,12 +5031,11 @@ details.backlog-fragment > summary:only-child {
       else markerDataset.backlogInjected = 'true';
 
       const performerId = parsePath(card.querySelector('a').href).ident;
-      const found = Cache.data.performers[performerId];
-      const changes = highlightObjectKeys(found || {});
-      if (Cache.performerScenes(performerId).length > 0)
-        changes.push('scenes');
+      const found = getDataFor('performers', performerId);
 
-      if (settings.highlightFragments) {
+      // TODO: remove (in favor of `found.changes`)
+      const changes = found?.changes ?? [];
+      if (!changes.includes('fragments') && settings.highlightFragments) {
         /** @type {{ urls: ScenePerformance_URL[] }} */
         const performerFiber = getReactFiber(card)?.return?.return?.memoizedProps?.performer;
         const urls = performerFiber?.urls?.map((u) => u.url) || [];
@@ -4993,8 +5044,9 @@ details.backlog-fragment > summary:only-child {
           changes.push('fragments');
       }
 
-      if (changes.length === 0)
+      if (!found || changes.length === 0)
         return;
+
       card.style.outline = getHighlightStyle(changes);
       const info = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
       card.title = info;
@@ -5004,7 +5056,7 @@ details.backlog-fragment > summary:only-child {
   /**
    * Field-specific scene card highlighting
    * @param {HTMLDivElement} card
-   * @param {HighlightKeys<SceneDataObject>[]} changes
+   * @param {SceneDataObject["changes"]} changes
    * @param {string} sceneId
    */
   function sceneCardHighlightChanges(card, changes, sceneId) {
@@ -5204,12 +5256,12 @@ details.backlog-fragment > summary:only-child {
       const type = object.slice(0, -1);
 
       const found = getDataFor(object, ident);
-      const changes = highlightObjectKeys(found || {});
 
-      if (object === 'performers') {
-        if (Cache.performerScenes(ident).length > 0)
-          changes.push('scenes');
+      if (!found || found.changes.length === 0)
+        return;
 
+      if (found.type === 'PerformerDataObject') {
+        // TODO: remove (in favor of `found.changes`)
         // FIXME: getPerformerFragments is too heavy for the edits pages
         //        optimize, we only need number of fragments
         if (false /* settings.highlightFragments */) { // disabled section
@@ -5227,22 +5279,20 @@ details.backlog-fragment > summary:only-child {
           })();
           const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: ident, urls });
           if (Object.keys(fragments).length > 0)
-            changes.push('fragments');
+            // @ts-expect-error
+            found.changes.push('fragments');
         } // disabled section
       }
 
-      if (changes.length === 0)
-        return;
-
       let backgroundColor = 'var(--bs-warning)';
-      if (changes.length === 1) {
-        if (changes[0] === 'scenes') {
+      if (found.changes.length === 1) {
+        if (found.changes[0] === 'scenes') {
           backgroundColor = 'var(--bs-green)';
         }
-        if (changes[0] === 'fragments') {
+        if (found.changes[0] === 'fragments') {
           backgroundColor = 'var(--bs-blue)';
         }
-        if (changes[0] === 'fingerprints' || changes[0] === 'urls') {
+        if (found.changes[0] === 'fingerprints' || found.changes[0] === 'urls') {
           backgroundColor = 'var(--bs-indigo)';
         }
       }
@@ -5254,7 +5304,7 @@ details.backlog-fragment > summary:only-child {
         padding: scenePerformer ? '0.05rem 0.25rem' : '.2rem',
         maxWidth: 'max-content',
       });
-      entityLink.title = `${type} is listed for:\n - ${changes.join('\n - ')}\n(click ${type} for more info)`;
+      entityLink.title = `${type} is listed for:\n - ${found.changes.join('\n - ')}\n(click ${type} for more info)`;
     };
 
     /**
@@ -5648,8 +5698,8 @@ details.backlog-fragment > summary:only-child {
 
     /** @type {(keyof PerformerDataObject)[]} */
     const unsubmittableKeys = ['name'];
-    /** @param {string} key */
-    const submittableKeys = (key) => !unsubmittableKeys.includes(/** @type {keyof PerformerDataObject} */ (key));
+    /** @param {PerformerDataObject} dataObject */
+    const filteredKeys = (dataObject) => dataObjectKeys(dataObject).filter((key) => !unsubmittableKeys.includes(key));
 
     /**
      * @param {PerformerEntriesItem[]} result
@@ -5658,11 +5708,11 @@ details.backlog-fragment > summary:only-child {
     const reduceKey = (result, item) => {
       const [key, value] = item;
       const { urls_notes, ...rest } = value;
-      return dataObjectKeys(rest).filter(submittableKeys).length > 0 ? result.concat([[key, rest]]) : result;
+      return filteredKeys(rest).length > 0 ? result.concat([[key, rest]]) : result;
     };
     /** @param {PerformerDataObject} item */
     const sortKey = (item) => {
-      return item.name || item.split?.name || item.duplicates?.name || dataObjectKeys(item).length;
+      return item.name || item.split?.name || item.duplicates?.name || filteredKeys(item).length;
     };
 
     const sortedPerformers =
@@ -5683,7 +5733,7 @@ details.backlog-fragment > summary:only-child {
         });
 
     /** @type {(keyof PerformerDataObject)[]} */
-    const filterKeys = ['split', 'urls', 'duplicates'];
+    const filterKeys = ['split', 'urls', 'duplicates', 'scenes', 'fragments'];
     const filters = [
       // keep 'all' first
       { key: 'all', text: 'all', list: sortedPerformers },
@@ -5691,9 +5741,9 @@ details.backlog-fragment > summary:only-child {
       //
       ...filterKeys.map((key) => ({ key, text: key, list: sortedPerformers.filter(([, item]) => !!item[key]) })),
       //
-      { key: 'multiple', text: 'multiple', list: sortedPerformers.filter(([, item]) => dataObjectKeys(item).length > 1) },
+      // { key: 'multiple', text: 'multiple', list: sortedPerformers.filter(([, item]) => filteredKeys(item).length > 1) },
       { key: 'other', text: 'other',
-        list: sortedPerformers.filter(([, item]) => dataObjectKeys(item).every((key) => !filterKeys.includes(key))),
+        list: sortedPerformers.filter(([, item]) => filteredKeys(item).every((key) => !filterKeys.includes(key))),
     }
     ];
 

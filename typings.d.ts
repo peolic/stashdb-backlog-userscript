@@ -38,16 +38,13 @@ interface FetchError {
     body: string | null;
 }
 
-type FingerprintAlgorithm = "phash" | "oshash" | "md5";
+type DataObjectGetters = "type" | "changes";
 
-type SceneFingerprint = {
-    algorithm: FingerprintAlgorithm;
-    hash: string;
-    correct_scene_id: string | null;
-    duration?: number;
-}
-
+type SceneChanges = Exclude<keyof SceneDataObject, DataObjectGetters | "comments" | "c_studio">;
 interface SceneDataObject {
+    get type(): "SceneDataObject";
+    get changes(): SceneChanges[];
+
     duplicates?: string[];
     duplicate_of?: string;
     title?: string;
@@ -70,15 +67,13 @@ interface SceneDataObject {
     c_studio?: [name: string, parent: string | null];
 }
 
-interface SplitFragment {
-    id: string | null;
-    name: string;
-    text?: string;
-    links?: string[];
-    notes?: string[];
-}
-
+type PerformerChanges = Exclude<keyof PerformerDataObject, DataObjectGetters | "name">;
 interface PerformerDataObject {
+    get type(): "PerformerDataObject";
+    get changes(): PerformerChanges[];
+    readonly scenes?: PerformerScenes[string];
+    readonly fragments?: PerformerFragments[string];
+
     duplicates?: {
         name: string;
         ids: string[];
@@ -97,11 +92,33 @@ interface PerformerDataObject {
     name?: string;
 }
 
+type FingerprintAlgorithm = "phash" | "oshash" | "md5";
+
+type SceneFingerprint = {
+    algorithm: FingerprintAlgorithm;
+    hash: string;
+    correct_scene_id: string | null;
+    duration?: number;
+}
+
+interface SplitFragment {
+    id: string | null;
+    name: string;
+    text?: string;
+    links?: string[];
+    notes?: string[];
+}
+
 interface PerformerScenes {
-    [uuid: string]: Array<{
-        sceneId: string;
-        action: keyof SceneDataObject["performers"];
-    }>;
+    [uuid: string]: {
+        [sceneId: string]: keyof SceneDataObject["performers"]; // v= action
+    };
+}
+
+interface PerformerFragments {
+    [uuid: string]: {
+        [performerId: string]: number[]; // v= fragmentIds
+    };
 }
 
 interface BaseCache {
@@ -119,18 +136,10 @@ type SupportedObject = Exclude<keyof DataCache, keyof BaseCache>
 
 type DataObject = DataCache[SupportedObject][string]
 
-type ObjectKeys = {
-    performers: Exclude<keyof PerformerDataObject, "name">
-    scenes: Exclude<keyof SceneDataObject, "comments" | "c_studio">
-}
-
 type DataObjectKeys<T extends DataObject> =
-    T extends PerformerDataObject ? ObjectKeys["performers"] :
-    T extends SceneDataObject ? ObjectKeys["scenes"] :
-    never;
-
-type HighlightKeys<T extends DataObject> =
-    DataObjectKeys<T> | (T extends PerformerDataObject ? "scenes" | "fragments" : never);
+    T extends PerformerDataObject ? PerformerChanges
+    : T extends SceneDataObject ? SceneChanges
+    : never;
 
 type CompactDataCache = Omit<BaseCache, "submitted"> & {
     submitted?: string[] | BaseCache["submitted"];
