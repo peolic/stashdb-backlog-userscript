@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.38.0
+// @version     1.38.1
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -1771,6 +1771,17 @@ details.backlog-fragment > summary:only-child {
   const SPLIT_STATUS_SINGLE = 'single fragment remains';
   const SPLIT_STATUS_QUEUED = 'queued to be marked as done';
 
+  /**
+   * @param {string} performerId
+   * @param {PerformerDataObject["scenes"]} [performerScenes]
+   */
+  const namesFromScenes = (performerId, performerScenes) =>
+    Object.entries(performerScenes || {})
+      .flatMap(([sId, action]) => {
+        const { performers: { [action]: entries } } = getDataFor('scenes', sId);
+        return entries.find(({ id }) => id === performerId)?.name;
+      });
+
   /** @param {PerformerDataObject["fragments"]} [performerFragments] */
   const namesFromFragments = (performerFragments) =>
     Object.entries(performerFragments || {})
@@ -1778,6 +1789,19 @@ details.backlog-fragment > summary:only-child {
         const { split: { fragments } } = getDataFor('performers', pId);
         return fIds.map((fId) => fragments[fId].name);
       });
+
+  /**
+   * @param {string} performerId
+   * @param {PerformerDataObject} performerData
+   */
+  const performerNames = (performerId, performerData) =>
+    [
+      performerData.name,
+      performerData.split?.name,
+      performerData.duplicates?.name,
+      ...namesFromScenes(performerId, performerData.scenes),
+      ...namesFromFragments(performerData.fragments),
+    ].find((n) => !!n);
 
   /**
    * @param {PerformerEntriesItem[]} list
@@ -1808,12 +1832,7 @@ details.backlog-fragment > summary:only-child {
       const mainURL = !custom
         ? (!performerData.duplicates ? `${viewURL}/edit` : `${viewURL}/merge`)
         : viewURL;
-      const name = [
-        performerData.name,
-        performerData.split?.name,
-        performerData.duplicates?.name,
-        ...namesFromFragments(performerData.fragments),
-      ].find((n) => !!n);
+      const name = performerNames(performerId, performerData);
       const link = makeLink(mainURL, name || performerId);
       if (!name)
         link.classList.add('font-monospace');
@@ -5710,17 +5729,17 @@ details.backlog-fragment > summary:only-child {
       const { urls_notes, ...rest } = value;
       return filteredKeys(rest).length > 0 ? result.concat([[key, rest]]) : result;
     };
-    /** @param {PerformerDataObject} item */
-    const sortKey = (item) => {
-      return item.name || item.split?.name || item.duplicates?.name || filteredKeys(item).length;
+    /** @param {PerformerEntriesItem} item */
+    const sortKey = ([performerId, performerData]) => {
+      return performerNames(performerId, performerData) || filteredKeys(performerData).length;
     };
 
     const sortedPerformers =
       Object.entries(Cache.data.performers)
         .reduce(reduceKey, [])
         .sort((a, b) => {
-          const aKey = sortKey(a[1]);
-          const bKey = sortKey(b[1]);
+          const aKey = sortKey(a);
+          const bKey = sortKey(b);
           if (typeof bKey === 'string' && typeof aKey === 'string')
             return aKey.localeCompare(bKey, undefined, { sensitivity: 'accent' });
           if (typeof bKey === 'number' && typeof aKey === 'number')
