@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.38.2
+// @version     1.38.4
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -14,9 +14,9 @@
 // @grant       GM.addStyle
 // @connect     github.com
 // @connect     githubusercontent.com
-// @homepageURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7
-// @downloadURL https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
-// @updateURL   https://gist.github.com/peolic/e4713081f7ad063cd0e91f2482ac39a7/raw/stashdb-backlog.user.js
+// @homepageURL https://github.com/peolic/stashdb-backlog-userscript
+// @downloadURL https://github.com/peolic/stashdb-backlog-userscript/raw/HEAD/stashdb-backlog.user.js
+// @updateURL   https://github.com/peolic/stashdb-backlog-userscript/raw/HEAD/stashdb-backlog.user.js
 // ==/UserScript==
 
 //@ts-check
