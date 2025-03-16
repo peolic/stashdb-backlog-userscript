@@ -859,12 +859,12 @@ details.backlog-fragment > summary:only-child {
         const dataCache = { scenes, performers, lastChecked, lastUpdated, submitted };
         if (Object.values(scenes).length === 0 && Object.values(performers).length === 0) {
           const legacyCache = /** @type {CompactDataCache} */ (await this._getValue(this._LEGACY_DATA_KEY));
-          this._data = await applyDataCacheMigrations(legacyCache);
+          this._data = await this.applyDataCacheMigrations(legacyCache);
         } else {
           this._data = dataCache;
         }
 
-        this._data = await applyMigrations(this._data);
+        this._data = await this.applyMigrations(this._data);
         await this.setData(this._data);
 
         // TODO: store and retrieve, only regenerate on update
@@ -872,6 +872,69 @@ details.backlog-fragment > summary:only-child {
       }
       return this._data;
     }
+
+    /**
+     * @param {CompactDataCache} legacyCache
+     * @returns {Promise<DataCache>}
+     */
+    static async applyDataCacheMigrations(legacyCache) {
+      const { lastChecked, lastUpdated, submitted, ...rest } = legacyCache;
+      /** @type {DataCache} */
+      const dataCache = {
+        scenes: {},
+        performers: {},
+        lastChecked,
+        lastUpdated,
+        submitted: {
+          scenes: submitted?.scenes ?? [],
+          performers: submitted?.performers ?? [],
+        },
+      };
+
+      // `scene/${uuid}` | `performer/${uuid}`
+      const allKeys = Object.keys(rest);
+      const oldKeys = allKeys.filter((k) => k.includes('/'));
+      if (oldKeys.length === 0) {
+        if (allKeys.length === 0) return dataCache;
+        else throw new Error(`migration failed: invalid object`);
+      }
+
+      /** @type {SupportedObject[]} */
+      let seen = [];
+      const log = (/** @type {SupportedObject} */ object) => {
+        if (!seen.includes(object)) {
+          console.debug(`[backlog] data-cache migration: convert from '${object}/uuid' key format`);
+          seen.push(object);
+        }
+      };
+
+      for (const cacheKey of oldKeys) {
+        const [oldObject, uuid] = /** @type {['scene' | 'performer', string]} */ (cacheKey.split('/'));
+        const object = /** @type {SupportedObject} */ (`${oldObject}s`);
+        log(object);
+        if (!(object in dataCache)) {
+          throw new Error(`migration failed: ${object} missing from new data cache object`);
+        }
+        dataCache[object][uuid] = legacyCache[cacheKey];
+      }
+
+      await Cache.setData(dataCache);
+
+      if (oldKeys.length > 0) {
+        await Cache._deleteValue(Cache._LEGACY_DATA_KEY);
+      }
+
+      return dataCache;
+    }
+
+    /**
+     * @param {MigrationDataCache} dataCache
+     * @returns {Promise<DataCache>}
+     */
+    static async applyMigrations(dataCache) {
+      return dataCache;
+    }
+
     static async setLastChecked() {
       this._data.lastChecked = new Date().toISOString();
       const { scenes, performers, ...cache } = this._data;
@@ -1012,85 +1075,14 @@ details.backlog-fragment > summary:only-child {
     );
   }
 
-  /**
-   * @param {CompactDataCache} legacyCache
-   * @returns {Promise<DataCache>}
-   */
-  async function applyDataCacheMigrations(legacyCache) {
-    const { lastChecked, lastUpdated, submitted: legacySubmitted } = legacyCache;
-    /** @type {DataCache} */
-    const dataCache = {
-      scenes: {},
-      performers: {},
-      lastChecked,
-      lastUpdated,
-      submitted: {
-        scenes: (Array.isArray(legacySubmitted) ? legacySubmitted : legacySubmitted?.scenes) ?? [],
-        performers: (Array.isArray(legacySubmitted) ? [] : legacySubmitted?.performers) ?? [],
-      },
-    };
-
-    // `scene/${uuid}` | `performer/${uuid}`
-    const allKeys = Object.keys(legacyCache);
-    const oldKeys = allKeys.filter((k) => k.includes('/'));
-    if (oldKeys.length === 0) {
-      if (allKeys.length === 0) return dataCache;
-      else throw new Error(`migration failed: invalid object`);
-    }
-
-    /** @type {SupportedObject[]} */
-    let seen = [];
-    const log = (/** @type {SupportedObject} */ object) => {
-      if (!seen.includes(object)) {
-        console.debug(`[backlog] data-cache migration: convert from '${object}/uuid' key format`);
-        seen.push(object);
-      }
-    };
-
-    for (const cacheKey of oldKeys) {
-      const [oldObject, uuid] = /** @type {['scene' | 'performer', string]} */ (cacheKey.split('/'));
-      const object = /** @type {SupportedObject} */ (`${oldObject}s`);
-      log(object);
-      if (!(object in dataCache)) {
-        throw new Error(`migration failed: ${object} missing from new data cache object`);
-      }
-      dataCache[object][uuid] = legacyCache[cacheKey];
-    }
-
-    await Cache.setData(dataCache);
-
-    if (oldKeys.length > 0) {
-      await Cache._deleteValue(Cache._LEGACY_DATA_KEY);
-    }
-
-    return dataCache;
-  }
-
-  /**
-   * @param {MigrationDataCache} dataCache
-   * @returns {Promise<DataCache>}
-   */
-  async function applyMigrations(dataCache) {
-    const performersMigration = Object.values(dataCache.performers);
-
-    // performer split `shards` -> `fragments`
-    performersMigration.forEach((item) => {
-      if (!item.split?.shards) return;
-      item.split.fragments = item.split.shards;
-      delete item.split.shards;
-    });
-
-    return dataCache;
-  }
-
   async function fetchBacklogData() {
     try {
       setStatus(`[backlog] getting cache...`);
 
       /** @type {CompactDataCache} */
       const legacyCache = (await request(`${BASE_URL}/stashdb_backlog.json`, 'json'));
-      let dataCache = await applyDataCacheMigrations(legacyCache);
-      dataCache = await applyMigrations(dataCache);
+      let dataCache = await Cache.applyDataCacheMigrations(legacyCache);
+      dataCache = await Cache.applyMigrations(dataCache);
       await Cache.setData(dataCache);
 
       setStatus('[backlog] data updated', 5000);

@@ -141,21 +141,16 @@ type DataObjectKeys<T extends DataObject> =
     : T extends SceneDataObject ? SceneChanges
     : never;
 
-type CompactDataCache = Omit<BaseCache, "submitted"> & {
-    submitted?: string[] | BaseCache["submitted"];
+type CompactDataCache = BaseCache & {
     [cacheKey: string]: DataObject;
 }
 
-type MigrationPerformerDataObject = PerformerDataObject & {
-    split?: {
-        shards?: SplitFragment[];
-    };
-}
+type MigrationSceneDataObject = SceneDataObject & {}
+type MigrationPerformerDataObject = PerformerDataObject & {}
 
 type MigrationDataCache = DataCache & {
-    performers: {
-        [uuid: string]: MigrationPerformerDataObject;
-    };
+    scenes: { [uuid: string]: MigrationSceneDataObject };
+    performers: { [uuid: string]: MigrationPerformerDataObject };
 }
 
 interface PerformerEntry {
