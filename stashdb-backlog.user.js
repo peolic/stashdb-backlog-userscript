@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.38.1
+// @version     1.38.2
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -872,6 +872,11 @@ details.backlog-fragment > summary:only-child {
       }
       return this._data;
     }
+    static async setLastChecked() {
+      this._data.lastChecked = new Date().toISOString();
+      const { scenes, performers, ...cache } = this._data;
+      await this._setValue(this._DATA_INDEX_KEY, cache);
+    }
     static async setData(/** @type {DataCache} */ data) {
       const { scenes, performers, ...cache } = data;
       await this._setValue(this._SCENES_DATA_KEY, scenes);
@@ -957,7 +962,7 @@ details.backlog-fragment > summary:only-child {
 
     static get data() {
       if (!this._data) throw new Error('Unexpected: null data');
-      return Object.freeze(this._data);
+      return this._data;
     }
 
     // ===
@@ -1119,8 +1124,7 @@ details.backlog-fragment > summary:only-child {
         return 'ERROR';
       } finally {
         // Store the last-checked timestamp as to not spam GitHub API
-        const newData = { ...Cache.data, lastChecked: new Date().toISOString() };
-        await Cache.setData(newData);
+        await Cache.setLastChecked();
       }
     }
 
