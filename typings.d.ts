@@ -195,7 +195,8 @@ type PerformerEntriesItem = [id: string, data: PerformerDataObject]
 type FragmentIndexMap = { [performerId: string]: number[] }
 
 
-//#region https://github.com/stashapp/stash-box/blob/develop/frontend/src/graphql/definitions/Scenes.ts
+//#region Stash-Box Models
+/** @see {@link https://github.com/stashapp/stash-box/blob/develop/frontend/src/graphql/definitions/Scenes.ts} */
 interface ScenePerformance_URL {
     __typename: "URL";
     url: string;

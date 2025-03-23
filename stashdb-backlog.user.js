@@ -104,8 +104,8 @@ async function inject() {
    * @returns {Record<string, any> | undefined}
    */
   const getReactFiber = (el) =>
-    //@ts-expect-error
-    el[Object.getOwnPropertyNames(el).find((p) => p.startsWith('__reactFiber$'))];
+    /** @type {Element & { [property: string]: Record<string, any> }} */
+    (el)[Object.getOwnPropertyNames(el).find((p) => p.startsWith('__reactFiber$'))];
 
   const reactRouterHistory = await (async () => {
     const getter = () => {
@@ -254,8 +254,7 @@ async function inject() {
       return;
     }
 
-    //@ts-expect-error
-    if (object === 'backlog') {
+    if (/** @type {AnyObject|'backlog'} */ (object) === 'backlog') {
       if (!ident) {
         // Backlog info page
         toggleBacklogInfo(true);
@@ -263,10 +262,10 @@ async function inject() {
         const backlogInfoStyle = document.createElement('style');
         backlogInfoStyle.id = 'backlog-info-page';
         backlogInfoStyle.textContent = [
-          `.backlog-info-container { margin-top: 2em; }`,
-          `.backlog-info-button { opacity: 0.5; pointer-events: none; top: 2px; margin-top: -2em; }`,
-          `#backlog-info { margin-right: calc(50vw - 450px/2); font-size: 1.3em; width: 450px !important; }`,
-          `.backlog-status-container { margin-right: calc(50vw - 420px/2); font-size: 1.3em; }`,
+          /* css */ `.backlog-info-container { margin-top: 2em; }`,
+          /* css */ `.backlog-info-button { opacity: 0.5; pointer-events: none; top: 2px; margin-top: -2em; }`,
+          /* css */ `#backlog-info { margin-right: calc(50vw - 450px/2); font-size: 1.3em; width: 450px !important; }`,
+          /* css */ `.backlog-status-container { margin-right: calc(50vw - 420px/2); font-size: 1.3em; }`,
         ].join('\n');
         document.head.append(backlogInfoStyle);
 
@@ -687,7 +686,7 @@ details.backlog-fragment > summary:only-child {
   /**
    * @param {Date} dt
    * @returns {string}
-   * @see https://github.com/bahamas10/human/blob/a1dd7dab562fabce86e98395bc70ae8426bb188e/human.js
+   * @see {@link https://github.com/bahamas10/human/blob/a1dd7dab562fabce86e98395bc70ae8426bb188e/human.js}
    */
   function humanRelativeDate(dt) {
     let seconds = Math.round((Date.now() - dt.getTime()) / 1000);
@@ -730,7 +729,7 @@ details.backlog-fragment > summary:only-child {
   }
 
   /**
-   * @see https://github.com/stashapp/stash/blob/v0.12.0/ui/v2.5/src/utils/hamming.ts
+   * @see {@link https://github.com/stashapp/stash/blob/v0.12.0/ui/v2.5/src/utils/hamming.ts}
    * @param {string} hex
    */
   function hexToBinary(hex) {
@@ -738,7 +737,7 @@ details.backlog-fragment > summary:only-child {
   }
 
   /**
-   * @see https://github.com/stashapp/stash/blob/v0.12.0/ui/v2.5/src/utils/hamming.ts
+   * @see {@link https://github.com/stashapp/stash/blob/v0.12.0/ui/v2.5/src/utils/hamming.ts}
    * @param {string} a
    * @param {string | null} [b]
    * @returns {number}
@@ -1345,8 +1344,8 @@ details.backlog-fragment > summary:only-child {
   /**
    * @param {HTMLElement} element
    * @param {string} value
-   * @see https://stackoverflow.com/a/48890844
-   * @see https://github.com/facebook/react/issues/10135#issuecomment-401496776
+   * @see {@link https://stackoverflow.com/a/48890844}
+   * @see {@link https://github.com/facebook/react/issues/10135#issuecomment-401496776}
    */
   function setNativeValue(element, value) {
     const valueSetter = Object.getOwnPropertyDescriptor(element, 'value')?.set;
@@ -1598,7 +1597,7 @@ details.backlog-fragment > summary:only-child {
 
   /**
    * @param {HTMLElement} element
-   * @see https://www.javascripttutorial.net/dom/css/check-if-an-element-is-visible-in-the-viewport/
+   * @see {@link https://www.javascripttutorial.net/dom/css/check-if-an-element-is-visible-in-the-viewport/}
    */
   function isInViewport(element) {
     const rect = element.getBoundingClientRect();
@@ -2095,7 +2094,7 @@ details.backlog-fragment > summary:only-child {
    * @param {HTMLElement} el
    * @param {AnyObject} object
    * @param {string} uuid
-   * @see https://stackoverflow.com/a/48890844
+   * @see {@link https://stackoverflow.com/a/48890844}
    */
   const removeHook = (el, object, uuid) => {
     const hook = () => {
