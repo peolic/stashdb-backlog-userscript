@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.38.6
+// @version     1.38.7
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -371,6 +371,20 @@ async function inject() {
   height: 4.2em;
   padding-right: 1.4em;
 }
+.backlog-status-bg {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+  width: 100%;
+	overflow: hidden;
+	line-height: 0.9em;
+	padding: 0 6px 6px 6px;
+	font-size: 3.6rem;
+	font-weight: 800;
+	letter-spacing: 20px;
+	opacity: 0.1;
+	user-select: none;
+}
 .backlog-status-close {
   cursor: pointer;
   user-select: none;
@@ -512,6 +526,11 @@ details.backlog-fragment > summary:only-child {
       const statusContainer = document.createElement('div');
       statusContainer.classList.add('backlog-status-container');
       statusContainer.classList.add('d-none');
+
+      const background = document.createElement('div');
+      background.classList.add('backlog-status-bg');
+      background.innerText = 'BACKLOG';
+      statusContainer.appendChild(background);
 
       const status = document.createElement('div');
       status.id = 'backlog-status';
