@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.38.4
+// @version     1.38.5
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -819,6 +819,7 @@ details.backlog-fragment > summary:only-child {
     static _DATA_INDEX_KEY = 'stashdb_backlog_index';
     static _SCENES_DATA_KEY = 'stashdb_backlog_scenes';
     static _PERFORMERS_DATA_KEY = 'stashdb_backlog_performers';
+    static _DYNAMIC_DATA_KEY = 'dynamic_data';
     static _LEGACY_DATA_KEY = 'stashdb_backlog';
 
     /** @type {Settings | null} */
@@ -843,41 +844,53 @@ details.backlog-fragment > summary:only-child {
 
     /** @type {DataCache | null} */
     static _data = null;
-    /** @type {PerformerScenes | null} */
-    static _performerScenes = null;
-    /** @type {PerformerFragments | null} */
-    static _performerFragments = null;
 
     /** @param {boolean} invalidate Force reload of stored data */
     static async getStoredData(invalidate = false) {
       if (!this._data || invalidate) {
         const scenes = /** @type {DataCache['scenes']} */ (await this._getValue(this._SCENES_DATA_KEY));
         const performers = /** @type {DataCache['performers']} */ (await this._getValue(this._PERFORMERS_DATA_KEY));
-        const cache = /** @type {BaseCache} */ (await this._getValue(this._DATA_INDEX_KEY));
-        const { lastChecked, lastUpdated, submitted } = cache;
-        /** @type {DataCache} */
-        const dataCache = { scenes, performers, lastChecked, lastUpdated, submitted };
-        if (Object.values(scenes).length === 0 && Object.values(performers).length === 0) {
-          const legacyCache = /** @type {CompactDataCache} */ (await this._getValue(this._LEGACY_DATA_KEY));
-          this._data = await this.applyDataCacheMigrations(legacyCache);
-        } else {
-          this._data = dataCache;
-        }
+        const index = /** @type {BaseCache} */ (await this._getValue(this._DATA_INDEX_KEY));
+        const { lastChecked, lastUpdated, submitted } = index;
 
-        this._data = await this.applyMigrations(this._data);
-        await this.setData(this._data);
+        const rawData =
+          (Object.values(scenes).length === 0 && Object.values(performers).length === 0)
+            ? /** @type {CompactDataCache} */ (await this._getValue(this._LEGACY_DATA_KEY))
+            : /** @type {DataCache} */ ({ scenes, performers, lastChecked, lastUpdated, submitted });
 
-        // TODO: store and retrieve, only regenerate on update
-        this._generateDynamicData();
+        await this.injestData(rawData);
       }
+
+      const dynamicData = /** @type {DynamicDataObject} */ (await this._getValue(this._DYNAMIC_DATA_KEY));
+      this._generateDynamicData(
+        Object.keys(dynamicData).length > 0
+          ? dynamicData
+          : undefined
+      );
+
       return this._data;
+    }
+
+    /** @param {CompactDataCache | DataCache} rawData */
+    static async injestData(rawData) {
+      /** @type {DataCache} */
+      let data;
+      if (!('scenes' in rawData && 'performers' in rawData)) {
+        data = await this._applyDataCacheMigrations(rawData);
+        await this._deleteValue(this._DYNAMIC_DATA_KEY); // clear dynamic data
+      } else {
+        data = /** @type {DataCache} */ (rawData);
+      }
+      data = await this._applyMigrations(data);
+
+      await this.setData(data);
     }
 
     /**
      * @param {CompactDataCache} legacyCache
      * @returns {Promise<DataCache>}
      */
-    static async applyDataCacheMigrations(legacyCache) {
+    static async _applyDataCacheMigrations(legacyCache) {
       const { lastChecked, lastUpdated, submitted, ...rest } = legacyCache;
       /** @type {DataCache} */
       const dataCache = {
@@ -918,10 +931,8 @@ details.backlog-fragment > summary:only-child {
         dataCache[object][uuid] = legacyCache[cacheKey];
       }
 
-      await Cache.setData(dataCache);
-
       if (oldKeys.length > 0) {
-        await Cache._deleteValue(Cache._LEGACY_DATA_KEY);
+        await this._deleteValue(this._LEGACY_DATA_KEY);
       }
 
       return dataCache;
@@ -931,7 +942,7 @@ details.backlog-fragment > summary:only-child {
      * @param {MigrationDataCache} dataCache
      * @returns {Promise<DataCache>}
      */
-    static async applyMigrations(dataCache) {
+    static async _applyMigrations(dataCache) {
       return dataCache;
     }
 
@@ -951,71 +962,77 @@ details.backlog-fragment > summary:only-child {
       await this._deleteValue(this._SCENES_DATA_KEY);
       await this._deleteValue(this._PERFORMERS_DATA_KEY);
       await this._deleteValue(this._DATA_INDEX_KEY);
+      await this._deleteValue(this._DYNAMIC_DATA_KEY);
       this._data = null;
-      this._performerScenes = null;
     }
 
-    /** @returns {void} */
-    static _generateDynamicData() {
+    /**
+     * @param {DynamicDataObject} cachedDynamicData
+     * @returns {void}
+     */
+    static _generateDynamicData(cachedDynamicData) {
       if (!this._data) return;
 
-      /** @type {PerformerScenes} */
-      this._performerScenes = {};
+      const performerScenes = cachedDynamicData?.performerScenes ?? {};
+      const performerFragments = cachedDynamicData?.performerFragments ?? {};
 
       for (const [sceneId, scene] of Object.entries(this._data.scenes)) {
         Object.defineProperties(scene, {
-          type: { get: () => 'SceneDataObject' },
+          type: { value: 'SceneDataObject' },
           changes: { get() { return dataObjectKeys(/** @type {SceneDataObject} */ (this)); } },
         });
 
         // Performer Scenes
-        if (scene.performers) {
+        if (!cachedDynamicData && scene.performers) {
           for (const [action, entries] of Object.entries(scene.performers)) {
             for (const entry of entries) {
               if (!entry.id)
                 continue;
-              if (!this._performerScenes[entry.id])
-                this._performerScenes[entry.id] = {};
+              if (!performerScenes[entry.id])
+                performerScenes[entry.id] = {};
 
-              this._performerScenes[entry.id][sceneId] =
+              performerScenes[entry.id][sceneId] =
                 /** @type {keyof SceneDataObject["performers"]} */ (action);
             }
           }
         }
       }
 
-      /** @type {PerformerFragments} */
-      this._performerFragments = {};
+      if (!cachedDynamicData) {
+        for (const [performerId, performer] of Object.entries(this._data.performers)) {
+          // TODO: improve in order to replace `getPerformerFragments`
+          // Performer Fragments
+          if (performer.split) {
+            performer.split.fragments.forEach((fragment, fragmentIdx) => {
+              if (!fragment.id || fragment.id === performerId)
+                return;
+              if (!performerFragments[fragment.id])
+                performerFragments[fragment.id] = {};
 
-      for (const [performerId, performer] of Object.entries(this._data.performers)) {
-        // TODO: improve in order to replace `getPerformerFragments`
-        // Performer Fragments
-        if (performer.split) {
-          performer.split.fragments.forEach((fragment, fragmentIdx) => {
-            if (!fragment.id || fragment.id === performerId)
-              return;
-            if (!this._performerFragments[fragment.id])
-              this._performerFragments[fragment.id] = {};
-
-            this._performerFragments[fragment.id][performerId] = [fragmentIdx];
-          });
+              performerFragments[fragment.id][performerId] = [fragmentIdx];
+            });
+          }
         }
+
+        /** @type {DynamicDataObject} */
+        const dynamicData = { performerScenes, performerFragments };
+        this._setValue(this._DYNAMIC_DATA_KEY, dynamicData);
       }
 
       const uniquePerformerIds = new Set([
         ...Object.keys(this._data.performers),
-        ...Object.keys(this._performerScenes),
-        ...Object.keys(this._performerFragments),
+        ...Object.keys(performerScenes),
+        ...Object.keys(performerFragments),
       ]);
       for (const performerId of uniquePerformerIds) {
-        const pScenes = this._performerScenes[performerId];
-        const pFragments = this._performerFragments[performerId];
+        const pScenes = performerScenes[performerId];
+        const pFragments = performerFragments[performerId];
         if (!this._data.performers[performerId] && (pScenes || pFragments))
           /** @type {Omit<PerformerDataObject, DataObjectGetters>} */
           (this._data.performers[performerId]) = {};
 
         Object.defineProperties(this._data.performers[performerId], {
-          type: { get: () => 'PerformerDataObject' },
+          type: { value: 'PerformerDataObject' },
           changes: { get() { return dataObjectKeys(/** @type {PerformerDataObject} */ (this)); } },
           ...(pScenes    && { scenes:    { value: pScenes,    enumerable: true } }),
           ...(pFragments && { fragments: { value: pFragments, enumerable: true } }),
@@ -1081,9 +1098,7 @@ details.backlog-fragment > summary:only-child {
 
       /** @type {CompactDataCache} */
       const legacyCache = (await request(`${BASE_URL}/stashdb_backlog.json`, 'json'));
-      let dataCache = await Cache.applyDataCacheMigrations(legacyCache);
-      dataCache = await Cache.applyMigrations(dataCache);
-      await Cache.setData(dataCache);
+      await Cache.injestData(legacyCache);
 
       setStatus('[backlog] data updated', 5000);
       return 'UPDATED';

@@ -42,7 +42,7 @@ type DataObjectGetters = "type" | "changes";
 
 type SceneChanges = Exclude<keyof SceneDataObject, DataObjectGetters | "comments" | "c_studio">;
 interface SceneDataObject {
-    get type(): "SceneDataObject";
+    readonly type: "SceneDataObject";
     get changes(): SceneChanges[];
 
     duplicates?: string[];
@@ -69,7 +69,7 @@ interface SceneDataObject {
 
 type PerformerChanges = Exclude<keyof PerformerDataObject, DataObjectGetters | "name">;
 interface PerformerDataObject {
-    get type(): "PerformerDataObject";
+    readonly type: "PerformerDataObject";
     get changes(): PerformerChanges[];
     readonly scenes?: PerformerScenes[string];
     readonly fragments?: PerformerFragments[string];
@@ -119,6 +119,11 @@ interface PerformerFragments {
     [uuid: string]: {
         [performerId: string]: number[]; // v= fragmentIds
     };
+}
+
+interface DynamicDataObject {
+    performerScenes: PerformerScenes;
+    performerFragments: PerformerFragments;
 }
 
 interface BaseCache {
