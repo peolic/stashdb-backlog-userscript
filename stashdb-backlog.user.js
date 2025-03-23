@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.38.5
+// @version     1.38.6
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -10,7 +10,6 @@
 // @grant       GM.getValue
 // @grant       GM.deleteValue
 // @grant       GM.xmlHttpRequest
-// @grant       GM.registerMenuCommand
 // @grant       GM.addStyle
 // @connect     github.com
 // @connect     githubusercontent.com
@@ -150,19 +149,19 @@ async function inject() {
     isDev = devUsernames.includes(await getUser());
     settings = await Cache.getSettings();
 
-    setUpStatusDiv();
+    if (init)
+      globalStyle();
+
     setUpInfo();
 
     // Ensure data is populated
     if (!await Cache.getStoredData(true)) {
-      return setStatus('[backlog] failed to ensure cache data', 10000);
+      return setStatus('failed to ensure cache data', 10000);
     }
 
     if (init) {
       console.log('[backlog] init');
       await updateBacklogData();
-      setUpMenu();
-      globalStyle();
     }
 
     const { object, ident, action } = loc;
@@ -264,8 +263,10 @@ async function inject() {
         const backlogInfoStyle = document.createElement('style');
         backlogInfoStyle.id = 'backlog-info-page';
         backlogInfoStyle.textContent = [
-          `nav > .backlog-info > div { margin-top: 2em; margin-right: calc(50vw - 7em); font-size: 1.3em; width: 450px !important; }`,
-          `nav > .backlog-info > span { opacity: 0.5; pointer-events: none; }`,
+          `.backlog-info-container { margin-top: 2em; }`,
+          `.backlog-info-button { opacity: 0.5; pointer-events: none; top: 2px; margin-top: -2em; }`,
+          `#backlog-info { margin-right: calc(50vw - 450px/2); font-size: 1.3em; width: 450px !important; }`,
+          `.backlog-status-container { margin-right: calc(50vw - 420px/2); font-size: 1.3em; }`,
         ].join('\n');
         document.head.append(backlogInfoStyle);
 
@@ -323,50 +324,66 @@ async function inject() {
 
   setTimeout(dispatcher, 0, true);
 
-  async function setUpStatusDiv() {
-    if (document.querySelector('div#backlogStatus')) return;
-    const statusDiv = document.createElement('div');
-    statusDiv.id = 'backlogStatus';
-    statusDiv.classList.add('me-auto', 'd-none');
-    const navLeft = await elementReadyIn('nav > :first-child', 1000);
-    navLeft.after(statusDiv);
-
-    window.addEventListener(locationChanged, () => setStatus(''));
-
-    new MutationObserver(() => {
-      statusDiv.classList.toggle('d-none', !statusDiv.innerText);
-    }).observe(statusDiv, { childList: true, subtree: true });
-  }
-
   /** @param {boolean} forceFetch */
   async function fetchData(forceFetch) {
     const result = await (forceFetch ? fetchBacklogData() : updateBacklogData(true));
     if (result === 'ERROR') {
-      setStatus('[backlog] failed to download cache', 10000);
+      setStatus('failed to download cache', 10000);
       return false;
     }
     if (result === 'UPDATED') {
-      setStatus('[backlog] cache downloaded, reloading page...');
+      setStatus('cache downloaded, reloading page...');
       setTimeout(() => {
         window.location.reload();
       }, 1000);
     } else {
-      setStatus('[backlog] no updates found', 5000);
+      setStatus('no updates found', 5000);
     }
     return true;
-  }
-
-  function setUpMenu() {
-    if (isDev) return;
-    //@ts-expect-error
-    GM.registerMenuCommand('Information', () => {
-      toggleBacklogInfo(true);
-    });
   }
 
   function globalStyle() {
     //@ts-expect-error
     GM.addStyle(/* css */`
+.backlog-info-container {
+  position: relative;
+}
+.backlog-info-button {
+  cursor: pointer;
+  position: absolute;
+  left: 2px;
+  top: -12px;
+}
+#backlog-info,
+.backlog-status-container {
+  position: absolute;
+  width: 280px;
+  top: 32px;
+  right: -20px;
+  text-align: center;
+  border: .25rem solid #cccccc;
+  padding: 0.3rem;
+  z-index: 100;
+  background-color: var(--bs-gray-dark); /* #343a40 */
+  transition: margin-top cubic-bezier(1,0,0,1) 0.15s;
+}
+.backlog-status-container {
+  width: 420px;
+  height: 4.2em;
+  padding-right: 1.4em;
+}
+.backlog-status-close {
+  cursor: pointer;
+  user-select: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-weight: 800;
+}
+#backlog-info:has(+ .backlog-status-container:not(.d-none)) {
+  margin-top: calc(4.2em - .25rem);
+}
+
 .performer-backlog:empty,
 .scene-backlog:empty,
 .studio-backlog:empty {
@@ -450,54 +467,38 @@ details.backlog-fragment > summary:only-child {
    */
   function setStatus(text, resetAfter) {
     /** @type {HTMLDivElement} */
-    const statusDiv = (document.querySelector('div#backlogStatus'));
+    const statusDiv = (document.querySelector('#backlog-status'));
     statusDiv.innerText = text;
     if (isDev && text)
-      console.debug(text);
+      console.debug(`[backlog] ${text}`);
     const id = Number(statusDiv.dataset.reset);
     if (id) {
       clearTimeout(id);
-      statusDiv.dataset.reset = '';
+      delete statusDiv.dataset.reset;
     }
     if (resetAfter) {
       const id = setTimeout(() => {
         statusDiv.innerText = '';
-        statusDiv.dataset.reset = '';
+        delete statusDiv.dataset.reset;
       }, resetAfter);
       statusDiv.dataset.reset = String(id);
     }
   }
 
   function setUpInfo() {
-    let info = /** @type {HTMLDivElement} */ (document.querySelector('#root nav > .backlog-info > div'));
+    let info = /** @type {HTMLDivElement} */ (document.querySelector('#backlog-info'));
     if (!info) {
       const infoContainer = document.createElement('div');
-      infoContainer.classList.add('backlog-info');
-      infoContainer.style.position = 'relative';
+      infoContainer.classList.add('backlog-info-container');
 
       const icon = document.createElement('span');
       icon.innerText = '📃';
       icon.title = 'Backlog Info';
-      setStyles(icon, {
-        cursor: 'pointer',
-        position: 'absolute',
-        left: '2px',
-        top: '-12px',
-      });
+      icon.classList.add('backlog-info-button');
 
       info = document.createElement('div');
-      setStyles(info, {
-        position: 'absolute',
-        width: '280px',
-        top: '32px',
-        right: '-20px',
-        textAlign: 'center',
-        border: '.25rem solid #cccccc',
-        padding: '0.3rem',
-        zIndex: '100',
-        backgroundColor: 'var(--bs-gray-dark)',
-        display: 'none',
-      });
+      info.id = 'backlog-info';
+      info.classList.add('d-none');
 
       icon.addEventListener('click', () => toggleBacklogInfo());
       icon.addEventListener('dblclick', () => fetchData(false));
@@ -507,26 +508,48 @@ details.backlog-fragment > summary:only-child {
       const target = document.querySelector('#root nav');
       target.appendChild(infoContainer);
     }
+
+    if (!document.querySelector('#backlog-status')) {
+      const statusContainer = document.createElement('div');
+      statusContainer.classList.add('backlog-status-container');
+      statusContainer.classList.add('d-none');
+
+      const status = document.createElement('div');
+      status.id = 'backlog-status';
+      statusContainer.appendChild(status);
+
+      const closeButton = document.createElement('div');
+      closeButton.classList.add('backlog-status-close');
+      closeButton.innerText = '❌';
+      closeButton.addEventListener('click', () => setStatus(''));
+      statusContainer.appendChild(closeButton);
+
+      info.after(statusContainer);
+
+      // window.addEventListener(locationChanged, () => setStatus(''));
+
+      new MutationObserver(() => {
+        statusContainer.classList.toggle('d-none', !status.innerText);
+      }).observe(status, { childList: true, subtree: true });
+    }
   }
 
   /** @param {boolean} [newState] */
   function toggleBacklogInfo(newState) {
-    const info = /** @type {HTMLDivElement} */ (document.querySelector('#root nav > .backlog-info > div'));
+    const info = /** @type {HTMLDivElement} */ (document.querySelector('#backlog-info'));
 
     if (newState === undefined) {
-      newState = info.style.display === 'none';
+      newState = info.classList.contains('d-none');
     }
 
-    if (newState) {
+    if (newState)
       updateInfo();
-      info.style.display = '';
-    } else {
-      info.style.display = 'none';
-    }
+
+    info.classList.toggle('d-none', !newState);
   }
 
   function updateInfo() {
-    const info = /** @type {HTMLDivElement} */ (document.querySelector('#root nav > .backlog-info > div'));
+    const info = /** @type {HTMLDivElement} */ (document.querySelector('#backlog-info'));
 
     /**
      * @param {string} text
@@ -572,7 +595,7 @@ details.backlog-fragment > summary:only-child {
     } else {
       const ago = humanRelativeDate(new Date(lastUpdated));
       info.append(
-        block(ago, 'me-1'),
+        block(ago),
         block(`(${formatDate(lastUpdated)})`),
       );
 
@@ -1094,17 +1117,17 @@ details.backlog-fragment > summary:only-child {
 
   async function fetchBacklogData() {
     try {
-      setStatus(`[backlog] getting cache...`);
+      setStatus(`getting cache...`);
 
       /** @type {CompactDataCache} */
       const legacyCache = (await request(`${BASE_URL}/stashdb_backlog.json`, 'json'));
       await Cache.injestData(legacyCache);
 
-      setStatus('[backlog] data updated', 5000);
+      setStatus('data updated', 5000);
       return 'UPDATED';
 
     } catch (error) {
-      setStatus(`[backlog] error:\n${error}`);
+      setStatus(`error:\n${error}`);
       console.error('[backlog] error getting cache', error);
       return 'ERROR';
     }
@@ -1115,7 +1138,7 @@ details.backlog-fragment > summary:only-child {
     if (!dev && (forceCheck || updateData)) {
       try {
         // Only fetch if there really was an update
-        setStatus(`[backlog] checking for updates`);
+        setStatus(`checking for updates`);
         const lastUpdated = await getDataLastUpdatedDate();
         if (lastUpdated) {
           updateData = shouldFetch(Cache.data, lastUpdated);
@@ -1124,9 +1147,10 @@ details.backlog-fragment > summary:only-child {
             + ` - updating: ${updateData}`
           );
         }
-        setStatus('');
+        if (!forceCheck)
+          setStatus('');
       } catch (error) {
-        setStatus(`[backlog] error:\n${error}`);
+        setStatus(`error:\n${error}`);
         console.error('[backlog] error trying to determine latest data update', error);
         return 'ERROR';
       } finally {
@@ -2363,7 +2387,7 @@ details.backlog-fragment > summary:only-child {
       const newImageBlob = getImageBlob(found.image);
 
       if (img) {
-        setStatus(`[backlog] fetching/comparing images...`);
+        setStatus(`fetching/comparing images...`);
 
         const onCurrentImageReady = async () => {
           const fullImage = sceneFiber?.images?.find((i) => i.url === img.src);
@@ -2402,7 +2426,7 @@ details.backlog-fragment > summary:only-child {
             imgNewLink.style.flex = '50%';
 
             scenePhoto.appendChild(imgNewLink);
-            setStatus(`[backlog] error fetching/comparing images:\n${newImage}`);
+            setStatus(`error fetching/comparing images:\n${newImage}`);
             return;
           }
 
@@ -2457,7 +2481,7 @@ details.backlog-fragment > summary:only-child {
 
           scenePhoto.appendChild(newImageContainer);
 
-          setStatus(`[backlog] error loading current image:\n${reason}`);
+          setStatus(`error loading current image:\n${reason}`);
         };
 
         imageReady(img).then(
@@ -2467,7 +2491,7 @@ details.backlog-fragment > summary:only-child {
 
       } else {
         // missing image
-        setStatus(`[backlog] fetching new image...`);
+        setStatus(`fetching new image...`);
 
         scenePhoto.classList.add('bg-danger', 'p-2');
         scenePhoto.style.transition = 'min-height 1s ease';
@@ -2489,7 +2513,7 @@ details.backlog-fragment > summary:only-child {
           imgLink.prepend(found.image);
           img.remove();
           scenePhoto.append(imgLink);
-          setStatus(`[backlog] error fetching new image:\n${reason}`);
+          setStatus(`error fetching new image:\n${reason}`);
         };
         newImageBlob.then(
           (blob) => {
