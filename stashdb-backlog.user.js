@@ -238,22 +238,6 @@ async function inject() {
     }
 
     // Backlog - generated pages
-
-    // FIXME: (2024-01-07) temporary - redirect old
-    const newBacklogPath = ({
-      'pbacklog': ['backlog', 'performers'],
-      'preadyfragments': ['backlog', 'fragments-ready'],
-      'pfragments': ['backlog', 'fragment-search'],
-    })[/** @type {string} */ (object)];
-
-    if (newBacklogPath) {
-      document.body.innerHTML = '<div align="center" class="mt-5 fs-1 fw-bold">Redirecting\u{2026}</div>';
-      setTimeout(() => {
-        window.location.pathname = '/' + newBacklogPath.join('/');
-      }, 500);
-      return;
-    }
-
     if (/** @type {AnyObject|'backlog'} */ (object) === 'backlog') {
       if (!ident) {
         // Backlog info page
