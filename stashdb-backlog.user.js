@@ -908,7 +908,7 @@ details.backlog-fragment > summary:only-child {
       }
       data = await this._applyMigrations(data);
 
-      await this.setData(data);
+      await this._setData(data);
     }
 
     /**
@@ -976,14 +976,14 @@ details.backlog-fragment > summary:only-child {
       const { scenes, performers, ...cache } = this._data;
       await this._setValue(this._DATA_INDEX_KEY, cache);
     }
-    static async setData(/** @type {DataCache} */ data) {
+    static async _setData(/** @type {DataCache} */ data) {
       const { scenes, performers, ...cache } = data;
       await this._setValue(this._SCENES_DATA_KEY, scenes);
       await this._setValue(this._PERFORMERS_DATA_KEY, performers);
       await this._setValue(this._DATA_INDEX_KEY, cache);
       this._data = data;
     }
-    static async clearData() {
+    static async _clearData() {
       await this._deleteValue(this._SCENES_DATA_KEY);
       await this._deleteValue(this._PERFORMERS_DATA_KEY);
       await this._deleteValue(this._DATA_INDEX_KEY);
