@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.38.7
+// @version     1.38.8
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -885,14 +885,6 @@ details.backlog-fragment > summary:only-child {
 
         await this.injestData(rawData);
       }
-
-      const dynamicData = /** @type {DynamicDataObject} */ (await this._getValue(this._DYNAMIC_DATA_KEY));
-      this._generateDynamicData(
-        Object.keys(dynamicData).length > 0
-          ? dynamicData
-          : undefined
-      );
-
       return this._data;
     }
 
@@ -900,6 +892,7 @@ details.backlog-fragment > summary:only-child {
     static async injestData(rawData) {
       /** @type {DataCache} */
       let data;
+      // source is compact data cache
       if (!('scenes' in rawData && 'performers' in rawData)) {
         data = await this._applyDataCacheMigrations(rawData);
         await this._deleteValue(this._DYNAMIC_DATA_KEY); // clear dynamic data
@@ -909,6 +902,7 @@ details.backlog-fragment > summary:only-child {
       data = await this._applyMigrations(data);
 
       await this._setData(data);
+      await this._generateDynamicData();
     }
 
     /**
@@ -991,15 +985,17 @@ details.backlog-fragment > summary:only-child {
       this._data = null;
     }
 
-    /**
-     * @param {DynamicDataObject} cachedDynamicData
-     * @returns {void}
-     */
-    static _generateDynamicData(cachedDynamicData) {
+    /** @returns {Promise<void>} */
+    static async _generateDynamicData() {
       if (!this._data) return;
 
-      const performerScenes = cachedDynamicData?.performerScenes ?? {};
-      const performerFragments = cachedDynamicData?.performerFragments ?? {};
+      const [{ performerScenes, performerFragments }, isCached] = await (
+        async () => {
+          const cachedDynamicData = /** @type {DynamicDataObject} */ (await this._getValue(this._DYNAMIC_DATA_KEY));
+          const isCached = Object.keys(cachedDynamicData).length > 0;
+          return [isCached ? cachedDynamicData : { performerScenes: {}, performerFragments: {} }, isCached];
+        }
+      )();
 
       for (const [sceneId, scene] of Object.entries(this._data.scenes)) {
         Object.defineProperties(scene, {
@@ -1008,7 +1004,7 @@ details.backlog-fragment > summary:only-child {
         });
 
         // Performer Scenes
-        if (!cachedDynamicData && scene.performers) {
+        if (!isCached && scene.performers) {
           for (const [action, entries] of Object.entries(scene.performers)) {
             for (const entry of entries) {
               if (!entry.id)
@@ -1023,7 +1019,7 @@ details.backlog-fragment > summary:only-child {
         }
       }
 
-      if (!cachedDynamicData) {
+      if (!isCached) {
         for (const [performerId, performer] of Object.entries(this._data.performers)) {
           // TODO: improve in order to replace `getPerformerFragments`
           // Performer Fragments
