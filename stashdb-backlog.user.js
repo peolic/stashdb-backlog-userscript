@@ -1109,9 +1109,10 @@ details.backlog-fragment > summary:only-child {
   function dataObjectKeys(dataObject) {
     return (
       /** @type {DataObjectKeys<T>[]} */
-      (Object.keys(dataObject ?? {}).filter((key) => key !== 'comments' && key !== 'c_studio' && key !== 'name'))
+      (Object.keys(dataObject ?? {}).filter((key) => !_filteredDataKeys.includes(key)))
     );
   }
+  const _filteredDataKeys = ['comments', 'c_studio', 'urls_notes', 'name'];
 
   async function fetchBacklogData() {
     try {

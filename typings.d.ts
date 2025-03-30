@@ -67,7 +67,7 @@ interface SceneDataObject {
     c_studio?: [name: string, parent: string | null];
 }
 
-type PerformerChanges = Exclude<keyof PerformerDataObject, DataObjectGetters | "name">;
+type PerformerChanges = Exclude<keyof PerformerDataObject, DataObjectGetters | "urls_notes" | "name">;
 interface PerformerDataObject {
     readonly type: "PerformerDataObject";
     get changes(): PerformerChanges[];
