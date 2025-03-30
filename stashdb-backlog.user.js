@@ -444,6 +444,11 @@ async function inject() {
   color: rgba(0,212,255,1) !important;
 }
 
+.performer-backlog div[data-backlog="split"] > details > ol > li::marker {
+	counter-increment: list-item;
+	content: "(" attr(data-sheet-column) ") " counter(list-item) ". ";
+}
+
 /* https://codepen.io/zachhanding/pen/MKyVPq */
 .line-clamp {
   display: block;
@@ -4229,6 +4234,7 @@ details.backlog-fragment > summary:only-child {
       fragments.forEach((fragment, index) => {
         const fragmentEl = document.createElement('li');
         fragmentEl.classList.add('mt-1');
+        fragmentEl.dataset.sheetColumn = fragment.column;
 
         if (highlightFragments.includes(index)) {
           fragmentEl.classList.add('bg-primary', 'bg-opacity-50');

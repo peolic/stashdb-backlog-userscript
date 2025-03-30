@@ -102,6 +102,7 @@ type SceneFingerprint = {
 }
 
 interface SplitFragment {
+    column: string;
     id: string | null;
     name: string;
     text?: string;
