@@ -122,9 +122,16 @@ interface PerformerFragments {
     };
 }
 
+interface PerformerURLFragments {
+    [url: string]: {
+        [performerId: string]: number[]; // v= fragmentIds
+    };
+}
+
 interface DynamicDataObject {
     performerScenes: PerformerScenes;
     performerFragments: PerformerFragments;
+    performerURLFragments: PerformerURLFragments;
 }
 
 interface BaseCache {

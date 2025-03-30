@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.38.9
+// @version     1.39.0
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -642,10 +642,10 @@ details.backlog-fragment > summary:only-child {
       const versionInfo = block(`userscript version: ${usVersion}`);
       info.append(hr, versionInfo);
 
-      const toggles = /** @type {{ name: string; key: keyof Settings; title: string; }[]} */
+      const toggles = /** @type {{ key: keyof Settings; name: string; title: string; }[]} */
       ([
         {key: 'sceneCardPerformers', name: 'scene card performers', title: ''},
-        {key: 'highlightFragments', name: 'highlight fragments (!)', title: '(!) incurs slowness due to heavy calculations'},
+        {key: 'highlightFragments', name: 'highlight fragments (!)', title: '(!) may incur slowness due to heavy calculations'},
       ]).flatMap(({key, name, title}, i) => {
         const toggle = makeLink('#', `Toggle ${name}`);
         if (title) toggle.title = title;
@@ -903,6 +903,9 @@ details.backlog-fragment > summary:only-child {
     /** @type {DataCache | null} */
     static _data = null;
 
+    /** @type {PerformerURLFragments | null} */
+    static performerURLFragments = null;
+
     /** @param {boolean} invalidate Force reload of stored data */
     static async getStoredData(invalidate = false) {
       if (!this._data || invalidate) {
@@ -1027,11 +1030,18 @@ details.backlog-fragment > summary:only-child {
     static async _generateDynamicData() {
       if (!this._data) return;
 
-      const [{ performerScenes, performerFragments }, isCached] = await (
+      const [{ performerScenes, performerFragments, performerURLFragments }, isCached] = await (
         async () => {
           const cachedDynamicData = /** @type {DynamicDataObject} */ (await this._getValue(this._DYNAMIC_DATA_KEY));
-          const isCached = Object.keys(cachedDynamicData).length > 0;
-          return [isCached ? cachedDynamicData : { performerScenes: {}, performerFragments: {} }, isCached];
+          /** @type {(keyof DynamicDataObject)[]} */
+          const keys = ['performerScenes', 'performerFragments', 'performerURLFragments'];
+          const isCached = keys.every((key) => key in cachedDynamicData);
+          const data = /** @type {DynamicDataObject} */ (
+            isCached
+              ? cachedDynamicData
+              : Object.fromEntries(keys.map((key) => [key, {}]))
+          );
+          return [data, isCached];
         }
       )();
 
@@ -1059,22 +1069,41 @@ details.backlog-fragment > summary:only-child {
 
       if (!isCached) {
         for (const [performerId, performer] of Object.entries(this._data.performers)) {
-          // TODO: improve in order to replace `getPerformerFragments`
           // Performer Fragments
           if (performer.split) {
             performer.split.fragments.forEach((fragment, fragmentIdx) => {
-              if (!fragment.id || fragment.id === performerId)
-                return;
-              if (!performerFragments[fragment.id])
-                performerFragments[fragment.id] = {};
+              if (fragment.id) {
+                if (fragment.id === performerId)
+                  return;
+                if (!performerFragments[fragment.id])
+                  performerFragments[fragment.id] = {};
 
-              performerFragments[fragment.id][performerId] = [fragmentIdx];
+                if (!performerFragments[fragment.id][performerId])
+                  performerFragments[fragment.id][performerId] = [fragmentIdx];
+                else if (!performerFragments[fragment.id][performerId].includes(fragmentIdx))
+                  performerFragments[fragment.id][performerId].push(fragmentIdx);
+              }
+
+              // map sanitized fragment url to performer IDs
+              fragment.links?.forEach((url) => {
+                url = sanitizeFragmentURL(url);
+                if (!performerURLFragments[url])
+                  performerURLFragments[url] = {};
+
+                if (!performerURLFragments[url][performerId])
+                  performerURLFragments[url][performerId] = [fragmentIdx];
+                else if (!performerURLFragments[url][performerId].includes(fragmentIdx))
+                  performerURLFragments[url][performerId].push(fragmentIdx);
+              });
+
             });
           }
         }
+      }
 
+      if (!isCached) {
         /** @type {DynamicDataObject} */
-        const dynamicData = { performerScenes, performerFragments };
+        const dynamicData = { performerScenes, performerFragments, performerURLFragments };
         this._setValue(this._DYNAMIC_DATA_KEY, dynamicData);
       }
 
@@ -1097,6 +1126,8 @@ details.backlog-fragment > summary:only-child {
           ...(pFragments && { fragments: { value: pFragments, enumerable: true } }),
         });
       }
+
+      this.performerURLFragments = performerURLFragments;
     }
 
     static get data() {
@@ -1761,83 +1792,113 @@ details.backlog-fragment > summary:only-child {
   const validFragmentLink = (url) =>
     !fragmentLinksToIgnore.some((i) => i instanceof RegExp ? i.test(url) : url.startsWith(i))
 
+  /** @param {string} url */
+  const sanitizeFragmentURL = (url) =>
+    url.replace(/^https?:\/\/(www\.)?/i, '').toLowerCase();
+
   /**
-   * @param {{ performerId?: string; urls: string[]; }} data
+   * @param {string[]} arr
+   * @param {string} search
+   * @returns {Boolean}
+   */
+  const arrayIncludesURL = (arr, search) => {
+    search = sanitizeFragmentURL(search);
+    return arr.some((v) => (
+      0 === v.localeCompare(search, undefined, { sensitivity: 'base' })
+      || 0 === sanitizeFragmentURL(v).localeCompare(search, undefined, { sensitivity: 'base' })
+    ));
+  };
+
+  /**
+   * @param {{ urls: string[]; performerId?: string }} input
+   * @returns {string[]}
+   */
+  const performerFragmentsByURLs = ({ urls, performerId: currentPerformerId }) => {
+    if (!Cache.performerURLFragments)
+      throw new Error('Unexpected: null performerURLFragments');
+
+    const currentPerformerURL = `${window.location.origin}/performers/${currentPerformerId}`;
+    const seen = new Set();
+    return urls.concat(currentPerformerId ? currentPerformerURL : [])
+      .reduce((result, url) => {
+        url = sanitizeFragmentURL(url);
+        if (seen.has(url)) return result;
+        seen.add(url);
+
+        const matches = Object.keys(Cache.performerURLFragments[url] ?? {});
+        // exclude the currently viewed performer (if provided)
+        if (currentPerformerId && matches.includes(currentPerformerId))
+          matches.splice(matches.indexOf(currentPerformerId), 1);
+        return result.concat(matches);
+      }, /** @type {string[]} */ ([]));
+  };
+
+  /**
+   * @param {{ urls: string[]; performerId?: string }} input
+   * @param {boolean} [findPossibleLinks=true]
    * @returns {{
    *   performerFragments: PerformerEntriesItem[];
    *   fragmentIndexMap: FragmentIndexMap;
    *   possibleLinks: string[];
    * }}
    */
-  const getPerformerFragments = ({ performerId, urls }) => {
+  const performerFragmentsByURLsFull = ({ urls, performerId: currentPerformerId }, findPossibleLinks=true) => {
+    if (!Cache.performerURLFragments)
+      throw new Error('Unexpected: null performerURLFragments');
+
     /** @type {FragmentIndexMap} */
     const fragmentIndexMap = {};
 
-    /** @param {string} s */
-    const reNoSchemeWWW = (s) => s.replace(/^https?:\/\/(www\.)?/, '');
-    /**
-     * @param {string[]} arr
-     * @param {string} search
-     * @returns {Boolean}
-     */
-    const arrayIncludesURL = (arr, search) => {
-      const searchNoSchemeWWW = reNoSchemeWWW(search);
-      return arr.some((v) => (
-        0 === v.localeCompare(search, undefined, { sensitivity: 'base' })
-        || 0 === reNoSchemeWWW(v).localeCompare(searchNoSchemeWWW, undefined, { sensitivity: 'base' })
-      ));
-    };
+    /** @type {Set<string>} */
+    const possibleLinks = new Set();
 
-    /** @type {string[]} */
-    const possibleLinks = [];
+    const currentPerformerURL = `${window.location.origin}/performers/${currentPerformerId}`;
+    const seen = new Set();
+    const performerURLFragments =
+      urls.concat(currentPerformerId ? currentPerformerURL : [])
+      .reduce((result, url) => {
+        url = sanitizeFragmentURL(url);
+        if (seen.has(url)) return result;
+        seen.add(url);
 
-    const performerFullURL = `${window.location.origin}/performers/${performerId}`;
-    const performerFragments = Object.entries(Cache.data.performers).filter(([id, { split }]) => {
-      if ((performerId && id === performerId) || !split) return false;
-      const { fragments } = split;
-      const matchedFragments = fragments.filter(({ id: fragmentId, links }) => (
-        // fragment id is currently viewed performer
-        (performerId && fragmentId === performerId) ||
-        !!links && (
-          // any performer url listed in fragment links?
-          urls.some((url) => arrayIncludesURL(links, url)) ||
-          // current performer url listed in fragment links? (additional performers)
-          links.some((link) => link.startsWith(performerFullURL))
-        )
-      ));
+        const matches = Cache.performerURLFragments[url];
+        if (!matches)
+          return result;
 
-      matchedFragments.forEach((matchedFragment) => {
-        if (matchedFragment.id && performerId && matchedFragment.id !== performerId) {
-          const fragmentPerformerURL = `${window.location.origin}/performers/${matchedFragment.id}`;
-          if (!arrayIncludesURL(possibleLinks, fragmentPerformerURL))
-            possibleLinks.push(fragmentPerformerURL);
+        for (const [matchId, fragmentIds] of Object.entries(matches)) {
+          // fragment id is currently viewed performer
+          if (currentPerformerId && matchId === currentPerformerId)
+            continue;
+
+          fragmentIndexMap[matchId] = fragmentIds;
+          const performerData = getDataFor('performers', matchId);
+          result.push([matchId, performerData]);
+
+          if (!findPossibleLinks)
+            continue;
+          const { fragments } = performerData.split;
+          for (const fragmentId of fragmentIds) {
+            const matchedFragment = fragments[fragmentId];
+            if (matchedFragment.id && currentPerformerId && matchedFragment.id !== currentPerformerId) {
+              const fragmentPerformerURL = `${window.location.origin}/performers/${matchedFragment.id}`;
+              possibleLinks.add(fragmentPerformerURL);
+            }
+            matchedFragment.links?.forEach((link) => {
+              // is new link and not a link to current performer
+              if (!arrayIncludesURL(urls, link) && link !== currentPerformerURL) {
+                possibleLinks.add(link);
+              }
+            });
+          }
         }
-        if (matchedFragment.links) {
-          const newLinks = matchedFragment.links
-            .filter((link) => (
-              !arrayIncludesURL(urls, link) // is new link
-              && link !== performerFullURL // is not a link to current performer
-            ));
-          newLinks.forEach((newLink) => {
-            if (!arrayIncludesURL(possibleLinks, newLink))
-              possibleLinks.push(newLink);
-          });
-        }
-        // Store fragment index for matching later
-        const fragmentIndex = fragments.indexOf(matchedFragment);
-        if (!fragmentIndexMap[id])
-          fragmentIndexMap[id] = [fragmentIndex];
-        else if (!fragmentIndexMap[id].includes(fragmentIndex))
-          fragmentIndexMap[id].push(fragmentIndex);
-      })
 
-      return matchedFragments.length > 0;
-    });
+        return result;
+      }, /** @type {PerformerEntriesItem[]} */ ([]));
 
     return {
-      performerFragments,
+      performerFragments: performerURLFragments,
       fragmentIndexMap,
-      possibleLinks,
+      possibleLinks: Array.from(possibleLinks),
     };
   };
 
@@ -4078,7 +4139,7 @@ details.backlog-fragment > summary:only-child {
     (function fragments() {
       // merge current links with backlogged links
       const urls = performerUrls.concat(foundData?.urls || []);
-      const { performerFragments, fragmentIndexMap, possibleLinks } = getPerformerFragments({ performerId, urls });
+      const { performerFragments, fragmentIndexMap, possibleLinks } = performerFragmentsByURLsFull({ urls, performerId });
 
       if (performerFragments.length === 0)
         return;
@@ -4974,13 +5035,12 @@ details.backlog-fragment > summary:only-child {
       const found = getDataFor(object, uuid);
 
       if (found?.type === 'PerformerDataObject') {
-        // TODO: remove (in favor of `found.changes`)
         if (!found.changes.includes('fragments') && settings.highlightFragments) {
           /** @type {{ urls: ScenePerformance_URL[] }} */
           const performerFiber = closestReactProperty(cardLink, 'performer', 4);
           const urls = performerFiber?.urls.map((u) => u.url) || [];
-          const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: uuid, urls });
-          if (Object.keys(fragments).length > 0)
+          const fragments = performerFragmentsByURLs({ urls, performerId: uuid });
+          if (fragments.length > 0)
             found.changes.push('fragments');
         }
       }
@@ -5127,14 +5187,13 @@ details.backlog-fragment > summary:only-child {
       const performerId = parsePath(card.querySelector('a').href).ident;
       const found = getDataFor('performers', performerId);
 
-      // TODO: remove (in favor of `found.changes`)
       const changes = found?.changes ?? [];
       if (!changes.includes('fragments') && settings.highlightFragments) {
         /** @type {{ urls: ScenePerformance_URL[] }} */
         const performerFiber = closestReactProperty(card, 'performer', 2);
         const urls = performerFiber?.urls?.map((u) => u.url) || [];
-        const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId, urls });
-        if (Object.keys(fragments).length > 0)
+        const fragments = performerFragmentsByURLs({ urls, performerId });
+        if (fragments.length > 0)
           changes.push('fragments');
       }
 
@@ -5355,10 +5414,7 @@ details.backlog-fragment > summary:only-child {
         return;
 
       if (found.type === 'PerformerDataObject') {
-        // TODO: remove (in favor of `found.changes`)
-        // FIXME: getPerformerFragments is too heavy for the edits pages
-        //        optimize, we only need number of fragments
-        if (false /* settings.highlightFragments */) { // disabled section
+        if (settings.highlightFragments) {
           /** @type {string[]} */
           const urls = (() => {
             /** @type {HTMLDivElement} */
@@ -5371,11 +5427,10 @@ details.backlog-fragment > summary:only-child {
                 .map(({ performer }) => performer).find(({ id }) => id === ident);
             return performerFiber?.urls?.map((u) => u.url) || [];
           })();
-          const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: ident, urls });
-          if (Object.keys(fragments).length > 0)
-            // @ts-expect-error
+          const fragments = performerFragmentsByURLs({ urls, performerId: ident });
+          if (fragments.length > 0)
             found.changes.push('fragments');
-        } // disabled section
+        }
       }
 
       let backgroundColor = 'var(--bs-warning)';
@@ -5474,7 +5529,7 @@ details.backlog-fragment > summary:only-child {
         (function fragments() {
           if (isEditsList && !settings.highlightFragments) return;
 
-          const { performerFragments, fragmentIndexMap } = getPerformerFragments({ urls });
+          const { performerFragments, fragmentIndexMap } = performerFragmentsByURLsFull({ urls }, false);
           if (performerFragments.length === 0) return;
 
           (function possibleExistingPerformers() {
@@ -6158,7 +6213,7 @@ details.backlog-fragment > summary:only-child {
       const urls = urlInput.value.replace(/^\s+|\s+$/g, '').split('\n');
       if (!performerId && urls.length === 0)
         return;
-      const { performerFragments, possibleLinks, fragmentIndexMap } = getPerformerFragments({ performerId, urls });
+      const { performerFragments, possibleLinks, fragmentIndexMap } = performerFragmentsByURLsFull({ urls, performerId });
 
       // find by pending links
       const performerByPendingLinks = Object.entries(Cache.data.performers).find(
