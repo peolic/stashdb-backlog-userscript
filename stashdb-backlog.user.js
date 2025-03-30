@@ -107,6 +107,30 @@ async function inject() {
     /** @type {Element & { [property: string]: Record<string, any> }} */
     (el)[Object.getOwnPropertyNames(el).find((p) => p.startsWith('__reactFiber$'))];
 
+  /**
+   * Traverse React fiber parents until a specific property is found.
+   * @template T
+   * @param {Element | Record<string, any> | undefined} elOrFiber
+   * @param {string} property
+   * @param {number} [maxParents=10]
+   * @returns {T | undefined} property value
+   */
+  const closestReactProperty = (elOrFiber, property, maxParents = 10) => {
+    let fiber =
+      elOrFiber instanceof Element
+        ? getReactFiber(elOrFiber)
+        : elOrFiber;
+    if (!elOrFiber) throw new Error('Unexpected: missing react fiber');
+
+    let propValue;
+    let parentsTraversed = 0;
+    while (parentsTraversed <= maxParents && !(propValue = fiber?.memoizedProps?.[property])) {
+      parentsTraversed++;
+      fiber = fiber.return;
+    }
+    return propValue;
+  };
+
   const reactRouterHistory = await (async () => {
     const getter = () => {
       const e = document.querySelector('#root > div');
@@ -4938,7 +4962,7 @@ details.backlog-fragment > summary:only-child {
         // TODO: remove (in favor of `found.changes`)
         if (!found.changes.includes('fragments') && settings.highlightFragments) {
           /** @type {{ urls: ScenePerformance_URL[] }} */
-          const performerFiber = getReactFiber(cardLink)?.return?.return?.return?.return?.memoizedProps?.performer;
+          const performerFiber = closestReactProperty(cardLink, 'performer', 4);
           const urls = performerFiber?.urls.map((u) => u.url) || [];
           const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId: uuid, urls });
           if (Object.keys(fragments).length > 0)
@@ -5092,7 +5116,7 @@ details.backlog-fragment > summary:only-child {
       const changes = found?.changes ?? [];
       if (!changes.includes('fragments') && settings.highlightFragments) {
         /** @type {{ urls: ScenePerformance_URL[] }} */
-        const performerFiber = getReactFiber(card)?.return?.return?.memoizedProps?.performer;
+        const performerFiber = closestReactProperty(card, 'performer', 2);
         const urls = performerFiber?.urls?.map((u) => u.url) || [];
         const { fragmentIndexMap: fragments } = getPerformerFragments({ performerId, urls });
         if (Object.keys(fragments).length > 0)
@@ -5325,10 +5349,10 @@ details.backlog-fragment > summary:only-child {
             /** @type {HTMLDivElement} */
             const changeRow = entityLink.closest('.ListChangeRow-Performers');
             if (!changeRow) return [];
-            const { added, removed } = getReactFiber(changeRow)?.return?.return?.memoizedProps;
+            const { added_performers, removed_performers } = closestReactProperty(changeRow, 'details', 3);
             const performerFiber =
               /** @type {{ performer: { id: string; urls: ScenePerformance_URL[] } }[]} */
-              (added || removed || [])
+              ([].concat(added_performers ?? [], removed_performers ?? []))
                 .map(({ performer }) => performer).find(({ id }) => id === ident);
             return performerFiber?.urls?.map((u) => u.url) || [];
           })();
