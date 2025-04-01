@@ -181,7 +181,7 @@ async function inject() {
 
     // Ensure data is populated
     if (!await Cache.getStoredData(true)) {
-      return setStatus('failed to ensure cache data', 10000);
+      return setStatus('failed to load data', 10000);
     }
 
     if (!isReady) {
@@ -906,17 +906,22 @@ details.backlog-fragment > summary:only-child {
     /** @param {boolean} invalidate Force reload of stored data */
     static async getStoredData(invalidate = false) {
       if (!this._data || invalidate) {
-        const scenes = /** @type {DataCache['scenes']} */ (await this._getValue(this._SCENES_DATA_KEY));
-        const performers = /** @type {DataCache['performers']} */ (await this._getValue(this._PERFORMERS_DATA_KEY));
-        const index = /** @type {BaseCache} */ (await this._getValue(this._DATA_INDEX_KEY));
-        const { lastChecked, lastUpdated, submitted } = index;
+        try {
+          const scenes = /** @type {DataCache['scenes']} */ (await this._getValue(this._SCENES_DATA_KEY));
+          const performers = /** @type {DataCache['performers']} */ (await this._getValue(this._PERFORMERS_DATA_KEY));
+          const index = /** @type {BaseCache} */ (await this._getValue(this._DATA_INDEX_KEY));
+          const { lastChecked, lastUpdated, submitted } = index;
 
-        const rawData =
-          (Object.values(scenes).length === 0 && Object.values(performers).length === 0)
-            ? /** @type {CompactDataCache} */ (await this._getValue(this._LEGACY_DATA_KEY))
-            : /** @type {DataCache} */ ({ scenes, performers, lastChecked, lastUpdated, submitted });
+          const rawData =
+            (Object.values(scenes).length === 0 && Object.values(performers).length === 0)
+              ? /** @type {CompactDataCache} */ (await this._getValue(this._LEGACY_DATA_KEY))
+              : /** @type {DataCache} */ ({ scenes, performers, lastChecked, lastUpdated, submitted });
 
-        await this.injestData(rawData);
+          await this.injestData(rawData);
+        } catch (error) {
+          setStatus(`error:\n${error}`);
+          console.error('[backlog] error in getStoredData', error);
+        }
       }
       return this._data;
     }
