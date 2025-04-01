@@ -153,11 +153,12 @@ async function inject() {
     return history;
   })();
 
+  let isReady = false;
   let isDevUser = false;
   /** @type {Settings} */
   let settings;
 
-  async function dispatcher(init=false) {
+  async function dispatcher() {
     const loc = parsePath();
     if (!loc) {
       throw new Error('[backlog] Failed to parse location!');
@@ -173,7 +174,7 @@ async function inject() {
     isDevUser = devUsernames.includes(await getUser());
     settings = await Cache.getSettings();
 
-    if (init)
+    if (!isReady)
       globalStyle();
 
     setUpInfo();
@@ -183,9 +184,10 @@ async function inject() {
       return setStatus('failed to ensure cache data', 10000);
     }
 
-    if (init) {
+    if (!isReady) {
       console.log('[backlog] init');
       await updateBacklogData();
+      isReady = true;
     }
 
     const { object, ident, action } = loc;
@@ -326,10 +328,12 @@ async function inject() {
   }
   window.addEventListener(locationChanged, async (ev) => {
     if (/** @type {CustomEvent<string>} */ (ev).detail === 'popstate') await wait(200);
+    for (let ms = 0, step = 50; (!isReady && ms <= 1000); ms += step)
+      await wait(step);
     dispatcher();
   });
 
-  setTimeout(dispatcher, 0, true);
+  setTimeout(dispatcher, 0);
 
   /** @param {boolean} forceFetch */
   async function fetchData(forceFetch) {
