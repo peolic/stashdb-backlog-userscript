@@ -21,14 +21,14 @@
 //@ts-check
 /// <reference path="typings.d.ts" />
 
-const dev = false;
+const devServer = false;
 
 const devUsernames = ['peolic', 'root'];
 
 async function inject() {
   const backlogSpreadsheet = 'https://docs.google.com/spreadsheets/d/1eiOC-wbqbaK8Zp32hjF8YmaKql_aH-yeGLmvHP1oBKQ';
   const BASE_URL =
-    dev
+    devServer
       ? 'http://localhost:8000'
       : 'https://github.com/peolic/stashdb_backlog_data/releases/download/cache';
 
@@ -153,7 +153,7 @@ async function inject() {
     return history;
   })();
 
-  let isDev = false;
+  let isDevUser = false;
   /** @type {Settings} */
   let settings;
 
@@ -170,7 +170,7 @@ async function inject() {
 
     if (document.querySelector('.LoginPrompt')) return;
 
-    isDev = devUsernames.includes(await getUser());
+    isDevUser = devUsernames.includes(await getUser());
     settings = await Cache.getSettings();
 
     if (init)
@@ -495,7 +495,7 @@ details.backlog-fragment > summary:only-child {
     /** @type {HTMLDivElement} */
     const statusDiv = (document.querySelector('#backlog-status'));
     statusDiv.innerText = text;
-    if (isDev && text)
+    if (isDevUser && text)
       console.debug(`[backlog] ${text}`);
     const id = Number(statusDiv.dataset.reset);
     if (id) {
@@ -607,7 +607,7 @@ details.backlog-fragment > summary:only-child {
       checkForUpdates.classList.toggle('invisible', false);
     });
 
-    if (isDev) {
+    if (isDevUser) {
       const downloadCache = updateButtons.appendChild(block('📥', 'my-1'));
       downloadCache.setAttribute('role', 'button');
       downloadCache.title = 'Download cache';
@@ -1165,7 +1165,7 @@ details.backlog-fragment > summary:only-child {
 
   async function updateBacklogData(forceCheck=false) {
     let updateData = shouldFetch(Cache.data, 1);
-    if (!dev && (forceCheck || updateData)) {
+    if (!devServer && (forceCheck || updateData)) {
       try {
         // Only fetch if there really was an update
         setStatus(`checking for updates`);
@@ -3798,7 +3798,7 @@ details.backlog-fragment > summary:only-child {
       // Don't show if native links exist (#439)
       const nativeLinks = performerInfo.querySelector('.card + .float-end');
       if (nativeLinks) {
-        if (isDev) nativeLinks.classList.add('d-none');
+        if (isDevUser) nativeLinks.classList.add('d-none');
         else return;
       }
 
@@ -5145,7 +5145,7 @@ details.backlog-fragment > summary:only-child {
    * @param {string} sceneId
    */
   function sceneCardHighlightChanges(card, changes, sceneId) {
-    if (!(isDev || settings.sceneCardHighlightChanges)) return;
+    if (!(isDevUser || settings.sceneCardHighlightChanges)) return;
 
     const parent = /** @type {HTMLDivElement | HTMLAnchorElement} */ (card.parentElement);
     const isSearchCard = parent.classList.contains('SearchPage-scene');
