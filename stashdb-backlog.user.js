@@ -384,18 +384,18 @@ async function inject() {
   padding-right: 1.4em;
 }
 .backlog-status-bg {
-	position: absolute;
-	bottom: 0;
-	left: 0;
+  position: absolute;
+  bottom: 0;
+  left: 0;
   width: 100%;
-	overflow: hidden;
-	line-height: 0.9em;
-	padding: 0 6px 6px 6px;
-	font-size: 3.6rem;
-	font-weight: 800;
-	letter-spacing: 20px;
-	opacity: 0.1;
-	user-select: none;
+  overflow: hidden;
+  line-height: 0.9em;
+  padding: 0 6px 6px 6px;
+  font-size: 3.6rem;
+  font-weight: 800;
+  letter-spacing: 20px;
+  opacity: 0.1;
+  user-select: none;
 }
 .backlog-status-close {
   cursor: pointer;
@@ -449,8 +449,8 @@ async function inject() {
 }
 
 .performer-backlog div[data-backlog="split"] > details > ol > li::marker {
-	counter-increment: list-item;
-	content: "(" attr(data-sheet-column) ") " counter(list-item) ". ";
+  counter-increment: list-item;
+  content: "(" attr(data-sheet-column) ") " counter(list-item) ". ";
 }
 
 /* https://codepen.io/zachhanding/pen/MKyVPq */
