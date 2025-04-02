@@ -1614,6 +1614,17 @@ details.backlog-fragment > summary:only-child {
     }
   };
 
+  const performerNameBracketStyles = { square: ['[', ']'], round: ['(', ')'] };
+  /**
+   * @param {{ name: string; disambiguation?: string; }} info
+   * @param {'square' | 'round'} [style='square']
+   */
+  const formatPerformerName = ({ name, disambiguation }, style='square') => {
+    if (!disambiguation) return name;
+    const [open, close] = performerNameBracketStyles[style];
+    return `${name} ${open}${disambiguation}${close}`;
+  };
+
   /** @param {[name: string, parent: string | null]} [studio] */
   const studioArrayToString = (studio) => {
     if (!studio) return '';
@@ -1914,7 +1925,7 @@ details.backlog-fragment > summary:only-child {
     Object.entries(performerScenes || {})
       .flatMap(([sId, action]) => {
         const { performers: { [action]: entries } } = getDataFor('scenes', sId);
-        return entries.find(({ id }) => id === performerId)?.name;
+        return formatPerformerName(entries.find(({ id }) => id === performerId));
       });
 
   /** @param {PerformerDataObject["fragments"]} [performerFragments] */
@@ -3389,8 +3400,7 @@ details.backlog-fragment > summary:only-child {
             label.innerText = '[' + (action === 'append' ? 'add' : action) + ']';
             li.appendChild(label);
 
-            const disambiguation = entry.disambiguation ? ` (${entry.disambiguation})` : '';
-            let name = entry.name + disambiguation;
+            let name = formatPerformerName(entry, 'round');
 
             const info = document.createElement('span');
             setStyles(info, { flex: '1', whiteSpace: 'pre-wrap' });
@@ -3512,7 +3522,7 @@ details.backlog-fragment > summary:only-child {
                     ?.click();
 
                   const failHandler = () => {
-                    const replName = replacement.name + (replacement.disambiguation ? ` [${replacement.disambiguation}]` : '');
+                    const replName = formatPerformerName(replacement);
                     alert(`failed to replace performer ${replName} with ${name}`);
                   };
 
@@ -4048,8 +4058,7 @@ details.backlog-fragment > summary:only-child {
           /** @param {PerformerEntry} entry */
           remove: (entry) => {
             if (!entry) return null;
-            const { name, disambiguation } = entry;
-            return name + (disambiguation ? ` (${disambiguation})` : '');
+            return formatPerformerName(entry, 'round');
           },
           /** @param {PerformerEntry} entry */
           update: (entry) => {
@@ -5117,7 +5126,7 @@ details.backlog-fragment > summary:only-child {
         info.append(icon);
         const performerId = object === 'performers' ? parsePath().ident : null;
         performers.forEach((p, i) => {
-          const name = p.performer.name + (p.performer.disambiguation ? ` [${p.performer.disambiguation}]` : '');
+          const name = formatPerformerName(p.performer);
           const label = p.as ? `${p.as} (${name})` : name;
           /** @type {HTMLAnchorElement | HTMLSpanElement} */
           let pa;
@@ -5669,7 +5678,7 @@ details.backlog-fragment > summary:only-child {
         return result;
 
       entry.performers.append.forEach((p) => {
-        const name = p.name + (p.disambiguation ? ` [${p.disambiguation}]` : '');
+        const name = formatPerformerName(p);
         if (!result.includes(name))
           result.push(name);
       });
@@ -5754,7 +5763,7 @@ details.backlog-fragment > summary:only-child {
 
         return entry[1].performers.append.some(
           (p) => performerFilter.localeCompare(
-            p.name + (p.disambiguation ? ` [${p.disambiguation}]` : ''),
+            formatPerformerName(p),
             undefined,
             { sensitivity: 'accent' }
           ) === 0
@@ -6372,7 +6381,7 @@ details.backlog-fragment > summary:only-child {
 
       for (const result of queryPerformers.performers) {
         const li = document.createElement('li');
-        const name = result.name + (result.disambiguation ? ` [${result.disambiguation}]` : '');
+        const name = formatPerformerName(result);
         const link = makeLink(`/performers/${result.id}`, `${name} - ${result.id}`, { color: 'var(--bs-teal)' });
         li.appendChild(link);
 
