@@ -2024,7 +2024,7 @@ details.backlog-fragment > summary:only-child {
         row.append(makeSep(), label);
 
         if (Array.isArray(fragmentNumbers))
-          link.dataset.state = JSON.stringify({ performerFragment: fragmentNumbers });
+          link.dataset.state = JSON.stringify({ matchingFragments: fragmentNumbers });
 
         if (custom === 'fragment-search' && Array.isArray(fragmentNumbers)) {
           const { fragments } = performerData.split;
@@ -2083,7 +2083,7 @@ details.backlog-fragment > summary:only-child {
         row.append(makeSep(), flag, label);
 
         if (Array.isArray(fragmentNumbers)) {
-          link.dataset.state = JSON.stringify({ performerFragment: fragmentNumbers });
+          link.dataset.state = JSON.stringify({ matchingFragments: fragmentNumbers });
 
           if ((fragments.length === 0 && !status) || status === SPLIT_STATUS_EMPTY)
             flag.textContent = '🟢 ';
@@ -4301,8 +4301,8 @@ details.backlog-fragment > summary:only-child {
         && ((fragments[0].text?.match(/\n/g)?.length || 1) + (fragments[0].notes?.length || 0)) <= 5
       );
       /** @type {number[]} */
-      const highlightFragments = history.state?.usr?.state?.performerFragment || [];
-      fragmentsDetails.open = highlightFragments.length > 0 || fragmentsAreShort;
+      const matchingFragments = history.state?.usr?.state?.matchingFragments || [];
+      fragmentsDetails.open = matchingFragments.length > 0 || fragmentsAreShort;
 
       const fragmentsList = document.createElement('ol');
       setStyles(fragmentsList, { padding: '0', margin: '0 0 0 2rem' });
@@ -4315,7 +4315,7 @@ details.backlog-fragment > summary:only-child {
         fragmentEl.classList.add('mt-1');
         fragmentEl.dataset.sheetColumn = fragment.column;
 
-        if (highlightFragments.includes(index)) {
+        if (matchingFragments.includes(index)) {
           fragmentEl.classList.add('bg-primary', 'bg-opacity-50');
           if (!firstHighlighedFragmentEl)
             firstHighlighedFragmentEl = fragmentEl;
