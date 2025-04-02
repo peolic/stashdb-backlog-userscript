@@ -1,7 +1,6 @@
 interface Settings {
     sceneCardPerformers: boolean;
     sceneCardHighlightChanges: boolean;
-    highlightFragments: boolean;
 }
 
 type AnyObject =

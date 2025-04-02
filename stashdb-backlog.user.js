@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.39.0
+// @version     1.39.1
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -645,7 +645,6 @@ details.backlog-fragment > summary:only-child {
       const toggles = /** @type {{ key: keyof Settings; name: string; title: string; }[]} */
       ([
         {key: 'sceneCardPerformers', name: 'scene card performers', title: 'Adds performers under every scene cards'},
-        {key: 'highlightFragments', name: 'highlight fragments (!)', title: 'Highlights performers with pending fragments\n(!) may incur slowness due to heavy calculations'},
       ]).flatMap(({key, name, title}, i) => {
         const toggle = makeLink('#', `Toggle ${name}`);
         if (title) toggle.title = title;
@@ -887,7 +886,6 @@ details.backlog-fragment > summary:only-child {
     static _knownSettings = {
       sceneCardPerformers: true,
       sceneCardHighlightChanges: false,
-      highlightFragments: false,
     };
 
     static async getSettings(invalidate = false) {
@@ -5058,7 +5056,7 @@ details.backlog-fragment > summary:only-child {
       const found = getDataFor(object, uuid);
 
       if (found?.type === 'PerformerDataObject') {
-        if (!found.changes.includes('fragments') && settings.highlightFragments) {
+        if (!found.changes.includes('fragments')) {
           /** @type {{ urls: ScenePerformance_URL[] }} */
           const performerFiber = closestReactProperty(cardLink, 'performer', 4);
           const urls = performerFiber?.urls.map((u) => u.url) || [];
@@ -5211,7 +5209,7 @@ details.backlog-fragment > summary:only-child {
       const found = getDataFor('performers', performerId);
 
       const changes = found?.changes ?? [];
-      if (!changes.includes('fragments') && settings.highlightFragments) {
+      if (!changes.includes('fragments')) {
         /** @type {{ urls: ScenePerformance_URL[] }} */
         const performerFiber = closestReactProperty(card, 'performer', 2);
         const urls = performerFiber?.urls?.map((u) => u.url) || [];
@@ -5437,7 +5435,7 @@ details.backlog-fragment > summary:only-child {
         return;
 
       if (found.type === 'PerformerDataObject') {
-        if (settings.highlightFragments) {
+        if (!found.changes.includes('fragments') ) {
           /** @type {string[]} */
           const urls = (() => {
             /** @type {HTMLDivElement} */
@@ -5550,8 +5548,6 @@ details.backlog-fragment > summary:only-child {
         });
 
         (function fragments() {
-          if (isEditsList && !settings.highlightFragments) return;
-
           const { performerFragments, fragmentIndexMap } = performerFragmentsByURLsFull({ urls }, false);
           if (performerFragments.length === 0) return;
 
