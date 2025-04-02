@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.39.1
+// @version     1.39.2
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -873,7 +873,7 @@ details.backlog-fragment > summary:only-child {
 
   class Cache {
     // stored data keys
-    static _DK = {
+    static #DK = {
       SETTINGS: 'settings',
       INDEX: 'index',
       SCENES: 'scenes',
@@ -883,56 +883,56 @@ details.backlog-fragment > summary:only-child {
     };
 
     /** @type {Settings | null} */
-    static _settings = null;
+    static #settings = null;
 
     /** @type {Required<Record<keyof Settings, boolean>>} settings and defaults */
-    static _knownSettings = {
+    static #knownSettings = {
       sceneCardPerformers: true,
       sceneCardHighlightChanges: false,
     };
 
     static async getSettings(invalidate = false) {
-      if (!this._settings || invalidate) {
-        this._settings = /** @type {Settings} */ (await this._getValue(this._DK.SETTINGS));
+      if (!this.#settings || invalidate) {
+        this.#settings = /** @type {Settings} */ (await this.#getValue(this.#DK.SETTINGS));
         /** @type {(keyof Settings)[]} */
-        (Object.keys(this._settings)).forEach((key) => {
-          if (!(key in this._knownSettings))
-            delete this._settings[key];
+        (Object.keys(this.#settings)).forEach((key) => {
+          if (!(key in this.#knownSettings))
+            delete this.#settings[key];
           else
-            this._settings[key] ??= this._knownSettings[key];
+            this.#settings[key] ??= this.#knownSettings[key];
         })
       }
-      return this._settings;
+      return this.#settings;
     }
 
     /**
      * @param {keyof Settings} name
      * @returns {Promise<boolean>} */
     static async toggleSetting(name) {
-      if (!this._settings) await this.getSettings();
-      this._settings[name] = !this._settings[name];
-      await this._setValue(this._DK.SETTINGS, this._settings);
-      return this._settings[name];
+      if (!this.#settings) await this.getSettings();
+      this.#settings[name] = !this.#settings[name];
+      await this.#setValue(this.#DK.SETTINGS, this.#settings);
+      return this.#settings[name];
     }
 
     /** @type {DataCache | null} */
-    static _data = null;
+    static #data = null;
 
     /** @type {PerformerURLFragments | null} */
     static performerURLFragments = null;
 
     /** @param {boolean} invalidate Force reload of stored data */
     static async getStoredData(invalidate = false) {
-      if (!this._data || invalidate) {
+      if (!this.#data || invalidate) {
         try {
-          const scenes = /** @type {DataCache['scenes']} */ (await this._getValue(this._DK.SCENES));
-          const performers = /** @type {DataCache['performers']} */ (await this._getValue(this._DK.PERFORMERS));
-          const index = /** @type {BaseCache} */ (await this._getValue(this._DK.INDEX));
+          const scenes = /** @type {DataCache['scenes']} */ (await this.#getValue(this.#DK.SCENES));
+          const performers = /** @type {DataCache['performers']} */ (await this.#getValue(this.#DK.PERFORMERS));
+          const index = /** @type {BaseCache} */ (await this.#getValue(this.#DK.INDEX));
           const { lastChecked, lastUpdated, submitted } = index;
 
           const rawData =
             (Object.values(scenes).length === 0 && Object.values(performers).length === 0)
-              ? /** @type {CompactDataCache} */ (await this._getValue(this._DK.LEGACY))
+              ? /** @type {CompactDataCache} */ (await this.#getValue(this.#DK.LEGACY))
               : /** @type {DataCache} */ ({ scenes, performers, lastChecked, lastUpdated, submitted });
 
           await this.injestData(rawData);
@@ -941,7 +941,7 @@ details.backlog-fragment > summary:only-child {
           console.error('[backlog] error in getStoredData', error);
         }
       }
-      return this._data;
+      return this.#data;
     }
 
     /** @param {CompactDataCache | DataCache} rawData */
@@ -950,22 +950,22 @@ details.backlog-fragment > summary:only-child {
       let data;
       // source is compact data cache
       if (!('scenes' in rawData && 'performers' in rawData)) {
-        data = await this._applyDataCacheMigrations(rawData);
-        await this._deleteValue(this._DK.DYNAMIC); // clear dynamic data
+        data = await this.#applyDataCacheMigrations(rawData);
+        await this.#deleteValue(this.#DK.DYNAMIC); // clear dynamic data
       } else {
         data = /** @type {DataCache} */ (rawData);
       }
-      data = await this._applyMigrations(data);
+      data = await this.#applyMigrations(data);
 
-      await this._setData(data);
-      await this._generateDynamicData();
+      await this.#setData(data);
+      await this.#generateDynamicData();
     }
 
     /**
      * @param {CompactDataCache} legacyCache
      * @returns {Promise<DataCache>}
      */
-    static async _applyDataCacheMigrations(legacyCache) {
+    static async #applyDataCacheMigrations(legacyCache) {
       const { lastChecked, lastUpdated, submitted, ...rest } = legacyCache;
       /** @type {DataCache} */
       const dataCache = {
@@ -1007,7 +1007,7 @@ details.backlog-fragment > summary:only-child {
       }
 
       if (oldKeys.length > 0) {
-        await this._deleteValue(this._DK.LEGACY);
+        await this.#deleteValue(this.#DK.LEGACY);
       }
 
       return dataCache;
@@ -1017,37 +1017,30 @@ details.backlog-fragment > summary:only-child {
      * @param {MigrationDataCache} dataCache
      * @returns {Promise<DataCache>}
      */
-    static async _applyMigrations(dataCache) {
+    static async #applyMigrations(dataCache) {
       return dataCache;
     }
 
     static async setLastCheckedNow() {
-      this._data.lastChecked = new Date().toISOString();
-      const { scenes, performers, ...cache } = this._data;
-      await this._setValue(this._DK.INDEX, cache);
+      this.#data.lastChecked = new Date().toISOString();
+      const { scenes, performers, ...cache } = this.#data;
+      await this.#setValue(this.#DK.INDEX, cache);
     }
-    static async _setData(/** @type {DataCache} */ data) {
+    static async #setData(/** @type {DataCache} */ data) {
       const { scenes, performers, ...cache } = data;
-      await this._setValue(this._DK.SCENES, scenes);
-      await this._setValue(this._DK.PERFORMERS, performers);
-      await this._setValue(this._DK.INDEX, cache);
-      this._data = data;
-    }
-    static async _clearData() {
-      await this._deleteValue(this._DK.SCENES);
-      await this._deleteValue(this._DK.PERFORMERS);
-      await this._deleteValue(this._DK.INDEX);
-      await this._deleteValue(this._DK.DYNAMIC);
-      this._data = null;
+      await this.#setValue(this.#DK.SCENES, scenes);
+      await this.#setValue(this.#DK.PERFORMERS, performers);
+      await this.#setValue(this.#DK.INDEX, cache);
+      this.#data = data;
     }
 
     /** @returns {Promise<void>} */
-    static async _generateDynamicData() {
-      if (!this._data) return;
+    static async #generateDynamicData() {
+      if (!this.#data) return;
 
       const [{ performerScenes, performerFragments, performerURLFragments }, isCached] = await (
         async () => {
-          const cachedDynamicData = /** @type {DynamicDataObject} */ (await this._getValue(this._DK.DYNAMIC));
+          const cachedDynamicData = /** @type {DynamicDataObject} */ (await this.#getValue(this.#DK.DYNAMIC));
           /** @type {(keyof DynamicDataObject)[]} */
           const keys = ['performerScenes', 'performerFragments', 'performerURLFragments'];
           const isCached = keys.every((key) => key in cachedDynamicData);
@@ -1060,7 +1053,7 @@ details.backlog-fragment > summary:only-child {
         }
       )();
 
-      for (const [sceneId, scene] of Object.entries(this._data.scenes)) {
+      for (const [sceneId, scene] of Object.entries(this.#data.scenes)) {
         Object.defineProperties(scene, {
           type: { value: 'SceneDataObject' },
           changes: { get() { return dataObjectKeys(/** @type {SceneDataObject} */ (this)); } },
@@ -1083,7 +1076,7 @@ details.backlog-fragment > summary:only-child {
       }
 
       if (!isCached) {
-        for (const [performerId, performer] of Object.entries(this._data.performers)) {
+        for (const [performerId, performer] of Object.entries(this.#data.performers)) {
           // Performer Fragments
           if (performer.split) {
             performer.split.fragments.forEach((fragment, fragmentIdx) => {
@@ -1119,22 +1112,22 @@ details.backlog-fragment > summary:only-child {
       if (!isCached) {
         /** @type {DynamicDataObject} */
         const dynamicData = { performerScenes, performerFragments, performerURLFragments };
-        this._setValue(this._DK.DYNAMIC, dynamicData);
+        this.#setValue(this.#DK.DYNAMIC, dynamicData);
       }
 
       const uniquePerformerIds = new Set([
-        ...Object.keys(this._data.performers),
+        ...Object.keys(this.#data.performers),
         ...Object.keys(performerScenes),
         ...Object.keys(performerFragments),
       ]);
       for (const performerId of uniquePerformerIds) {
         const pScenes = performerScenes[performerId];
         const pFragments = performerFragments[performerId];
-        if (!this._data.performers[performerId] && (pScenes || pFragments))
+        if (!this.#data.performers[performerId] && (pScenes || pFragments))
           /** @type {Omit<PerformerDataObject, DataObjectGetters>} */
-          (this._data.performers[performerId]) = {};
+          (this.#data.performers[performerId]) = {};
 
-        Object.defineProperties(this._data.performers[performerId], {
+        Object.defineProperties(this.#data.performers[performerId], {
           type: { value: 'PerformerDataObject' },
           changes: { get() { return dataObjectKeys(/** @type {PerformerDataObject} */ (this)); } },
           ...(pScenes    && { scenes:    { value: pScenes,    enumerable: true } }),
@@ -1146,8 +1139,8 @@ details.backlog-fragment > summary:only-child {
     }
 
     static get data() {
-      if (!this._data) throw new Error('Unexpected: null data');
-      return this._data;
+      if (!this.#data) throw new Error('Unexpected: null data');
+      return this.#data;
     }
 
     // ===
@@ -1157,16 +1150,16 @@ details.backlog-fragment > summary:only-child {
      * @param {string} key
      * @returns {Promise<T>}
      */
-    static async _getValue(key) {
+    static async #getValue(key) {
       //@ts-expect-error
       let stored = await GM.getValue(key);
       // FIXME: (2025-03-23) temporary - migration of values' keys
-      if (!stored && [this._DK.INDEX, this._DK.SCENES, this._DK.PERFORMERS].includes(key)) {
+      if (!stored && [this.#DK.INDEX, this.#DK.SCENES, this.#DK.PERFORMERS].includes(key)) {
         const oldKey = `stashdb_backlog_${key}`;
         //@ts-expect-error
         stored = await GM.getValue(oldKey);
         if (stored !== undefined)
-          await this._deleteValue(oldKey);
+          await this.#deleteValue(oldKey);
       }
 
       stored ??= {};
@@ -1183,13 +1176,13 @@ details.backlog-fragment > summary:only-child {
      * @param {string} key
      * @param {T} value
      */
-    static async _setValue(key, value) {
+    static async #setValue(key, value) {
       //@ts-expect-error
       return await GM.setValue(key, value);
     }
 
     /** @param {string} key */
-    static async _deleteValue(key) {
+    static async #deleteValue(key) {
       //@ts-expect-error
       return await GM.deleteValue(key);
     }
