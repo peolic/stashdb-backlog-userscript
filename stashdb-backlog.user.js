@@ -644,8 +644,8 @@ details.backlog-fragment > summary:only-child {
 
       const toggles = /** @type {{ key: keyof Settings; name: string; title: string; }[]} */
       ([
-        {key: 'sceneCardPerformers', name: 'scene card performers', title: ''},
-        {key: 'highlightFragments', name: 'highlight fragments (!)', title: '(!) may incur slowness due to heavy calculations'},
+        {key: 'sceneCardPerformers', name: 'scene card performers', title: 'Adds performers under every scene cards'},
+        {key: 'highlightFragments', name: 'highlight fragments (!)', title: 'Highlights performers with pending fragments\n(!) may incur slowness due to heavy calculations'},
       ]).flatMap(({key, name, title}, i) => {
         const toggle = makeLink('#', `Toggle ${name}`);
         if (title) toggle.title = title;
@@ -883,9 +883,23 @@ details.backlog-fragment > summary:only-child {
     /** @type {Settings | null} */
     static _settings = null;
 
+    /** @type {Required<Record<keyof Settings, boolean>>} settings and defaults */
+    static _knownSettings = {
+      sceneCardPerformers: true,
+      sceneCardHighlightChanges: false,
+      highlightFragments: false,
+    };
+
     static async getSettings(invalidate = false) {
       if (!this._settings || invalidate) {
         this._settings = /** @type {Settings} */ (await this._getValue(this._SETTINGS_KEY));
+        /** @type {(keyof Settings)[]} */
+        (Object.keys(this._settings)).forEach((key) => {
+          if (!(key in this._knownSettings))
+            delete this._settings[key];
+          else
+            this._settings[key] ??= this._knownSettings[key];
+        })
       }
       return this._settings;
     }
