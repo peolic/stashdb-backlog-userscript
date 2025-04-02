@@ -875,9 +875,9 @@ details.backlog-fragment > summary:only-child {
     // stored data keys
     static _DK = {
       SETTINGS: 'settings',
-      INDEX: 'stashdb_backlog_index',
-      SCENES: 'stashdb_backlog_scenes',
-      PERFORMERS: 'stashdb_backlog_performers',
+      INDEX: 'index',
+      SCENES: 'scenes',
+      PERFORMERS: 'performers',
       DYNAMIC: 'dynamic_data',
       LEGACY: 'stashdb_backlog',
     };
@@ -1159,7 +1159,17 @@ details.backlog-fragment > summary:only-child {
      */
     static async _getValue(key) {
       //@ts-expect-error
-      let stored = await GM.getValue(key, {});
+      let stored = await GM.getValue(key);
+      // FIXME: (2025-03-23) temporary - migration of values' keys
+      if (!stored && [this._DK.INDEX, this._DK.SCENES, this._DK.PERFORMERS].includes(key)) {
+        const oldKey = `stashdb_backlog_${key}`;
+        //@ts-expect-error
+        stored = await GM.getValue(oldKey);
+        if (stored !== undefined)
+          await this._deleteValue(oldKey);
+      }
+
+      stored ??= {};
       // Legacy stored as JSON
       if (typeof stored === 'string') stored = JSON.parse(stored);
       if (!stored) {
