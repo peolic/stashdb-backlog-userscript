@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.39.2
+// @version     1.39.3
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -1875,57 +1875,64 @@ details.backlog-fragment > summary:only-child {
     if (!Cache.performerURLFragments)
       throw new Error('Unexpected: null performerURLFragments');
 
+    /** @type {PerformerEntriesItem[]} */
+    const performerFragments = [];
+
     /** @type {FragmentIndexMap} */
     const fragmentIndexMap = {};
 
     /** @type {Set<string>} */
     const possibleLinks = new Set();
 
+    const matchesByID = getDataFor('performers', currentPerformerId)?.fragments ?? {};
+
     const currentPerformerURL = `${window.location.origin}/performers/${currentPerformerId}`;
-    const seen = new Set();
-    const performerURLFragments =
-      urls.concat(currentPerformerId ? currentPerformerURL : [])
-      .reduce((result, url) => {
+    const seen = /** @type {Set<string>} */ (new Set());
+
+    const matchesByURL = urls.concat(currentPerformerId ? currentPerformerURL : [])
+      .reduce((matches, url) => {
         url = sanitizeFragmentURL(url);
-        if (seen.has(url)) return result;
+        if (seen.has(url)) return matches;
         seen.add(url);
 
-        const matches = Cache.performerURLFragments[url];
-        if (!matches)
-          return result;
+        const urlMatches = Cache.performerURLFragments[url];
+        return urlMatches ? matches.concat(Object.entries(urlMatches)) : matches;
+      }, /** @type {Array<[string, number[]]>} */ ([]));
 
-        for (const [matchId, fragmentIds] of Object.entries(matches)) {
-          // fragment id is currently viewed performer
-          if (currentPerformerId && matchId === currentPerformerId)
-            continue;
 
-          fragmentIndexMap[matchId] = fragmentIds;
-          const performerData = getDataFor('performers', matchId);
-          result.push([matchId, performerData]);
+    for (const [matchId, fragmentIds] of Object.entries(matchesByID).concat(matchesByURL)) {
+      // fragment id is currently viewed performer
+      if (currentPerformerId && matchId === currentPerformerId)
+        continue;
 
-          if (!findPossibleLinks)
-            continue;
-          const { fragments } = performerData.split;
-          for (const fragmentId of fragmentIds) {
-            const matchedFragment = fragments[fragmentId];
-            if (matchedFragment.id && currentPerformerId && matchedFragment.id !== currentPerformerId) {
-              const fragmentPerformerURL = `${window.location.origin}/performers/${matchedFragment.id}`;
-              possibleLinks.add(fragmentPerformerURL);
-            }
-            matchedFragment.links?.forEach((link) => {
-              // is new link and not a link to current performer
-              if (!arrayIncludesURL(urls, link) && link !== currentPerformerURL) {
-                possibleLinks.add(link);
-              }
-            });
-          }
+      const performerData = getDataFor('performers', matchId);
+      if (fragmentIndexMap[matchId]) {
+        fragmentIndexMap[matchId] = Array.from(new Set(fragmentIndexMap[matchId].concat(fragmentIds)));
+      } else {
+        fragmentIndexMap[matchId] = fragmentIds;
+        performerFragments.push([matchId, performerData]);
+      }
+
+      if (!findPossibleLinks)
+        continue;
+      const { fragments } = performerData.split;
+      for (const fragmentId of fragmentIds) {
+        const matchedFragment = fragments[fragmentId];
+        if (matchedFragment.id && currentPerformerId && matchedFragment.id !== currentPerformerId) {
+          const fragmentPerformerURL = `${window.location.origin}/performers/${matchedFragment.id}`;
+          possibleLinks.add(fragmentPerformerURL);
         }
-
-        return result;
-      }, /** @type {PerformerEntriesItem[]} */ ([]));
+        matchedFragment.links?.forEach((link) => {
+          // is new link and not a link to current performer
+          if (!arrayIncludesURL(urls, link) && link !== currentPerformerURL) {
+            possibleLinks.add(link);
+          }
+        });
+      }
+    }
 
     return {
-      performerFragments: performerURLFragments,
+      performerFragments,
       fragmentIndexMap,
       possibleLinks: Array.from(possibleLinks),
     };
