@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.39.3
+// @version     1.39.4
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -374,9 +374,13 @@ async function inject() {
   text-align: center;
   border: .25rem solid #cccccc;
   padding: 0.3rem;
-  z-index: 100;
   background-color: var(--bs-gray-dark); /* #343a40 */
   transition: margin-top cubic-bezier(1,0,0,1) 0.15s;
+}
+nav:has(.SearchField input[value=""]) #backlog-info,
+nav:has(.SearchField input[value=""]) .backlog-status-container {
+  /* set a high z-index, unless the search field is in use */
+  z-index: 100;
 }
 .backlog-status-container {
   width: 420px;
