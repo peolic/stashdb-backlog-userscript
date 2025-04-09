@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.39.4
+// @version     1.39.5
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -1057,8 +1057,22 @@ details.backlog-fragment > summary:only-child {
         }
       )();
 
+      /**
+       * @param {DataObject} obj
+       * @param {PropertyDescriptorMap} properties
+       */
+      const defineProperties = (obj, properties) => {
+        /** @type {[keyof DataObject, PropertyDescriptor][]} */
+        (Object.entries(properties)).forEach(([prop, propDef]) => {
+          // ignore property if it already exists, or if its value is falsy (when applicable)
+          if (obj[prop] || ('value' in propDef && !propDef.value))
+            delete properties[prop];
+        });
+        Object.defineProperties(obj, properties);
+      };
+
       for (const [sceneId, scene] of Object.entries(this.#data.scenes)) {
-        Object.defineProperties(scene, {
+        defineProperties(scene, {
           type: { value: 'SceneDataObject' },
           changes: { get() { return dataObjectKeys(/** @type {SceneDataObject} */ (this)); } },
         });
@@ -1131,11 +1145,11 @@ details.backlog-fragment > summary:only-child {
           /** @type {Omit<PerformerDataObject, DataObjectGetters>} */
           (this.#data.performers[performerId]) = {};
 
-        Object.defineProperties(this.#data.performers[performerId], {
+        defineProperties(this.#data.performers[performerId], {
           type: { value: 'PerformerDataObject' },
           changes: { get() { return dataObjectKeys(/** @type {PerformerDataObject} */ (this)); } },
-          ...(pScenes    && { scenes:    { value: pScenes,    enumerable: true } }),
-          ...(pFragments && { fragments: { value: pFragments, enumerable: true } }),
+          scenes: { value: pScenes, enumerable: true },
+          fragments: { value: pFragments, enumerable: true },
         });
       }
 
