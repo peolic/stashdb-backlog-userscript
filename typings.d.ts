@@ -10,6 +10,7 @@ type AnyObject =
     | "tags"
     | "categories"
     | "edits"
+    | "drafts"
     | "users"
     | "search"
 
