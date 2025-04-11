@@ -111,7 +111,7 @@ async function inject() {
    * Traverse React fiber parents until a specific property is found.
    * @template T
    * @param {Element | Record<string, any> | undefined} elOrFiber
-   * @param {string} property
+   * @param {string} property supports 'deep.property' syntax
    * @param {number} [maxParents=10]
    * @returns {T | undefined} property value
    */
@@ -120,11 +120,15 @@ async function inject() {
       elOrFiber instanceof Element
         ? getReactFiber(elOrFiber)
         : elOrFiber;
-    if (!elOrFiber) throw new Error('Unexpected: missing react fiber');
+    if (!fiber) throw new Error('Unexpected: missing react fiber');
 
+    const properties = property.split('.');
+    const getProp = () => properties.reduce((current, prop) => current?.[prop], fiber?.memoizedProps);
+
+    /** @type {T | undefined} */
     let propValue;
     let parentsTraversed = 0;
-    while (parentsTraversed <= maxParents && !(propValue = fiber?.memoizedProps?.[property])) {
+    while (parentsTraversed <= maxParents && !(propValue = getProp())) {
       parentsTraversed++;
       fiber = fiber.return;
     }
@@ -137,9 +141,7 @@ async function inject() {
       if (!e) return undefined;
       const f = getReactFiber(e);
       if (!f) return undefined;
-      let r = f;
-      while ((r = r.return) && r !== null && !r.memoizedProps?.value?.navigator);
-      return r?.memoizedProps?.value?.navigator;
+      return closestReactProperty(f, 'value.navigator');
     };
 
     let attempt = 0;
