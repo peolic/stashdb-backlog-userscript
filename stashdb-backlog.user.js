@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.39.6
+// @version     1.39.7
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -1869,8 +1869,8 @@ details.backlog-fragment > summary:only-child {
   };
 
   /**
-   * @param {{ urls: string[]; performerId?: string }} input
-   * @returns {string[]}
+   * @param {{ urls: string[]; performerId?: string|null }} input
+   * @returns {string[]} IDs of performers with fragments
    */
   const performerFragmentsByURLs = ({ urls, performerId: currentPerformerId }) => {
     if (!Cache.performerURLFragments)
@@ -4386,6 +4386,16 @@ details.backlog-fragment > summary:only-child {
           fragmentSearch.classList.add('me-1', 'fw-bold', 'text-decoration-none', 'user-select-none');
           fragmentSearch.title = 'Search for other fragments...';
           fragmentEl.appendChild(fragmentSearch);
+
+          const relatedFragments = performerFragmentsByURLs({ urls: params.getAll('url'), performerId: fragment.id })
+            .filter((pId) => pId !== performerId);
+          if (relatedFragments.length > 0) {
+            setStyles(fragmentSearch, { background: 'var(--bs-pink)', borderRadius: '0.25em' });
+            fragmentSearch.title += (
+              `\nFound at least ${relatedFragments.length} more fragment${relatedFragments.length === 1 ? '' : 's'}`
+              + ` with matching links/performer ID.\n\n${relatedFragments.join('\n')}`
+            );
+          }
         }
 
         const fragmentCopy = document.createElement('div');
