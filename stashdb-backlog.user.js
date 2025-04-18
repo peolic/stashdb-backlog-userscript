@@ -317,6 +317,9 @@ async function inject() {
       if (ident === 'fragment-search') {
         return await iPerformerFragmentsPage();
       }
+
+      // Fallback
+      history.pushState(undefined, '', `/${object}`);
     }
 
     // Home page
