@@ -1002,19 +1002,9 @@ details.backlog-fragment > summary:only-child {
         else throw new Error(`migration failed: invalid object`);
       }
 
-      /** @type {SupportedObject[]} */
-      let seen = [];
-      const log = (/** @type {SupportedObject} */ object) => {
-        if (!seen.includes(object)) {
-          console.debug(`[backlog] data-cache migration: convert from '${object}/uuid' key format`);
-          seen.push(object);
-        }
-      };
-
       for (const cacheKey of oldKeys) {
         const [oldObject, uuid] = /** @type {['scene' | 'performer', string]} */ (cacheKey.split('/'));
         const object = /** @type {SupportedObject} */ (`${oldObject}s`);
-        log(object);
         if (!(object in dataCache)) {
           throw new Error(`migration failed: ${object} missing from new data cache object`);
         }
