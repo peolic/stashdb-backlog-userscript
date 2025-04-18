@@ -317,11 +317,6 @@ async function inject() {
       if (ident === 'fragment-search') {
         return await iPerformerFragmentsPage();
       }
-
-      // Search performer by URL page
-      if (ident === 'url-search') {
-        return await iPerformerURLSearchPage();
-      }
     }
 
     // Home page
@@ -687,8 +682,6 @@ details.backlog-fragment > summary:only-child {
         makeLink('/backlog/fragments-ready', 'Performers with ready fragments'),
         hr.cloneNode(),
         makeLink('/backlog/fragment-search', 'Performer Fragments Search Page'),
-        hr.cloneNode(),
-        makeLink('/backlog/url-search', '[\u{03B1}] Performer URL Search Page'),
       );
     }
   }
@@ -6447,132 +6440,6 @@ details.backlog-fragment > summary:only-child {
     renderList();
 
   } // iPerformerFragmentsPage
-
-  async function iPerformerURLSearchPage() {
-    const main = /** @type {HTMLDivElement} */ (await elementReadyIn('.NarrowPage', 200));
-    if (!main) {
-      alert('failed to construct page');
-      return;
-    }
-
-    toggleBacklogInfo(false);
-    document.title = `Performer URL Search | ${document.title}`;
-
-    const performers = document.createElement('div');
-    main.appendChild(performers);
-
-    const performersHeader = document.createElement('h3');
-    performersHeader.innerText = 'Performer URL Search';
-    performers.appendChild(performersHeader);
-
-    const subTitle = document.createElement('h5');
-    subTitle.innerText = 'Input performer link to find performers that match:';
-    performers.appendChild(subTitle);
-
-    const inputWrapper = document.createElement('div');
-    inputWrapper.classList.add('my-2');
-
-    const searchBtn = document.createElement('button');
-    searchBtn.innerText = 'Search';
-    searchBtn.classList.add('font-bold', 'me-2');
-    inputWrapper.appendChild(searchBtn);
-
-    const urlInput = document.createElement('input');
-    urlInput.id = 'urlInput';
-    setStyles(urlInput, { width: '600px' });
-    inputWrapper.appendChild(urlInput);
-
-    performers.appendChild(inputWrapper);
-
-    const results = document.createElement('h4');
-    results.innerText = '';
-    performers.appendChild(results);
-
-    const performersList = document.createElement('ol');
-    performers.appendChild(performersList);
-
-    window.addEventListener(locationChanged, () => performers.remove(), { once: true });
-
-    await wait(0);
-
-    const search = async () => {
-      performersList.innerHTML = '';
-      results.innerHTML = '';
-
-      const url = urlInput.value.trim() || undefined;
-      if (!url)
-        return;
-
-      const query = `query ($url: String!) {
-        queryPerformers(input: {
-          url: $url
-          per_page: 40
-        }) {
-          count
-          performers {
-            id
-            name
-            disambiguation
-            aliases
-            urls {
-              url
-            }
-          }
-        }
-      }`;
-
-      results.innerText = 'Searching...';
-
-      const response = await fetch(
-        `${window.location.origin}/graphql`,
-        {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            variables: { url },
-            query,
-          }),
-        }
-      );
-      const { data, errors } = await response.json();
-
-      if (errors) {
-        results.innerText = `ERROR:\n${JSON.stringify(errors, null, 2)}`
-        console.error(errors);
-        return;
-      }
-
-      const { queryPerformers } = data;
-
-      results.innerText = `Results (${queryPerformers.count}):`;
-
-      for (const result of queryPerformers.performers) {
-        const li = document.createElement('li');
-        const name = formatPerformerName(result);
-        const link = makeLink(`/performers/${result.id}`, `${name} - ${result.id}`, { color: 'var(--bs-teal)' });
-        li.appendChild(link);
-
-        if (result.aliases.length > 0)
-          li.append(document.createElement('br'), result.aliases.join(', '))
-
-        const ul = document.createElement('ul');
-        const urls = /** @type {{ url: string }[]} */ (result.urls);
-        urls.forEach(({ url }) => {
-          ul.appendChild(makeLink(url, undefined, { display: 'list-item', color: 'var(--bs-yellow)' }));
-        });
-        li.appendChild(ul);
-        performersList.appendChild(li);
-      }
-    };
-
-    searchBtn.addEventListener('click', search);
-    urlInput.addEventListener('keypress', function (event) {
-      if (event.key === 'Enter') {
-        search();
-      }
-    });
-
-  } // iPerformerURLSearchPage
 }
 
 // Based on: https://dirask.com/posts/JavaScript-on-location-changed-event-on-url-changed-event-DKeyZj
