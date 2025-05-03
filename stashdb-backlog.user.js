@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.39.7
+// @version     1.39.8
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -2954,8 +2954,8 @@ details.backlog-fragment > summary:only-child {
       if (markerDataset.backlogInjected) return;
 
       /** @type {HTMLDivElement | null} */
-      let director = (sceneFooter.querySelector(':scope > div:last-of-type'));
-      if (!director || !/^Director:/.test(director.innerText)) {
+      let director = (Array.from(sceneFooter.querySelectorAll('div')).find((el) => /^Director:/.test(el.innerText)));
+      if (!director) {
         const newDirector = document.createElement('b');
         newDirector.innerText = found.director;
         director = document.createElement('div');
@@ -2982,8 +2982,8 @@ details.backlog-fragment > summary:only-child {
       if (markerDataset.backlogInjected) return;
 
       /** @type {HTMLDivElement | null} */
-      let code = (sceneFooter.querySelector(':scope > div:last-of-type'));
-      if (!code || !/^Studio Code:/.test(code.innerText)) {
+      let code = (Array.from(sceneFooter.querySelectorAll('div')).find((el) => /^Studio Code:/.test(el.innerText)));
+      if (!code) {
         const newCode = document.createElement('b');
         newCode.innerText = found.code;
         code = document.createElement('div');
