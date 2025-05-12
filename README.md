@@ -1,6 +1,6 @@
 # StashDB Backlog Userscript
 
-This userscript is used to be able to view pending changes from the StashDB Backlog spreadsheet directly on StashDB.  
+This userscript displays the pending changes from the StashDB Backlog spreadsheet directly on StashDB.  
 The data is usually synced every hour, starting at midnight UTC.
 ## [**INSTALL USERSCRIPT**](https://github.com/peolic/stashdb-backlog-userscript/raw/HEAD/stashdb-backlog.user.js)
 
