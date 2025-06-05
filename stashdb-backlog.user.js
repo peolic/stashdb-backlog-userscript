@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.39.9
+// @version     1.39.10
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -11,6 +11,7 @@
 // @grant       GM.deleteValue
 // @grant       GM.xmlHttpRequest
 // @grant       GM.addStyle
+// @sandbox     JavaScript+DOM
 // @connect     github.com
 // @connect     githubusercontent.com
 // @homepageURL https://github.com/peolic/stashdb-backlog-userscript
@@ -861,17 +862,18 @@ details.backlog-fragment > summary:only-child {
   async function getDataLastUpdatedDate() {
     try {
       console.debug('[backlog] fetching last updated date for data');
-      const response = await fetch(
-        'https://api.github.com/repos/peolic/stashdb_backlog_data/releases',
-        { credentials: 'same-origin', referrerPolicy: 'same-origin' },
-      );
-      if (!response.ok) {
-        const body = await response.text();
-        console.error('[backlog] api fetch bad response', response.status, body);
-        return null;
-      }
+      // const response = await fetch(
+      //   'https://api.github.com/repos/peolic/stashdb_backlog_data/releases',
+      //   { credentials: 'same-origin', referrerPolicy: 'same-origin' },
+      // );
+      // if (!response.ok) {
+      //   const body = await response.text();
+      //   console.error('[backlog] api fetch bad response', response.status, body);
+      //   return null;
+      // }
       /** @type {{ tag_name: string, created_at: string, [k: string]: unknown }[]} */
-      const data = await response.json();
+      // const data = await response.json();
+      const data = await request('https://api.github.com/repos/peolic/stashdb_backlog_data/releases', 'json');
       const release = data.find((r) => r.tag_name === 'cache');
       if (!release) throw new Error('cache release not found');
       return new Date(release.created_at);
@@ -3918,10 +3920,8 @@ details.backlog-fragment > summary:only-child {
     (function performerLinks() {
       // Don't show if native links exist (#439)
       const nativeLinks = performerInfo.querySelector('.card + .float-end');
-      if (nativeLinks) {
-        if (isDevUser) nativeLinks.classList.add('d-none');
-        else return;
-      }
+      if (nativeLinks && !isDevUser)
+        return;
 
       // Dev-only
       const header = performerInfo.querySelector('.card-header');
@@ -3990,6 +3990,9 @@ details.backlog-fragment > summary:only-child {
 
       const numColumns = Math.ceil(links.childElementCount / 2);
       setStyles(links, { /* flexBasis: */ width: `calc(${numColumns * .25}rem + ${numColumns * 2}ex)`, /* marginRight: '-.5em' */ position: 'absolute', top: '.5em', right: '.5em' });
+
+      if (nativeLinks)
+        nativeLinks.classList.add('d-none');
     })();
 
     highlightSceneCards('performers');
@@ -4188,7 +4191,7 @@ details.backlog-fragment > summary:only-child {
 
     (function fragments() {
       // merge current links with backlogged links
-      const urls = performerUrls.concat(foundData?.urls || []);
+      const urls = (performerUrls ?? []).concat(foundData?.urls || []);
       const { performerFragments, fragmentIndexMap, possibleLinks } = performerFragmentsByURLsFull({ urls, performerId });
 
       if (performerFragments.length === 0)
