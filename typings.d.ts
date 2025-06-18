@@ -42,7 +42,7 @@ type DataObjectGetters = "type" | "changes";
 
 type SceneChanges = Exclude<keyof SceneDataObject, DataObjectGetters | "comments" | "c_studio">;
 interface SceneDataObject {
-    readonly type: "SceneDataObject";
+    readonly type: "scene";
     get changes(): SceneChanges[];
 
     duplicates?: string[];
@@ -69,7 +69,7 @@ interface SceneDataObject {
 
 type PerformerChanges = Exclude<keyof PerformerDataObject, DataObjectGetters | "urls_notes" | "name">;
 interface PerformerDataObject {
-    readonly type: "PerformerDataObject";
+    readonly type: "performer";
     get changes(): PerformerChanges[];
     readonly scenes?: PerformerScenes[string];
     readonly fragments?: PerformerFragments[string];

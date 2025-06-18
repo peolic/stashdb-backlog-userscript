@@ -1072,7 +1072,7 @@ details.backlog-fragment > summary:only-child {
 
       for (const [sceneId, scene] of Object.entries(this.#data.scenes)) {
         defineProperties(scene, {
-          type: { value: 'SceneDataObject' },
+          type: { value: 'scene' },
           changes: { get() { return dataObjectKeys(/** @type {SceneDataObject} */ (this)); } },
         });
 
@@ -1145,7 +1145,7 @@ details.backlog-fragment > summary:only-child {
           (this.#data.performers[performerId]) = {};
 
         defineProperties(this.#data.performers[performerId], {
-          type: { value: 'PerformerDataObject' },
+          type: { value: 'performer' },
           changes: { get() { return dataObjectKeys(/** @type {PerformerDataObject} */ (this)); } },
           scenes: { value: pScenes, enumerable: true },
           fragments: { value: pFragments, enumerable: true },
@@ -5193,7 +5193,7 @@ details.backlog-fragment > summary:only-child {
 
       const found = getDataFor(object, uuid);
 
-      if (found?.type === 'PerformerDataObject') {
+      if (found?.type === 'performer') {
         if (!found.changes.includes('fragments')) {
           /** @type {{ urls: ScenePerformance_URL[] }} */
           const performerFiber = closestReactProperty(cardLink, 'performer', 4);
@@ -5207,7 +5207,7 @@ details.backlog-fragment > summary:only-child {
       if (!found || found.changes.length === 0)
         return;
 
-      if (found.type === 'PerformerDataObject' && found.changes.length === 1 && found.changes[0] === 'split') {
+      if (found.type === 'performer' && found.changes.length === 1 && found.changes[0] === 'split') {
         // only split and it's already queued for deletion
         if (found.split?.status === SPLIT_STATUS_QUEUED)
           return;
@@ -5216,10 +5216,10 @@ details.backlog-fragment > summary:only-child {
       if (found.changes) {
         const card = /** @type {HTMLDivElement} */ (cardLink.querySelector(':scope > .card'));
         card.style.outline = getHighlightStyle(found.changes);
-        if (found.type === 'SceneDataObject') {
+        if (found.type === 'scene') {
           cardLink.title = `<pending> changes to:\n - ${found.changes.join('\n - ')}\n(click scene to view changes)`;
           sceneCardHighlightChanges(card, found.changes, uuid);
-        } else if (found.type === 'PerformerDataObject') {
+        } else if (found.type === 'performer') {
           cardLink.title = `performer is listed for:\n - ${found.changes.join('\n - ')}\n(click performer for more info)`;
         }
       }
@@ -5590,7 +5590,7 @@ details.backlog-fragment > summary:only-child {
       if (!found || found.changes.length === 0)
         return;
 
-      if (found.type === 'PerformerDataObject') {
+      if (found.type === 'performer') {
         if (!found.changes.includes('fragments') ) {
           /** @type {string[]} */
           const urls = (() => {
