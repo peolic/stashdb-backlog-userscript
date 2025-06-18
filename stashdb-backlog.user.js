@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.39.10
+// @version     1.39.11
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -1271,6 +1271,19 @@ details.backlog-fragment > summary:only-child {
   }
 
   /**
+   * @template {SupportedObject} T
+   * @template {string} I
+   * @param {T} object
+   * @returns {DataCache[T][I]}
+   */
+  function getEmptyData(object) {
+    return defineProperties(/** @type {DataCache[T][I]} */ ({}), {
+      type: { value: /** @type {DataCache[T][I]["type"]} */ (object.slice(0, -1)) },
+      changes: { get() { return dataObjectKeys(this); } },
+    });
+  }
+
+  /**
    * @param {SupportedObject} object
    * @param {string} uuid
    * @returns {boolean | null}
@@ -1858,8 +1871,11 @@ details.backlog-fragment > summary:only-child {
   };
 
   /**
+   * @typedef {PerformerURLFragments[string] & Readonly<{ keys: string[]; count: number }>} PerformerFragmentsByURLsResult
+   */
+  /**
    * @param {{ urls: string[]; performerId?: string|null }} input
-   * @returns {string[]} IDs of performers with fragments
+   * @returns {PerformerFragmentsByURLsResult} IDs of performers with fragments
    */
   const performerFragmentsByURLs = ({ urls, performerId: currentPerformerId }) => {
     if (!Cache.performerURLFragments)
@@ -1873,12 +1889,18 @@ details.backlog-fragment > summary:only-child {
         if (seen.has(url)) return result;
         seen.add(url);
 
-        const matches = Object.keys(Cache.performerURLFragments[url] ?? {});
+        const matches = Cache.performerURLFragments[url];
+        if (!matches)
+          return result;
         // exclude the currently viewed performer (if provided)
-        if (currentPerformerId && matches.includes(currentPerformerId))
-          matches.splice(matches.indexOf(currentPerformerId), 1);
-        return result.concat(matches);
-      }, /** @type {string[]} */ ([]));
+        if (currentPerformerId)
+          delete matches[currentPerformerId];
+        return Object.assign(result, matches);
+      },
+      defineProperties(/** @type {PerformerFragmentsByURLsResult} */ ({}), {
+        keys: { get() { return Object.keys(this); } },
+        count: { get() { return this.keys.length; } },
+      }));
   };
 
   /**
@@ -4377,13 +4399,13 @@ details.backlog-fragment > summary:only-child {
           fragmentSearch.title = 'Search for other fragments...';
           fragmentEl.appendChild(fragmentSearch);
 
-          const relatedFragments = performerFragmentsByURLs({ urls: params.getAll('url'), performerId: fragment.id })
-            .filter((pId) => pId !== performerId);
-          if (relatedFragments.length > 0) {
+          const relatedFragments = performerFragmentsByURLs({ urls: params.getAll('url'), performerId: fragment.id });
+          delete relatedFragments[performerId]; // exclude the current performer
+          if (relatedFragments.count > 0) {
             setStyles(fragmentSearch, { background: 'var(--bs-pink)', borderRadius: '0.25em' });
             fragmentSearch.title += (
-              `\nFound at least ${relatedFragments.length} more fragment${relatedFragments.length === 1 ? '' : 's'}`
-              + ` with matching links/performer ID.\n\n${relatedFragments.join('\n')}`
+              `\nFound at least ${relatedFragments.count} more fragment${relatedFragments.count === 1 ? '' : 's'}`
+              + ` with matching links/performer ID.\n\n${relatedFragments.keys.join('\n')}`
             );
           }
         }
@@ -5192,29 +5214,26 @@ details.backlog-fragment > summary:only-child {
       const { object, ident: uuid } = parsePath(cardLink.href);
       if (!isSupportedObject(object)) return;
 
-      const found = getDataFor(object, uuid);
+      const found = getDataFor(object, uuid) ?? getEmptyData(object);
 
-      if (found?.type === 'performer') {
+      if (found.type === 'performer') {
         if (!found.changes.includes('fragments')) {
           /** @type {{ urls: ScenePerformance_URL[] }} */
           const performerFiber = closestReactProperty(cardLink, 'performer', 4);
           const urls = performerFiber?.urls.map((u) => u.url) || [];
           const fragments = performerFragmentsByURLs({ urls, performerId: uuid });
-          if (fragments.length > 0)
-            found.changes.push('fragments');
+          if (fragments.count > 0)
+            defineProperties(found, { fragments: { value: fragments, enumerable: true } });
+        }
+
+        if (found.changes.length === 1 && found.changes[0] === 'split') {
+          // only split and it's already queued for deletion
+          if (found.split?.status === SPLIT_STATUS_QUEUED)
+            return;
         }
       }
 
-      if (!found || found.changes.length === 0)
-        return;
-
-      if (found.type === 'performer' && found.changes.length === 1 && found.changes[0] === 'split') {
-        // only split and it's already queued for deletion
-        if (found.split?.status === SPLIT_STATUS_QUEUED)
-          return;
-      }
-
-      if (found.changes) {
+      if (found.changes.length > 0) {
         const card = /** @type {HTMLDivElement} */ (cardLink.querySelector(':scope > .card'));
         card.style.outline = getHighlightStyle(found.changes);
         if (found.type === 'scene') {
@@ -5363,23 +5382,22 @@ details.backlog-fragment > summary:only-child {
       else markerDataset.backlogInjected = 'true';
 
       const performerId = parsePath(card.querySelector('a').href).ident;
-      const found = getDataFor('performers', performerId);
+      const found = getDataFor('performers', performerId) ?? getEmptyData('performers');
 
-      const changes = found?.changes ?? [];
-      if (!changes.includes('fragments')) {
+      if (!found.changes.includes('fragments')) {
         /** @type {{ urls: ScenePerformance_URL[] }} */
         const performerFiber = closestReactProperty(card, 'performer', 2);
         const urls = performerFiber?.urls?.map((u) => u.url) || [];
         const fragments = performerFragmentsByURLs({ urls, performerId });
-        if (fragments.length > 0)
-          changes.push('fragments');
+        if (fragments.count > 0)
+          defineProperties(found, { fragments: { value: fragments, enumerable: true } });
       }
 
-      if (!found || changes.length === 0)
+      if (found.changes.length === 0)
         return;
 
-      card.style.outline = getHighlightStyle(changes);
-      const info = `performer is listed for:\n - ${changes.join('\n - ')}\n(click performer for more info)`;
+      card.style.outline = getHighlightStyle(found.changes);
+      const info = `performer is listed for:\n - ${found.changes.join('\n - ')}\n(click performer for more info)`;
       card.title = info;
     });
   }
@@ -5586,13 +5604,10 @@ details.backlog-fragment > summary:only-child {
       if (!isSupportedObject(object)) return;
       const type = object.slice(0, -1);
 
-      const found = getDataFor(object, ident);
-
-      if (!found || found.changes.length === 0)
-        return;
+      const found = getDataFor(object, ident) ?? getEmptyData(object);
 
       if (found.type === 'performer') {
-        if (!found.changes.includes('fragments') ) {
+        if (!found.changes.includes('fragments')) {
           /** @type {string[]} */
           const urls = (() => {
             /** @type {HTMLDivElement} */
@@ -5606,10 +5621,13 @@ details.backlog-fragment > summary:only-child {
             return performerFiber?.urls?.map((u) => u.url) || [];
           })();
           const fragments = performerFragmentsByURLs({ urls, performerId: ident });
-          if (fragments.length > 0)
-            found.changes.push('fragments');
+          if (fragments.count > 0)
+            defineProperties(found, { fragments: { value: fragments, enumerable: true } });
         }
       }
+
+      if (found.changes.length === 0)
+        return;
 
       let backgroundColor = 'var(--bs-warning)';
       if (found.changes.length === 1) {

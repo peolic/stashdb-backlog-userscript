@@ -117,16 +117,14 @@ interface PerformerScenes {
 }
 
 interface PerformerFragments {
-    [uuid: string]: {
-        [performerId: string]: number[]; // v= fragmentIds
-    };
+    [uuid: string]: FragmentIndexMap;
 }
 
 interface PerformerURLFragments {
-    [url: string]: {
-        [performerId: string]: number[]; // v= fragmentIds
-    };
+    [url: string]: FragmentIndexMap;
 }
+
+type FragmentIndexMap = { [performerId: string]: number[] }
 
 interface DynamicDataObject {
     performerScenes: PerformerScenes;
@@ -199,8 +197,6 @@ type FingerprintsRow = {
 
 type SceneEntriesItem = [id: string, data: SceneDataObject]
 type PerformerEntriesItem = [id: string, data: PerformerDataObject]
-
-type FragmentIndexMap = { [performerId: string]: number[] }
 
 
 //#region Stash-Box Models
