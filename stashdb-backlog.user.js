@@ -1056,24 +1056,10 @@ details.backlog-fragment > summary:only-child {
         }
       )();
 
-      /**
-       * @param {DataObject} obj
-       * @param {PropertyDescriptorMap} properties
-       */
-      const defineProperties = (obj, properties) => {
-        /** @type {[keyof DataObject, PropertyDescriptor][]} */
-        (Object.entries(properties)).forEach(([prop, propDef]) => {
-          // ignore property if it already exists, or if its value is falsy (when applicable)
-          if (obj[prop] || ('value' in propDef && !propDef.value))
-            delete properties[prop];
-        });
-        Object.defineProperties(obj, properties);
-      };
-
       for (const [sceneId, scene] of Object.entries(this.#data.scenes)) {
         defineProperties(scene, {
           type: { value: 'scene' },
-          changes: { get() { return dataObjectKeys(/** @type {SceneDataObject} */ (this)); } },
+          changes: { get() { return dataObjectKeys(this); } },
         });
 
         // Performer Scenes
@@ -1146,7 +1132,7 @@ details.backlog-fragment > summary:only-child {
 
         defineProperties(this.#data.performers[performerId], {
           type: { value: 'performer' },
-          changes: { get() { return dataObjectKeys(/** @type {PerformerDataObject} */ (this)); } },
+          changes: { get() { return dataObjectKeys(this); } },
           scenes: { value: pScenes, enumerable: true },
           fragments: { value: pFragments, enumerable: true },
         });
@@ -1293,6 +1279,21 @@ details.backlog-fragment > summary:only-child {
     if (object !== 'scenes' && object !== 'performers') return null;
     return Cache.data.submitted[object].find((i) => i === uuid) !== undefined;
   }
+
+  /**
+   * @template {Record<string, any>} O
+   * @param {O} obj
+   * @param {PropertyDescriptorMap & ThisType<O>} properties
+   * @returns {O}
+   */
+  const defineProperties = (obj, properties) => {
+    Object.entries(properties).forEach(([prop, propDef]) => {
+      // ignore property if it already exists, or if its value is falsy (when applicable)
+      if (obj[prop] || ('value' in propDef && !propDef.value))
+        delete properties[prop];
+    });
+    return Object.defineProperties(obj, properties);
+  };
 
   /**
    * @param {string} url
