@@ -433,6 +433,13 @@ nav:has(.SearchField input[value=""]) .backlog-status-container {
   padding: .5rem;
 }
 
+.scene-backlog-comments > * > a[href] {
+  font-weight: 600;
+}
+.scene-backlog-comments > * > a[href]:not(:hover) {
+  text-decoration: dotted underline;
+}
+
 .backlog-fingerprint {
   background-color: var(--bs-warning);
 }
@@ -1409,7 +1416,9 @@ details.backlog-fragment > summary:only-child {
     return imgRes;
   }
 
-  const urlPattern = /https?:\/\/([\w-]+(?:(?:\.[\w-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])/g;
+  const urlPattern = /(https?:\/\/(?:[\w-]+(?:(?:\.[\w-]+)+))(?:[\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-]))/g;
+  /** capture groups: 1+2 - markdown (text+url), 3 - plain url */
+  const embeddedLinksPattern = new RegExp(String.raw`\[([^\]]+)\]\(([^)]+)\)|${urlPattern.source}`, 'g');
 
   /**
    * All external links are made with `_blank` target.
@@ -1706,6 +1715,33 @@ details.backlog-fragment > summary:only-child {
   };
 
   /**
+   * Parse Markdown links and plain URLs in `text` and embed them as links when inserting into `target`.
+   * @template {HTMLElement} E
+   * @param {string} sourceText
+   * @param {E} targetElement
+   * @returns {E} `targetElement`
+   */
+  const insertTextWithEmbeddedLinks = (sourceText, targetElement) => {
+    let prevIndex = 0;
+    for (const match of sourceText.matchAll(embeddedLinksPattern)) {
+      const [matchedText, text, url, plainURL] = match;
+      const isMarkdownLink = !!text && !!url;
+      const startIndex = match.index;
+      const endIndex = startIndex + matchedText.length;
+      targetElement.append(
+        sourceText.slice(prevIndex, startIndex),
+        isMarkdownLink ? makeLink(url, text) : makeLink(plainURL, undefined),
+      );
+      prevIndex = endIndex;
+    }
+    if (prevIndex === 0)
+      targetElement.innerText = sourceText;
+    else if (prevIndex < sourceText.length)
+      targetElement.append(sourceText.slice(prevIndex));
+    return targetElement;
+  };
+
+  /**
    * @param {string} text
    * @returns {HTMLElement[]}
    */
@@ -1741,8 +1777,10 @@ details.backlog-fragment > summary:only-child {
         i = end;
       }
 
-      const s = document.createElement(del ? 's' : 'span');
-      s.innerText = text.slice(start, end);
+      const s = insertTextWithEmbeddedLinks(
+        text.slice(start, end),
+        document.createElement(del ? 's' : 'span'),
+      );
       out.push(s);
     }
 
@@ -2408,13 +2446,16 @@ details.backlog-fragment > summary:only-child {
       if (markerDataset.backlogInjected) return;
 
       const comments = document.createElement('div');
+      comments.classList.add('scene-backlog-comments');
       setStyles(comments, { padding: '0 .25rem', backgroundColor: '#17a2b8' /* Bootstrap4 info color */ });
 
       found.comments.forEach((comment, index) => {
         if (index > 0) comments.append(document.createElement('br'));
-        const commentElement = /^https?:/.test(comment) ? makeLink(comment) : document.createElement('span');
-        commentElement.innerText = comment;
-        comments.appendChild(commentElement);
+        comments.appendChild(
+          /^https?:/.test(comment)
+            ? makeLink(comment)
+            : insertTextWithEmbeddedLinks(comment, document.createElement('span'))
+        );
       });
 
       sceneHeader.appendChild(comments);
@@ -3930,14 +3971,20 @@ details.backlog-fragment > summary:only-child {
         };
 
         const fauxComment = comments.length === 0 ? [Symbol('Backlog')] : undefined;
-        (fauxComment || comments).forEach((comment, index) => {
+        (fauxComment || comments).forEach((commentRaw, index) => {
           if (index > 0) dd.append(document.createElement('br'));
-          const text = typeof comment === 'string' ? comment : comment.description;
+          const comment = typeof commentRaw === 'string' ? commentRaw : commentRaw.description;
           const commentElement =
-            /^https?:/.test(text)
-              ? makeLink(text, null, { color: 'var(--bs-teal)' })
-              : document.createElement(typeof comment === 'string' ? 'span' : 'code');
-          commentElement.innerText = prefixToName(text) || text;
+            /^https?:/.test(comment)
+              ? makeLink(
+                  comment,
+                  prefixToName(comment) || comment,
+                  { color: 'var(--bs-teal)', whiteSpace: 'break-spaces', wordBreak: 'break-all' },
+                )
+              : insertTextWithEmbeddedLinks(
+                  prefixToName(comment) || comment,
+                  document.createElement(typeof commentRaw === 'string' ? 'span' : 'code'),
+                )
           dd.appendChild(commentElement);
         });
 
