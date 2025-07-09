@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.39.11
+// @version     1.39.12
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -4488,11 +4488,16 @@ details.backlog-fragment > summary:only-child {
 
       const hasDuplicates = document.createElement('div');
       hasDuplicates.dataset.backlog = 'duplicates';
-      hasDuplicates.classList.add('mb-1', 'p-1', 'fw-bold');
+      hasDuplicates.classList.add('mb-1', 'p-1');
 
       const label = document.createElement('span');
       label.innerText = 'This performer has duplicates:';
+      label.classList.add('fw-bold');
       hasDuplicates.appendChild(label);
+
+      const indented = document.createElement('div');
+      setStyles(indented, { marginLeft: '1.75rem' });
+      hasDuplicates.appendChild(indented);
 
       const performerName =
         /** @type {HTMLElement[]} */
@@ -4501,48 +4506,46 @@ details.backlog-fragment > summary:only-child {
       if (performerName !== expectedName) {
         const warning = document.createElement('div');
         warning.classList.add('bg-danger', 'fw-bold');
-        setStyles(warning, { marginLeft: '1.75rem', padding: '.15rem .25rem', width: 'fit-content' });
+        setStyles(warning, { padding: '.15rem .25rem', width: 'fit-content' });
         warning.innerText = `Unexpected performer name - expected "${expectedName}"`;
-        hasDuplicates.appendChild(warning);
+        indented.appendChild(warning);
       }
 
-      const linksSpan = document.createElement('span');
+      const linksDiv = document.createElement('div');
+      linksDiv.classList.add('fw-bold');
 
       const notesDiv = document.createElement('div');
-      setStyles(notesDiv, { marginLeft: '1.75rem', whiteSpace: 'pre-wrap' });
-      notesDiv.classList.add('fw-normal');
+      setStyles(notesDiv, { whiteSpace: 'pre-wrap' });
 
       (notes || []).forEach((note) => {
         if (/^https?:/.test(note)) {
           const siteName = getSiteName(note);
           const link = makeLink(note, `[${siteName}]`, { color: 'var(--bs-yellow)' });
-          link.classList.add('ms-1');
+          link.classList.add('me-1');
           link.title = note;
-          linksSpan.appendChild(link);
+          linksDiv.appendChild(link);
         } else {
           notesDiv.append((notesDiv.textContent ? '\n' : '') + note);
         }
       });
 
-      if (linksSpan.textContent) {
-        label.after(linksSpan);
-      }
-
       if (notesDiv.textContent) {
         notesDiv.prepend('📝 ');
-        hasDuplicates.appendChild(notesDiv);
+        indented.appendChild(notesDiv);
+      }
+
+      if (linksDiv.textContent) {
+        indented.appendChild(linksDiv);
       }
 
       ids.forEach((dupId) => {
         const dupDiv = document.createElement('div');
-        dupDiv.classList.add('fw-normal');
-        dupDiv.style.marginLeft = '1.75rem';
         const a = makeLink(`/performers/${dupId}`, dupId, { color: 'var(--bs-teal)' });
         a.target = '_blank';
         dupDiv.append(a);
 
         if (isMarkedForSplit(dupId)) a.after(' 🔀 needs to be split up');
-        hasDuplicates.append(dupDiv);
+        indented.append(dupDiv);
       });
       const emoji = document.createElement('span');
       emoji.classList.add('me-1');
@@ -4913,7 +4916,7 @@ details.backlog-fragment > summary:only-child {
       if (!foundData.duplicates) return;
       if (backlogDiv.querySelector('[data-backlog="duplicates"]')) return;
 
-      const { ids, notes } = foundData.duplicates;
+      const { ids, name: expectedName, notes } = foundData.duplicates;
 
       /** @param {string} uuid */
       const addPerformer = async (uuid) => {
@@ -4927,62 +4930,82 @@ details.backlog-fragment > summary:only-child {
 
       const hasDuplicates = document.createElement('div');
       hasDuplicates.dataset.backlog = 'duplicates';
-      hasDuplicates.classList.add('mb-1', 'p-1', 'fw-bold');
+      hasDuplicates.classList.add('mb-1', 'p-1');
+
+      const name = document.createElement('div');
+      name.style.width = 'fit-content';
+      name.innerText = `📛 ${expectedName}`;
+      hasDuplicates.appendChild(name);
 
       const label = document.createElement('span');
       label.innerText = 'This performer has duplicates:';
+      label.classList.add('fw-bold');
       hasDuplicates.appendChild(label);
 
-      const linksSpan = document.createElement('span');
+      const emoji = document.createElement('span');
+      emoji.classList.add('me-1');
+      emoji.innerText = '♊';
+      label.before(emoji);
 
-      const infoSpan = document.createElement('span');
-      setStyles(infoSpan, { marginLeft: '1.75rem', whiteSpace: 'pre-wrap' });
-      infoSpan.classList.add('d-inline-block', 'fw-normal');
+      const indented = document.createElement('div');
+      setStyles(indented, { marginLeft: '1.75rem' });
+      hasDuplicates.appendChild(indented);
+
+      const linksDiv = document.createElement('div');
+      linksDiv.classList.add('fw-bold');
+
+      const notesDiv = document.createElement('div');
+      setStyles(notesDiv, { whiteSpace: 'pre-wrap' });
+      notesDiv.classList.add('d-inline-block');
 
       (notes || []).forEach((note) => {
         if (/^https?:/.test(note)) {
           const siteName = getSiteName(note);
           const link = makeLink(note, `[${siteName}]`, { color: 'var(--bs-yellow)' });
-          link.classList.add('ms-1');
+          link.classList.add('me-1');
           link.title = note;
-          linksSpan.appendChild(link);
+          linksDiv.appendChild(link);
           profiles.push(note);
         } else {
-          infoSpan.append((infoSpan.textContent ? '\n' : '') + note);
+          notesDiv.append((notesDiv.textContent ? '\n' : '') + note);
         }
       });
 
-      if (linksSpan.textContent) {
-        label.after(linksSpan);
+      if (notesDiv.textContent) {
+        notesDiv.prepend('📝 ');
+        indented.appendChild(notesDiv);
       }
 
-      if (infoSpan.textContent) {
-        infoSpan.prepend('📝 ');
-        hasDuplicates.append(document.createElement('br'), infoSpan);
+      if (linksDiv.textContent) {
+        indented.appendChild(linksDiv);
       }
+
+      const adders = document.createElement('div');
+      adders.id = 'backlog-duplicate-performer-ids';
+      hasDuplicates.appendChild(adders);
 
       ids.forEach((dupId) => {
-        hasDuplicates.append(document.createElement('br'));
+        const dupDiv = document.createElement('div');
+        setStyles(dupDiv, { marginLeft: '1.5rem' });
 
         const add = document.createElement('span');
-        setStyles(add, { marginLeft: '1.5rem', marginRight: '0.5rem', cursor: 'pointer' });
+        setStyles(add, { marginRight: '0.5rem', cursor: 'pointer' });
         add.innerText = '\u{2795}'; // ➕
         add.addEventListener('click', () => {
           addPerformer(dupId);
         });
-        hasDuplicates.append(add);
+        dupDiv.append(add);
 
         const a = makeLink(`/performers/${dupId}`, dupId, { color: 'var(--bs-teal)' });
         a.target = '_blank';
         a.classList.add('fw-normal');
-        hasDuplicates.append(a);
+        dupDiv.append(a);
+
+        adders.append(dupDiv);
 
         if (isMarkedForSplit(dupId)) a.after(' 🔀 needs to be split up');
       });
-      const emoji = document.createElement('span');
-      emoji.classList.add('me-1');
-      emoji.innerText = '♊';
-      hasDuplicates.prepend(emoji);
+
       backlogDiv.append(hasDuplicates);
     })();
 
@@ -5026,7 +5049,8 @@ details.backlog-fragment > summary:only-child {
       await elementReady('.PerformerForm', performerMerge);
 
       const duplicatesDiv = backlogDiv.querySelector('[data-backlog="duplicates"]');
-      duplicatesDiv.remove();
+      const duplicatesAdders = duplicatesDiv.querySelector('#backlog-duplicate-performer-ids');
+      if (duplicatesAdders) duplicatesAdders.remove();
 
       const list = document.createElement('ul');
       setStyles(list, {
@@ -5048,6 +5072,9 @@ details.backlog-fragment > summary:only-child {
         link.classList.add('text-truncate', 'd-block', 'ms-4');
         li.appendChild(link);
         list.appendChild(li);
+
+        const notesLink = duplicatesDiv.querySelector(`a[href="${link.href}"]`);
+        if (notesLink) notesLink.remove();
       });
 
       profiles.filter((u) => !urls.includes(u)).forEach((url) => {
@@ -5075,15 +5102,10 @@ details.backlog-fragment > summary:only-child {
         link.classList.add('text-truncate', 'd-block', 'ms-4');
         li.appendChild(link);
         list.appendChild(li);
-      });
 
-      if (foundData.duplicates.notes?.length > 0) {
-        const notesDiv = document.createElement('div');
-        setStyles(notesDiv, { whiteSpace: 'pre-wrap' });
-        const textNotes = foundData.duplicates.notes.filter((note) => !/^https?:/.test(note)).join('\n');
-        if (textNotes) notesDiv.append('📝 ', textNotes);
-        backlogDiv.appendChild(notesDiv);
-      }
+        const notesLink = duplicatesDiv.querySelector(`a[href="${link.href}"]`);
+        if (notesLink) notesLink.remove();
+      });
 
       backlogDiv.appendChild(list);
   })();
