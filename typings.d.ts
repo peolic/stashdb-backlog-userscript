@@ -124,12 +124,17 @@ interface PerformerURLFragments {
     [url: string]: FragmentIndexMap;
 }
 
+interface PerformerURLScenes {
+    [url: string]: PerformerScenes[string];
+}
+
 type FragmentIndexMap = { [performerId: string]: number[] }
 
 interface DynamicDataObject {
     performerScenes: PerformerScenes;
     performerFragments: PerformerFragments;
     performerURLFragments: PerformerURLFragments;
+    performerURLScenes: PerformerURLScenes;
 }
 
 interface BaseCache {

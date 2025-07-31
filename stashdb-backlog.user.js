@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.39.12
+// @version     1.40.00
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -934,6 +934,9 @@ details.backlog-fragment > summary:only-child {
     /** @type {PerformerURLFragments | null} */
     static performerURLFragments = null;
 
+    /** @type {PerformerURLScenes | null} */
+    static performerURLScenes = null;
+
     /** @param {boolean} invalidate Force reload of stored data */
     static async getStoredData(invalidate = false) {
       if (!this.#data || invalidate) {
@@ -1041,11 +1044,11 @@ details.backlog-fragment > summary:only-child {
     static async #generateDynamicData() {
       if (!this.#data) return;
 
-      const [{ performerScenes, performerFragments, performerURLFragments }, isCached] = await (
+      const [{ performerScenes, performerFragments, performerURLFragments, performerURLScenes }, isCached] = await (
         async () => {
           const cachedDynamicData = /** @type {DynamicDataObject} */ (await this.#getValue(this.#DK.DYNAMIC));
           /** @type {(keyof DynamicDataObject)[]} */
-          const keys = ['performerScenes', 'performerFragments', 'performerURLFragments'];
+          const keys = ['performerScenes', 'performerFragments', 'performerURLFragments', 'performerURLScenes'];
           const isCached = keys.every((key) => key in cachedDynamicData);
           const data = /** @type {DynamicDataObject} */ (
             isCached
@@ -1066,8 +1069,21 @@ details.backlog-fragment > summary:only-child {
         if (!isCached && scene.performers) {
           for (const [action, entries] of Object.entries(scene.performers)) {
             for (const entry of entries) {
-              if (!entry.id)
+              if (!entry.id) {
+                if (entry.status === 'new') {
+                  // map sanitized performer urls to scene IDs
+                  [entry.status_url].concat(entry.notes).forEach((url) => {
+                    if (!url || !/^https?:\/\//.test(url)) return;
+                    url = sanitizeFragmentURL(url);
+                    if (!performerURLScenes[url])
+                      performerURLScenes[url] = {};
+
+                    performerURLScenes[url][sceneId] =
+                      /** @type {keyof SceneDataObject["performers"]} */ (action);
+                  });
+                }
                 continue;
+              }
               if (!performerScenes[entry.id])
                 performerScenes[entry.id] = {};
 
@@ -1114,7 +1130,7 @@ details.backlog-fragment > summary:only-child {
 
       if (!isCached) {
         /** @type {DynamicDataObject} */
-        const dynamicData = { performerScenes, performerFragments, performerURLFragments };
+        const dynamicData = { performerScenes, performerFragments, performerURLFragments, performerURLScenes };
         this.#setValue(this.#DK.DYNAMIC, dynamicData);
       }
 
@@ -1139,6 +1155,7 @@ details.backlog-fragment > summary:only-child {
       }
 
       this.performerURLFragments = performerURLFragments;
+      this.performerURLScenes = performerURLScenes;
     }
 
     static get data() {
@@ -1977,6 +1994,34 @@ details.backlog-fragment > summary:only-child {
       fragmentIndexMap,
       possibleLinks: Array.from(possibleLinks),
     };
+  };
+
+  /**
+   * @typedef {PerformerURLScenes[string] & Readonly<{ keys: string[]; count: number }>} PerformerScenesByURLsResult
+   */
+  /**
+   * @param {string[]} urls
+   * @returns {PerformerScenesByURLsResult} IDs of scenes with entries containing these urls
+   */
+  const performerScenesByURLs = (urls) => {
+    if (!Cache.performerURLScenes)
+      throw new Error('Unexpected: null performerURLScenes');
+
+    const seen = new Set();
+    return urls.reduce((result, url) => {
+      url = sanitizeFragmentURL(url);
+      if (seen.has(url)) return result;
+      seen.add(url);
+
+      const matches = Cache.performerURLScenes[url];
+      if (!matches)
+        return result;
+      return Object.assign(result, matches);
+    },
+    defineProperties(/** @type {PerformerScenesByURLsResult} */ ({}), {
+      keys: { get() { return Object.keys(this); } },
+      count: { get() { return this.keys.length; } },
+    }));
   };
 
   const SPLIT_STATUS_EMPTY = 'empty - delete performer';
@@ -4055,7 +4100,11 @@ details.backlog-fragment > summary:only-child {
       if (backlogDiv.querySelector('[data-backlog="scene-changes"]')) return;
 
       try {
-        if (!foundData?.scenes) return;
+        const foundScenes = Object.assign(
+          performerScenesByURLs(performerUrls),
+          foundData?.scenes,
+        );
+        if (foundScenes.count === 0) return;
 
         /** @typedef {[sceneId: string, entry: PerformerEntry, studio: string]} performerScene */
         /** @type {Record<keyof SceneDataObject["performers"], performerScene[]>} */
@@ -4063,13 +4112,20 @@ details.backlog-fragment > summary:only-child {
         /** @type {{ [sceneId: string]: true }} */
         const sceneIds = {};
 
-        for (const [sceneId, action] of Object.entries(foundData.scenes)) {
+        for (const [sceneId, action] of Object.entries(foundScenes)) {
           const scene = getDataFor('scenes', sceneId);
           const studio = studioArrayToString(scene.c_studio);
 
           const { append, remove, update } = scene.performers;
           if (action === 'append') {
-            const appendEntry = append.find(({ id }) => id === performerId);
+            const appendEntry = (
+              append.find(({ id }) => id === performerId)
+              ?? append.find((entry) => (
+                entry.status === 'new'
+                && [entry.status_url].concat(entry.notes).some(
+                  (url) => !!url && /^https?:\/\//.test(url) && performerUrls.includes(url))
+              ))
+            );
             performerScenes.append.push([sceneId, appendEntry, studio]);
             sceneIds[sceneId] = true;
           } else if (action === 'remove') {
@@ -4087,30 +4143,6 @@ details.backlog-fragment > summary:only-child {
             performerScenes.update.push([sceneId, updateEntry, studio]);
             sceneIds[sceneId] = true;
           }
-        }
-
-        // Pending scenes by URLs
-        if (performerUrls) {
-          Object.entries(Cache.data.scenes).forEach(([sceneId, { performers, c_studio }]) => {
-            if (sceneIds[sceneId])
-              return;
-
-            const appendEntry = performers?.append.find((entry) => {
-              if (entry.status !== 'new')
-                return false;
-              const backlogUrls = (entry.notes || []).filter((u) => /https?:\/\//.test(u));
-              if (entry.status_url)
-                backlogUrls.splice(0, 0, entry.status_url);
-              return performerUrls.some((url) => backlogUrls.includes(url));
-            });
-
-            if (!appendEntry)
-              return;
-
-            const studio = studioArrayToString(c_studio);
-            performerScenes.append.push([sceneId, appendEntry, studio]);
-            sceneIds[sceneId] = true;
-          });
         }
 
         if (Object.values(performerScenes).every((v) => v.length === 0)) return;
@@ -5406,13 +5438,22 @@ details.backlog-fragment > summary:only-child {
       const performerId = parsePath(card.querySelector('a').href).ident;
       const found = getDataFor('performers', performerId) ?? getEmptyData('performers');
 
-      if (!found.changes.includes('fragments')) {
+      if (!found.changes.includes('fragments') || !found.changes.includes('scenes')) {
         /** @type {{ urls: ScenePerformance_URL[] }} */
         const performerFiber = closestReactProperty(card, 'performer', 2);
         const urls = performerFiber?.urls?.map((u) => u.url) || [];
-        const fragments = performerFragmentsByURLs({ urls, performerId });
-        if (fragments.count > 0)
-          defineProperties(found, { fragments: { value: fragments, enumerable: true } });
+
+        if (!found.changes.includes('fragments')) {
+          const fragments = performerFragmentsByURLs({ urls, performerId });
+          if (fragments.count > 0)
+            defineProperties(found, { fragments: { value: fragments, enumerable: true } });
+        }
+
+        if (!found.changes.includes('scenes')) {
+          const scenes = performerScenesByURLs(urls);
+          if (scenes.count > 0)
+            defineProperties(found, { scenes: { value: scenes, enumerable: true } });
+        }
       }
 
       if (found.changes.length === 0)
@@ -5567,12 +5608,8 @@ details.backlog-fragment > summary:only-child {
           if (status === 'c' && status_url === editUrl)
             return true;
           // by urls
-          if (status === 'new') {
-            const backlogUrls = (notes || []).filter((u) => /https?:\/\//.test(u));
-            if (status_url)
-              backlogUrls.splice(0, 0, status_url);
-            return urls.some((url) => backlogUrls.includes(url));
-          }
+          if (status === 'new')
+            return [status_url].concat(notes).some((url) => !!url && /^https?:\/\//.test(url) && urls.includes(url));
           return false;
         })
       );
