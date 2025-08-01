@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.40.00
+// @version     1.40.01
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -1839,6 +1839,11 @@ details.backlog-fragment > summary:only-child {
     if (siteName === 'indexxx') {
       const obj = parsed.pathname.match(/^\/([a-z]+)\//)?.[1];
       if (obj && obj !== 'm')
+        siteName += ` ${obj}`;
+    }
+    if (siteName === 'imdb') {
+      const obj = parsed.pathname.match(/^\/([a-z]+)\//)?.[1];
+      if (obj && obj !== 'name')
         siteName += ` ${obj}`;
     }
     if (siteName === 'data18') {
