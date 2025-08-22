@@ -3943,6 +3943,8 @@ details.backlog-fragment > summary:only-child {
             site = 'Indexxx';
           } else if (/data18.com\/(content|scenes)\//.test(comment)) {
             site = 'DATA18';
+          } else if (/imdb.com\/title\//.test(comment)) {
+            site = 'IMDb';
           } else {
             return;
           }
