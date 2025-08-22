@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.40.02
+// @version     1.40.03
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -3943,6 +3943,8 @@ details.backlog-fragment > summary:only-child {
             site = 'Indexxx';
           } else if (/data18.com\/(content|scenes)\//.test(comment)) {
             site = 'DATA18';
+          } else if (/imdb.com\/title\//.test(comment)) {
+            site = 'IMDb';
           } else {
             return;
           }
