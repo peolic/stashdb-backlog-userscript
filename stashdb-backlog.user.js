@@ -3715,11 +3715,14 @@ details.backlog-fragment > summary:only-child {
         setStyles(set, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer' });
         set.addEventListener('click', async () => {
           setNativeValue(fieldEl, studioId ? studioId : `"${studioName}"`);
-          await Promise.race([
-            elementReady('.react-select__option', studioSelect),
-            elementReady('.react-select__menu-notice--no-options', studioSelect),
-            wait(2000),
+          const searchMenu = await Promise.race([
+            elementReady('.react-select__option', studioSelect).then(() => true),
+            elementReady('.react-select__menu-notice--no-options', studioSelect).then(() => true),
+            wait(2000).then(() => false),
           ]);
+          if (!searchMenu) {
+            return alert('unable to set studio\nplease copy UUID from the right side and set manually');
+          }
           /** @type {HTMLDivElement[]} */
           const results = (Array.from(studioSelect.querySelectorAll('.react-select__option')));
           if (results.length === 1) results[0].click();
