@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.40.01
+// @version     1.40.02
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -1070,7 +1070,7 @@ details.backlog-fragment > summary:only-child {
           for (const [action, entries] of Object.entries(scene.performers)) {
             for (const entry of entries) {
               if (!entry.id) {
-                if (entry.status === 'new') {
+                if (['new', 'c'].includes(entry.status)) {
                   // map sanitized performer urls to scene IDs
                   [entry.status_url].concat(entry.notes).forEach((url) => {
                     if (!url || !/^https?:\/\//.test(url)) return;
@@ -4129,7 +4129,7 @@ details.backlog-fragment > summary:only-child {
             const appendEntry = (
               append.find(({ id }) => id === performerId)
               ?? append.find((entry) => (
-                entry.status === 'new'
+                ['new', 'c'].includes(entry.status)
                 && [entry.status_url].concat(entry.notes).some(
                   (url) => !!url && /^https?:\/\//.test(url) && performerUrls.includes(url))
               ))
