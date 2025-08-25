@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.40.03
+// @version     1.40.04
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -1863,9 +1863,9 @@ details.backlog-fragment > summary:only-child {
     'https://gayeroticvideoindex.com/video/',
     'https://www.freeones.com/forums/threads/performer-guide-netvideogirls-com.101884/',
     'https://stashdb.org/scenes/',
-    'https://adultempire.com/',
-    'https://adultdvdempire.com/',
-    'https://gaydvdempire.com/',
+    'https://www.adultempire.com/',
+    'https://www.adultdvdempire.com/',
+    'https://www.gaydvdempire.com/',
     'https://vod.aebn.com/',
     'https://straight.aebn.com/',
     'https://gay.aebn.com/'
