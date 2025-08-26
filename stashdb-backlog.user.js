@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.40.04
+// @version     1.40.05
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -3804,10 +3804,28 @@ details.backlog-fragment > summary:only-child {
           imgContainer.prepend(imgRes);
 
           const set = document.createElement('a');
-          set.innerText = 'set field';
+          set.innerText = 'add image';
           setStyles(set, { marginLeft: '.5rem', color: 'var(--bs-yellow)', cursor: 'pointer' });
-          set.addEventListener('click', () => {
+
+          /** @type {HTMLInputElement} */
+          const fieldEl = (sceneForm.querySelector('.EditImages input[type="file"]'));
+          /** @type {HTMLButtonElement[]} */
+          const imageRemoveButtons = (Array.from(sceneForm.querySelectorAll('.ImageInput-remove')));
+          if (!fieldEl && imageRemoveButtons.length === 1) {
+            set.innerText = 'replace image';
+            set.style.color = 'var(--bs-cyan)';
+          }
+
+          set.addEventListener('click', async () => {
             const imagesTab = getTabButton('Images');
+
+            /** @type {HTMLButtonElement[]} */
+            const imageRemoveButtons = (Array.from(sceneForm.querySelectorAll('.ImageInput-remove')));
+            if (imageRemoveButtons.length === 1) {
+              imageRemoveButtons.forEach((btn) => btn.click());
+              await wait(0);
+            }
+
             /** @type {HTMLInputElement} */
             const fieldEl = (sceneForm.querySelector('.EditImages input[type="file"]'));
             if (!fieldEl) {
