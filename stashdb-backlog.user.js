@@ -1668,8 +1668,14 @@ details.backlog-fragment > summary:only-child {
       .find((o) => o.text.localeCompare(site, undefined, { sensitivity: 'accent' }) === 0);
     setNativeValue(siteSelect, linkSite?.value ?? '');
     setNativeValue(inputField, url);
-    if (addButton.disabled) {
+    if (!linkSite?.value || addButton.disabled) {
       getTabButton(addButton).click();
+      await wait(0);
+      inputField.focus();
+      inputField.blur();
+      await wait(0);
+    }
+    if (addButton.disabled) {
       setTimeout(() => alert('unable to add url (add button disabled)'), 0);
       return;
     }
