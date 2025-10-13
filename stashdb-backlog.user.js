@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.40.05
+// @version     1.40.06
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -1720,12 +1720,18 @@ details.backlog-fragment > summary:only-child {
     const out = [];
     let i = 0;
 
-    while (i < text.length) {
+    while (i < text.length && out.length <= text.length) {
       const del = text[i] === '\u{0002}';
       let start, end;
       if (del) {
         start = i + 1;
         end = text.indexOf('\u{0003}', i);
+        if (end === -1) {
+          end = text.indexOf('\n', i);
+          if (end === -1) end = text.length;
+          text = text.slice(0, end) + '\u{0003}' + text.slice(end);
+          console.error('mismatched strikethrough markers:', text.slice(start, end));
+        }
         i = end + 1;
       } else {
         start = i;
