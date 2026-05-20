@@ -3230,11 +3230,14 @@ details.backlog-fragment > summary:only-child {
         fpInfoWrapper.appendChild(fpInfo);
 
         const backlogSheetId = '357846927'; // Fingerprints
-        /** @param {[column: string, label?: string][]} fields */
-        const makeQuery = (fields) => [
+        /**
+         * @param {string} sceneIdColumn
+         * @param {[column: string, label?: string][]} fields
+         */
+        const makeQuery = (sceneIdColumn, fields) => [
               'select',
               fields.map(([c]) => c).join(','),
-              `where F="${sceneId}"`,
+              `where ${sceneIdColumn}="${sceneId}"`,
               'label',
               fields
                 .reduce(
@@ -3246,14 +3249,14 @@ details.backlog-fragment > summary:only-child {
         const quickViewLink = makeLink(
           backlogQuickViewURL(
             backlogSheetId,
-            makeQuery([
-              ['B', 'Done'],
-              ['G', 'Algorithm'],
-              ['H', 'Hash'],
-              ['I', 'Correct Scene ID'],
-              ['J', 'Duration'],
+            makeQuery('E', [
+              ['A', 'Done'],
+              ['F', 'Algorithm'],
+              ['G', 'Hash'],
+              ['H', 'Correct Scene ID'],
+              ['I', 'Duration'],
+              ['J'],
               ['K'],
-              ['L'],
             ]),
           ),
           'quick view',
