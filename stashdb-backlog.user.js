@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        StashDB Backlog
 // @author      peolic
-// @version     1.40.06
+// @version     1.40.07
 // @description Highlights backlogged changes to scenes, performers and other entities on StashDB.org
 // @icon        https://raw.githubusercontent.com/stashapp/stash/v0.24.0/ui/v2.5/public/favicon.png
 // @namespace   https://github.com/peolic
@@ -3223,18 +3223,21 @@ details.backlog-fragment > summary:only-child {
         const fpInfoWrapper = document.createElement('div');
         fpInfoWrapper.dataset.backlog = 'fingerprints';
         fpInfoWrapper.classList.add('position-relative');
-        fpInfoWrapper.style.top = '22px';
+        setStyles(fpInfoWrapper, { top: '22px', right: '120px' });
 
         const fpInfo = document.createElement('div');
         fpInfo.classList.add('position-absolute', 'end-0', 'd-flex', 'flex-column');
         fpInfoWrapper.appendChild(fpInfo);
 
         const backlogSheetId = '357846927'; // Fingerprints
-        /** @param {[column: string, label?: string][]} fields */
-        const makeQuery = (fields) => [
+        /**
+         * @param {string} sceneIdColumn
+         * @param {[column: string, label?: string][]} fields
+         */
+        const makeQuery = (sceneIdColumn, fields) => [
               'select',
               fields.map(([c]) => c).join(','),
-              `where F="${sceneId}"`,
+              `where ${sceneIdColumn}="${sceneId}"`,
               'label',
               fields
                 .reduce(
@@ -3246,14 +3249,14 @@ details.backlog-fragment > summary:only-child {
         const quickViewLink = makeLink(
           backlogQuickViewURL(
             backlogSheetId,
-            makeQuery([
-              ['B', 'Done'],
-              ['G', 'Algorithm'],
-              ['H', 'Hash'],
-              ['I', 'Correct Scene ID'],
-              ['J', 'Duration'],
+            makeQuery('E', [
+              ['A', 'Done'],
+              ['F', 'Algorithm'],
+              ['G', 'Hash'],
+              ['H', 'Correct Scene ID'],
+              ['I', 'Duration'],
+              ['J'],
               ['K'],
-              ['L'],
             ]),
           ),
           'quick view',
