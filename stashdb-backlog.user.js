@@ -3223,7 +3223,7 @@ details.backlog-fragment > summary:only-child {
         const fpInfoWrapper = document.createElement('div');
         fpInfoWrapper.dataset.backlog = 'fingerprints';
         fpInfoWrapper.classList.add('position-relative');
-        fpInfoWrapper.style.top = '22px';
+        setStyles(fpInfoWrapper, { top: '22px', right: '120px' });
 
         const fpInfo = document.createElement('div');
         fpInfo.classList.add('position-absolute', 'end-0', 'd-flex', 'flex-column');
